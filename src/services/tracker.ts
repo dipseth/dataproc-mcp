@@ -36,7 +36,7 @@ export class ClusterTracker {
    * Starts the state save interval if configured
    */
   async initialize(): Promise<void> {
-    console.log('[DEBUG] ClusterTracker: Initializing with config:', this.config);
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] ClusterTracker: Initializing with config:', this.config);
     
     try {
       // Create the state directory if it doesn't exist
@@ -54,7 +54,7 @@ export class ClusterTracker {
         }, this.config.stateSaveInterval);
       }
       
-      console.log('[DEBUG] ClusterTracker: Initialization complete');
+      if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] ClusterTracker: Initialization complete');
     } catch (error) {
       console.error('[ERROR] ClusterTracker: Initialization error:', error);
       throw error;
@@ -99,7 +99,7 @@ export class ClusterTracker {
         this.clusters.set(clusterId, clusterInfo);
       }
       
-      console.log(`[DEBUG] ClusterTracker: Loaded ${this.clusters.size} tracked clusters from state`);
+      if (process.env.LOG_LEVEL === 'debug') console.error(`[DEBUG] ClusterTracker: Loaded ${this.clusters.size} tracked clusters from state`);
     } catch (error) {
       console.error('[ERROR] ClusterTracker: Error loading state:', error);
       throw error;
@@ -120,7 +120,7 @@ export class ClusterTracker {
       // Write the state file
       await fs.writeFile(this.config.stateFilePath, JSON.stringify(state, null, 2), 'utf8');
       
-      console.log('[DEBUG] ClusterTracker: State saved to disk');
+      if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] ClusterTracker: State saved to disk');
     } catch (error) {
       console.error('[ERROR] ClusterTracker: Error saving state:', error);
       throw error;
@@ -153,7 +153,7 @@ export class ClusterTracker {
     
     this.clusters.set(clusterId, trackingInfo);
     
-    console.log(`[DEBUG] ClusterTracker: Tracking cluster ${clusterName} (${clusterId})`);
+    if (process.env.LOG_LEVEL === 'debug') console.error(`[DEBUG] ClusterTracker: Tracking cluster ${clusterName} (${clusterId})`);
   }
   
   /**
@@ -191,7 +191,7 @@ export class ClusterTracker {
     
     if (cluster) {
       this.clusters.delete(clusterId);
-      console.log(`[DEBUG] ClusterTracker: Untracked cluster ${cluster.clusterName} (${clusterId})`);
+      if (process.env.LOG_LEVEL === 'debug') console.error(`[DEBUG] ClusterTracker: Untracked cluster ${cluster.clusterName} (${clusterId})`);
     }
   }
   

@@ -5,6 +5,9 @@
 
 import fetch from 'node-fetch';
 import { getGcloudAccessToken } from '../config/credentials.js';
+import { JobOutputHandler, JobOutputOptions } from './job-output-handler.js';
+import { OutputFormat } from '../types/gcs-types.js';
+import { CacheConfig } from '../types/cache-types.js';
 
 export type DataprocJobType = 'hive' | 'spark' | 'pyspark' | 'presto' | 'pig' | 'hadoop' | 'sparkR' | 'sparkSql';
 
@@ -15,6 +18,23 @@ export interface SubmitDataprocJobOptions {
   jobType: DataprocJobType;
   jobConfig: any;
   async?: boolean;
+}
+
+export interface GetJobResultsOptions extends JobOutputOptions {
+  /**
+   * Whether to wait for job completion
+   */
+  wait?: boolean;
+
+  /**
+   * Custom timeout for waiting (ms)
+   */
+  waitTimeout?: number;
+
+  /**
+   * Expected output format
+   */
+  format?: OutputFormat;
 }
 
 /**
@@ -130,13 +150,56 @@ export async function getDataprocJobStatus(options: { projectId: string, region:
   return await response.json();
 }
 
+// Output handler instance with default cache config
+const outputHandler = new JobOutputHandler();
+
 /**
  * Get Dataproc job results (for jobs that produce output)
  */
-export async function getDataprocJobResults(options: { projectId: string, region: string, jobId: string }): Promise<any> {
-  // For most Dataproc jobs, results are written to GCS or logs; this is a placeholder for future extension.
-  // For now, just return the job details/status.
-  return getDataprocJobStatus(options);
+export async function getDataprocJobResults<T>(
+  options: {
+    projectId: string;
+    region: string;
+    jobId: string;
+  } & GetJobResultsOptions
+): Promise<T> {
+  const { projectId, region, jobId, wait, waitTimeout, format = 'text', ...outputOptions } = options;
+
+  // Wait for job completion if requested
+  if (wait) {
+    const startTime = Date.now();
+    let jobStatus;
+
+    do {
+      jobStatus = await getDataprocJobStatus({ projectId, region, jobId });
+      
+      if (waitTimeout && Date.now() - startTime > waitTimeout) {
+        throw new Error(`Timeout waiting for job completion after ${waitTimeout}ms`);
+      }
+
+      if (jobStatus.status?.state === 'ERROR' || jobStatus.status?.state === 'CANCELLED') {
+        throw new Error(`Job failed with state: ${jobStatus.status?.state}`);
+      }
+
+      if (jobStatus.status?.state !== 'DONE') {
+        await new Promise(res => setTimeout(res, 2000));
+      }
+    } while (jobStatus.status?.state !== 'DONE');
+  }
+
+  // Get job details to find output location
+  const jobDetails = await getDataprocJobStatus({ projectId, region, jobId });
+  
+  if (!jobDetails.driverOutputResourceUri) {
+    throw new Error('No output location found in job details');
+  }
+
+  // Get job output from GCS
+  return outputHandler.getJobOutput<T>(
+    jobDetails.driverOutputResourceUri,
+    format,
+    outputOptions
+  );
 }
 
 /**

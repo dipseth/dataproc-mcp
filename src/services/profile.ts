@@ -36,7 +36,7 @@ export class ProfileManager {
    * Starts the profile scan interval if configured
    */
   async initialize(): Promise<void> {
-    console.log('[DEBUG] ProfileManager: Initializing with config:', this.config);
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] ProfileManager: Initializing with config:', this.config);
     
     try {
       // Create the root config directory if it doesn't exist
@@ -54,7 +54,7 @@ export class ProfileManager {
         }, this.config.profileScanInterval);
       }
       
-      console.log('[DEBUG] ProfileManager: Initialization complete');
+      if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] ProfileManager: Initialization complete');
     } catch (error) {
       console.error('[ERROR] ProfileManager: Initialization error:', error);
       throw error;
@@ -77,7 +77,7 @@ export class ProfileManager {
    * Recursively searches for YAML files and extracts profile information
    */
   async scanProfiles(): Promise<void> {
-    console.log('[DEBUG] ProfileManager: Scanning for profiles in:', this.config.rootConfigPath);
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] ProfileManager: Scanning for profiles in:', this.config.rootConfigPath);
     
     try {
       // Clear existing profiles
@@ -86,7 +86,7 @@ export class ProfileManager {
       // Recursively scan for profiles
       await this.scanDirectory(this.config.rootConfigPath);
       
-      console.log(`[DEBUG] ProfileManager: Found ${this.profiles.size} profiles`);
+      if (process.env.LOG_LEVEL === 'debug') console.error(`[DEBUG] ProfileManager: Found ${this.profiles.size} profiles`);
     } catch (error) {
       console.error('[ERROR] ProfileManager: Error scanning profiles:', error);
       throw error;
@@ -136,7 +136,7 @@ export class ProfileManager {
       // Add the profile to the map
       this.profiles.set(profileInfo.id, profileInfo);
       
-      console.log(`[DEBUG] ProfileManager: Processed profile: ${profileInfo.id}`);
+      if (process.env.LOG_LEVEL === 'debug') console.error(`[DEBUG] ProfileManager: Processed profile: ${profileInfo.id}`);
     } catch (error) {
       console.error(`[ERROR] ProfileManager: Error processing YAML file ${filePath}:`, error);
       // Don't throw, just log the error and continue
@@ -216,10 +216,10 @@ export class ProfileManager {
    * @returns Array of profile information
    */
   getAllProfiles(): ProfileInfo[] {
-    console.log('[DEBUG] ProfileManager.getAllProfiles: Profiles map size:', this.profiles.size);
-    console.log('[DEBUG] ProfileManager.getAllProfiles: Profiles map keys:', Array.from(this.profiles.keys()));
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] ProfileManager.getAllProfiles: Profiles map size:', this.profiles.size);
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] ProfileManager.getAllProfiles: Profiles map keys:', Array.from(this.profiles.keys()));
     const profiles = Array.from(this.profiles.values());
-    console.log('[DEBUG] ProfileManager.getAllProfiles: Returning profiles:', profiles);
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] ProfileManager.getAllProfiles: Returning profiles:', profiles);
     return profiles;
   }
   

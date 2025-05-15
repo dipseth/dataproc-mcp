@@ -91,13 +91,13 @@ export async function readYamlConfig(filePath: string): Promise<YamlClusterConfi
     try {
       // First try traditional format
       const validatedConfig = TraditionalClusterConfigSchema.parse(parsedConfig);
-      console.log('[DEBUG] YAML: Using traditional cluster config format');
+      if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] YAML: Using traditional cluster config format');
       return validatedConfig;
     } catch (traditionalError) {
       try {
         // Then try enhanced format
         const validatedConfig = EnhancedClusterConfigSchema.parse(parsedConfig);
-        console.log('[DEBUG] YAML: Using enhanced cluster config format');
+        if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] YAML: Using enhanced cluster config format');
         return validatedConfig;
       } catch (enhancedError) {
         // If both fail, throw the traditional error for backward compatibility

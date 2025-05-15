@@ -340,7 +340,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
 
         const { projectId, region, clusterName, clusterConfig } = args;
-        console.log('[DEBUG] MCP start_dataproc_cluster: Called with params:', { projectId, region, clusterName, clusterConfig });
+        if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] MCP start_dataproc_cluster: Called with params:', { projectId, region, clusterName, clusterConfig });
 
         let response;
         try {
@@ -350,7 +350,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             String(clusterName),
             clusterConfig as any
           );
-          console.log('[DEBUG] MCP start_dataproc_cluster: createCluster response:', response);
+          if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] MCP start_dataproc_cluster: createCluster response:', response);
         } catch (error) {
           console.error('[DEBUG] MCP start_dataproc_cluster: Error from createCluster:', error);
           throw error;
@@ -422,7 +422,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
         
         const { projectId, region, clusterName } = args;
-        console.log('[DEBUG] MCP get_cluster: Calling getCluster with params:', { projectId, region, clusterName });
+        if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] MCP get_cluster: Calling getCluster with params:', { projectId, region, clusterName });
         
         // Use the same service account for impersonation as in the test script
         const impersonateServiceAccount = 'grpn-sa-terraform-data-science@prj-grp-central-sa-prod-0b25.iam.gserviceaccount.com';
@@ -452,7 +452,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
         
         const { projectId, region, clusterName, jobType, jobConfig, async } = args;
-        console.log('[DEBUG] MCP submit_dataproc_job: Called with params:', { projectId, region, clusterName, jobType, async });
+        if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] MCP submit_dataproc_job: Called with params:', { projectId, region, clusterName, jobType, async });
         
         try {
           const { submitDataprocJob } = await import("./services/job.js");
@@ -488,7 +488,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
         
         const { projectId, region, jobId } = args;
-        console.log('[DEBUG] MCP get_job_status: Called with params:', { projectId, region, jobId });
+        if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] MCP get_job_status: Called with params:', { projectId, region, jobId });
         
         try {
           const { getDataprocJobStatus } = await import("./services/job.js");
@@ -519,7 +519,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
         
         const { projectId, region, jobId } = args;
-        console.log('[DEBUG] MCP get_job_results: Called with params:', { projectId, region, jobId });
+        if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] MCP get_job_results: Called with params:', { projectId, region, jobId });
         
         try {
           const { getDataprocJobResults } = await import("./services/job.js");
@@ -545,7 +545,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       
       case "get_zeppelin_url": {
         const { projectId, region, clusterName } = args;
-        console.log('[DEBUG] MCP get_zeppelin_url: Called with params:', { projectId, region, clusterName });
+        if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] MCP get_zeppelin_url: Called with params:', { projectId, region, clusterName });
         try {
           const { getZeppelinUrl } = await import("./services/job.js");
           const url = getZeppelinUrl(String(projectId), String(region), String(clusterName));
@@ -570,7 +570,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
         
         const { projectId, region, clusterName } = args;
-        console.log('[DEBUG] MCP delete_cluster: Called with params:', { projectId, region, clusterName });
+        if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] MCP delete_cluster: Called with params:', { projectId, region, clusterName });
         
         try {
           const response = await clusterManager.deleteCluster(
@@ -600,7 +600,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
         
         const { projectId, region, profileId, clusterName, overrides } = args;
-        console.log('[DEBUG] MCP create_cluster_from_profile: Called with params:', { projectId, region, profileId, clusterName, overrides });
+        if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] MCP create_cluster_from_profile: Called with params:', { projectId, region, profileId, clusterName, overrides });
         
         try {
           const response = await clusterManager.createClusterFromProfile(
@@ -627,7 +627,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       
       case "list_tracked_clusters": {
         const { profileId } = args;
-        console.log('[DEBUG] MCP list_tracked_clusters: Called with params:', { profileId });
+        if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] MCP list_tracked_clusters: Called with params:', { profileId });
         
         try {
           let trackedClusters;
@@ -654,20 +654,20 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       
       case "list_profiles": {
         const { category } = args;
-        console.log('[DEBUG] MCP list_profiles: Called with params:', { category });
+        if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] MCP list_profiles: Called with params:', { category });
         
         try {
           let profiles;
           
           if (category) {
-            console.log('[DEBUG] MCP list_profiles: Getting profiles by category:', category);
+            if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] MCP list_profiles: Getting profiles by category:', category);
             profiles = clusterManager.getProfilesByCategory(String(category));
           } else {
-            console.log('[DEBUG] MCP list_profiles: Getting all profiles');
+            if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] MCP list_profiles: Getting all profiles');
             profiles = clusterManager.listProfiles();
           }
           
-          console.log('[DEBUG] MCP list_profiles: Found profiles:', profiles);
+          if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] MCP list_profiles: Found profiles:', profiles);
           
           return {
             content: [
@@ -690,7 +690,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
         
         const { profileId } = args;
-        console.log('[DEBUG] MCP get_profile: Called with params:', { profileId });
+        if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] MCP get_profile: Called with params:', { profileId });
         
         try {
           const profile = clusterManager.getProfile(String(profileId));
@@ -736,40 +736,40 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
  * This allows the server to communicate via standard input/output streams.
  */
 async function main() {
-  console.log('[DEBUG] MCP Server: Starting initialization');
+  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] MCP Server: Starting initialization');
   
   try {
     // Check credentials before starting
     const credentials = getCredentialsConfig();
-    console.log('[DEBUG] MCP Server: Using credentials config:', credentials);
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] MCP Server: Using credentials config:', credentials);
     
     // Load server configuration
     const serverConfig = await getServerConfig();
-    console.log('[DEBUG] MCP Server: Using server config:', serverConfig);
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] MCP Server: Using server config:', serverConfig);
     
     // Initialize profile manager
-    console.log('[DEBUG] MCP Server: Initializing ProfileManager');
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] MCP Server: Initializing ProfileManager');
     profileManager = new ProfileManager(serverConfig.profileManager);
     await profileManager.initialize();
     
     // Initialize cluster tracker
-    console.log('[DEBUG] MCP Server: Initializing ClusterTracker');
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] MCP Server: Initializing ClusterTracker');
     clusterTracker = new ClusterTracker(serverConfig.clusterTracker);
     await clusterTracker.initialize();
     
     // Initialize cluster manager
-    console.log('[DEBUG] MCP Server: Initializing ClusterManager');
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] MCP Server: Initializing ClusterManager');
     clusterManager = new ClusterManager(profileManager, clusterTracker);
     
     // Create and configure transport
-    console.log('[DEBUG] MCP Server: Creating StdioServerTransport');
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] MCP Server: Creating StdioServerTransport');
     const transport = new StdioServerTransport();
     
     // Connect server to transport with detailed error handling
-    console.log('[DEBUG] MCP Server: Connecting server to transport');
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] MCP Server: Connecting server to transport');
     await server.connect(transport);
     
-    console.log('[DEBUG] MCP Server: Successfully connected and ready to receive requests');
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] MCP Server: Successfully connected and ready to receive requests');
   } catch (error) {
     console.error('[DEBUG] MCP Server: Initialization error:', error);
     throw error;

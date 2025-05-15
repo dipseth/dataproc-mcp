@@ -70,7 +70,7 @@ export class ClusterManager {
     clusterNameOverride?: string,
     configOverrides?: Partial<ClusterConfig>
   ): Promise<any> {
-    console.log('[DEBUG] ClusterManager: Creating cluster from profile:', profileId);
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] ClusterManager: Creating cluster from profile:', profileId);
     
     // Get the profile
     const profile = this.profileManager.getProfile(profileId);
@@ -128,7 +128,7 @@ export class ClusterManager {
     yamlPath: string,
     overrides?: Partial<ClusterConfig>
   ): Promise<any> {
-    console.log('[DEBUG] ClusterManager: Creating cluster from YAML:', yamlPath);
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] ClusterManager: Creating cluster from YAML:', yamlPath);
     
     // Read the YAML configuration
     const { clusterName } = await getDataprocConfigFromYaml(yamlPath);
@@ -175,7 +175,7 @@ export class ClusterManager {
     pageSize?: number,
     pageToken?: string
   ): Promise<ClusterListResponse> {
-    console.log('[DEBUG] ClusterManager: Listing clusters with tracking info');
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] ClusterManager: Listing clusters with tracking info');
     
     // Get clusters from Dataproc
     const response = await listClusters(
@@ -234,7 +234,7 @@ export class ClusterManager {
     region: string,
     clusterName: string
   ): Promise<any> {
-    console.log('[DEBUG] ClusterManager: Getting cluster with tracking info:', clusterName);
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] ClusterManager: Getting cluster with tracking info:', clusterName);
     
     // Get cluster details from Dataproc
     const cluster = await getCluster(projectId, region, clusterName);
@@ -298,7 +298,7 @@ export class ClusterManager {
     region: string,
     clusterName: string
   ): Promise<any> {
-    console.log('[DEBUG] ClusterManager: Deleting cluster:', clusterName);
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] ClusterManager: Deleting cluster:', clusterName);
     
     try {
       // Get cluster details first to get the UUID
@@ -313,7 +313,7 @@ export class ClusterManager {
         
         if (trackedCluster) {
           this.clusterTracker.untrackCluster(cluster.clusterUuid);
-          console.log(`[DEBUG] ClusterManager: Untracked cluster ${clusterName} (${cluster.clusterUuid})`);
+          if (process.env.LOG_LEVEL === 'debug') console.error(`[DEBUG] ClusterManager: Untracked cluster ${clusterName} (${cluster.clusterUuid})`);
         }
       }
       
