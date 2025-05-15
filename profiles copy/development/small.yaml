@@ -1,0 +1,27 @@
+cluster:
+  name: dev-small-cluster
+  region: us-central1
+  config:
+    masterConfig:
+      numInstances: 1
+      machineTypeUri: n1-standard-2
+      diskConfig:
+        bootDiskType: pd-standard
+        bootDiskSizeGb: 500
+    workerConfig:
+      numInstances: 2
+      machineTypeUri: n1-standard-2
+      diskConfig:
+        bootDiskType: pd-standard
+        bootDiskSizeGb: 500
+    softwareConfig:
+      imageVersion: 2.0-debian10
+      optionalComponents:
+        - JUPYTER
+        - ZEPPELIN
+    initializationActions:
+      - executableFile: gs://goog-dataproc-initialization-actions-us-central1/python/pip-install.sh
+    labels:
+      environment: development
+      size: small
+      purpose: data-processing

@@ -1,0 +1,74 @@
+# Example Dataproc cluster configuration
+# This file demonstrates the full range of configuration options available
+
+cluster:
+  name: example-cluster
+  region: us-central1
+  config:
+    # GCE cluster configuration
+    gceClusterConfig:
+      zoneUri: us-central1-a
+      networkUri: default
+      subnetworkUri: default
+      internalIpOnly: false
+      serviceAccount: default
+      tags:
+        - dataproc
+        - example
+      metadata:
+        custom-metadata: value
+    
+    # Master node configuration
+    masterConfig:
+      numInstances: 1
+      machineTypeUri: n1-standard-4
+      diskConfig:
+        bootDiskSizeGb: 100
+        bootDiskType: pd-ssd
+        numLocalSsds: 0
+    
+    # Worker node configuration
+    workerConfig:
+      numInstances: 2
+      machineTypeUri: n1-standard-4
+      diskConfig:
+        bootDiskSizeGb: 100
+        bootDiskType: pd-standard
+    
+    # Secondary worker configuration (preemptible)
+    secondaryWorkerConfig:
+      numInstances: 0
+      machineTypeUri: n1-standard-2
+      isPreemptible: true
+    
+    # Software configuration
+    softwareConfig:
+      imageVersion: 2.0-debian10
+      optionalComponents:
+        - JUPYTER
+        - ZEPPELIN
+      properties:
+        dataproc:dataproc.allow.zero.workers: "false"
+        spark:spark.executor.memory: "4g"
+        hive:hive.metastore.warehouse.dir: "gs://your-bucket/hive-warehouse"
+    
+    # Initialization actions
+    initializationActions:
+      - executableFile: gs://goog-dataproc-initialization-actions-us-central1/python/pip-install.sh
+        executionTimeout: 600s
+    
+    # Autoscaling configuration (optional)
+    # autoscalingConfig:
+    #   policyUri: projects/your-project/regions/us-central1/autoscalingPolicies/example-policy
+    
+    # Encryption configuration (optional)
+    # encryptionConfig:
+    #   gcePdKmsKeyName: projects/your-project/locations/global/keyRings/ring-name/cryptoKeys/key-name
+    
+    # Endpoint configuration (optional)
+    endpointConfig:
+      enableHttpPortAccess: true
+    
+    # Metastore configuration (optional)
+    # metastoreConfig:
+    #   dataprocMetastoreService: projects/your-project/locations/us-central1/services/metastore-service

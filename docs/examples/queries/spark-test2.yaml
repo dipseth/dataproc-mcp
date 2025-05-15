@@ -1,0 +1,38 @@
+# Dataproc cluster configuration for spark-test2 (test case)
+cluster:
+  name: spark-test2
+  region: us-central1
+  config:
+    gceClusterConfig:
+      # No explicit zone in gcloud command; region is specified
+      subnetworkUri: projects/prj-grp-shared-vpc-prod-2511/regions/us-central1/subnetworks/sub-vpc-prod-sharedvpc01-us-central1-private
+      serviceAccount: loc-sa-pricing-promo-dataproc@prj-grp-data-sci-prod-b425.iam.gserviceaccount.com
+      tags:
+        - allow-google-apis
+        - allow-iap-ssh
+        - dataproc-vm
+      metadata:
+        artifact_urls: "com/groupon/local-intelligence/pricing-composer/v.0.13.051-staging/pricing-composer-v.0.13.051-staging.zip,com/groupon/local-intelligence/RetailPriceOptimization_POC/${GIT_TAG}/RetailPriceOptimization_POC-${GIT_TAG}.zip"
+        key_store_file_name: "mis--dnd-ds-pnp-service.jks"
+        secret_name: "tls--dnd-ds-pnp-service"
+    masterConfig:
+      numInstances: 1
+      machineTypeUri: e2-standard-4
+    workerConfig:
+      numInstances: 3
+    softwareConfig:
+      imageVersion: 2.2-debian
+      optionalComponents:
+        - ZEPPELIN
+      # No explicit properties in gcloud command
+    initializationActions:
+      - executableFile: gs://grpn-dnd-prod-analytics-common/init/load-artifacts.sh
+      - executableFile: gs://grpn-dnd-prod-analytics-common/init/load-certificates.sh
+    endpointConfig:
+      enableHttpPortAccess: true
+    metastoreConfig:
+      dataprocMetastoreService: projects/prj-grp-datalake-prod-8a19/locations/us-central1/services/grpn-dnd-dpms-prod-analytics-3x
+    lifecycleConfig:
+      idleDeleteTtl: 6000s
+    # The following is not standard in Dataproc YAML, but included for completeness
+    # impersonateServiceAccount: grpn-sa-terraform-data-science@prj-grp-central-sa-prod-0b25.iam.gserviceaccount.com

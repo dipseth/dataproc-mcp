@@ -1,0 +1,40 @@
+cluster:
+  name: prod-analysis-cluster
+  region: us-central1
+  config:
+    masterConfig:
+      numInstances: 1
+      machineTypeUri: n1-highmem-8
+      diskConfig:
+        bootDiskType: pd-ssd
+        bootDiskSizeGb: 1000
+    workerConfig:
+      numInstances: 4
+      machineTypeUri: n1-highmem-16
+      diskConfig:
+        bootDiskType: pd-ssd
+        bootDiskSizeGb: 1000
+    secondaryWorkerConfig:
+      numInstances: 2
+      machineTypeUri: n1-highmem-8
+      diskConfig:
+        bootDiskType: pd-standard
+        bootDiskSizeGb: 500
+    softwareConfig:
+      imageVersion: 2.0-debian10
+      properties:
+        "dataproc:dataproc.worker.custom.memory.mb": "49152"
+        "spark:spark.executor.memory": "12g"
+        "spark:spark.driver.memory": "8g"
+      optionalComponents:
+        - JUPYTER
+        - ZEPPELIN
+        - HIVE_WEBHCAT
+    autoscalingConfig:
+      policyUri: projects/your-project-id/regions/us-central1/autoscalingPolicies/high-memory-policy
+    lifecycleConfig:
+      idleDeleteTtl: 3600s
+    labels:
+      environment: production
+      type: high-memory
+      purpose: data-analysis

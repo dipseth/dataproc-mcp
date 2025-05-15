@@ -1,0 +1,89 @@
+# Corrected Dataproc cluster configuration matching the working gcloud command
+
+cluster:
+  name: spark-test2
+  region: us-central1
+  config:
+    gceClusterConfig:
+      subnetworkUri: projects/prj-grp-shared-vpc-prod-2511/regions/us-central1/subnetworks/sub-vpc-prod-sharedvpc01-us-central1-private
+      serviceAccount: loc-sa-pricing-promo-dataproc@prj-grp-data-sci-prod-b425.iam.gserviceaccount.com
+      tags:
+        - allow-google-apis
+        - allow-iap-ssh
+        - dataproc-vm
+      metadata:
+        artifact_urls: "com/groupon/local-intelligence/pricing-composer/v.0.13.051-staging/pricing-composer-v.0.13.051-staging.zip,com/groupon/local-intelligence/RetailPriceOptimization_POC/${GIT_TAG}/RetailPriceOptimization_POC-${GIT_TAG}.zip"
+        key_store_file_name: "mis--dnd-ds-pnp-service.jks"
+        secret_name: "tls--dnd-ds-pnp-service"
+      serviceAccountScopes:
+        - https://www.googleapis.com/auth/cloud-platform
+    masterConfig:
+      numInstances: 1
+      machineTypeUri: e2-standard-8
+    workerConfig:
+      numInstances: 2
+      machineTypeUri: e2-standard-8
+    softwareConfig:
+      imageVersion: 2.2-debian
+      optionalComponents:
+        - ZEPPELIN
+      properties:
+        dataproc:dataproc.logging.stackdriver.enable: "true"
+        dataproc:dataproc.logging.stackdriver.job.driver.enable: "true"
+        dataproc:dataproc.logging.stackdriver.job.yarn.container.enable: "true"
+        dataproc:jobs.file-backed-output.enable: "true"
+        hive:hive.server2.materializedviews.cache.at.startup: "false"
+        dataproc:pip.packages: "google-cloud-storage==3.1.0,google-cloud-secret-manager==2.23.1,pandas==1.3.5,joblib==1.3.2,plotly==5.24.1,seaborn==0.13.2,requests==2.31.0,urllib3==2.3.0,pytz==2024.2,kaleido==0.2.1,psutil==5.9.4,python-dotenv==1.0.0,python-card-framework==2.1.0"
+    initializationActions:
+      - executableFile: gs://grpn-dnd-prod-analytics-common/init/load-artifacts.sh
+      - executableFile: gs://grpn-dnd-prod-analytics-common/init/load-certificates.sh
+    endpointConfig:
+      enableHttpPortAccess: true
+    metastoreConfig:
+      dataprocMetastoreService: projects/prj-grp-datalake-prod-8a19/locations/us-central1/services/grpn-dnd-dpms-prod-analytics-3x
+    lifecycleConfig:
+      idleDeleteTtl: 30001s
+
+cluster_main:
+  name: spark-test2
+  region: us-central1
+  config:
+    gceClusterConfig:
+      zone_uri: us-central1-f
+      subnetworkUri: projects/prj-grp-shared-vpc-prod-2511/regions/us-central1/subnetworks/sub-vpc-prod-sharedvpc01-us-central1-private
+      serviceAccount: loc-sa-pricing-promo-dataproc@prj-grp-data-sci-prod-b425.iam.gserviceaccount.com
+      tags:
+        - allow-google-apis
+        - allow-iap-ssh
+        - dataproc-vm
+      metadata:
+        artifact_urls: "com/groupon/local-intelligence/pricing-composer/v.0.13.051-staging/pricing-composer-v.0.13.051-staging.zip,com/groupon/local-intelligence/RetailPriceOptimization_POC/${GIT_TAG}/RetailPriceOptimization_POC-${GIT_TAG}.zip"
+        key_store_file_name: "mis--dnd-ds-pnp-service.jks"
+        secret_name: "tls--dnd-ds-pnp-service"
+      serviceAccountScopes:
+        - https://www.googleapis.com/auth/cloud-platform
+    masterConfig:
+      numInstances: 1
+      machineTypeUri: e2-standard-8
+    workerConfig:
+      numInstances: 2
+      machineTypeUri: e2-standard-8
+    softwareConfig:
+      imageVersion: 1.5-debian10
+      optionalComponents:
+        - ZEPPELIN
+      properties:
+        dataproc:dataproc.logging.stackdriver.job.driver.enable: "false"
+        dataproc:dataproc.logging.stackdriver.enable: "false"
+        dataproc:jobs.file-backed-output.enable: "true"
+        dataproc:dataproc.logging.stackdriver.job.yarn.container.enable: "true"
+        hive:hive.server2.materializedviews.cache.at.startup: "false"
+    initializationActions:
+      - executableFile: gs://grpn-dnd-prod-analytics-common/init/load-artifacts.sh
+      - executableFile: gs://grpn-dnd-prod-analytics-common/init/load-certificates.sh
+    endpointConfig:
+      enableHttpPortAccess: true
+    metastoreConfig:
+      dataproc_metastore_service: projects/prj-grp-datalake-prod-8a19/locations/us-central1/services/grpn-dpms-prod-analytics
+    lifecycleConfig:
+      idleDeleteTtl: 30001s

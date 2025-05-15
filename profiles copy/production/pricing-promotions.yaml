@@ -1,0 +1,119 @@
+
+prj-grp-data-sci-prod-b425:
+  region: us-central1
+  tags:
+    - DataProc
+    - pricing-n-promotions
+  labels:
+    service: ds-pnp-service
+    owner: dnd-ds-pnp
+    pipeline: unspecified
+  cluster_config:
+    gce_cluster_config:
+      zone_uri: us-central1-f
+      subnetwork_uri: projects/prj-grp-shared-vpc-prod-2511/regions/us-central1/subnetworks/sub-vpc-prod-sharedvpc01-us-central1-private
+      service_account_scopes:
+        - https://www.googleapis.com/auth/cloud-platform
+      service_account: loc-sa-pricing-promo-dataproc@prj-grp-data-sci-prod-b425.iam.gserviceaccount.com
+      # service_account: sa-dataproc-nodes@prj-grp-data-sci-prod-b425.iam.gserviceaccount.com
+      # service_account: grpn-sa-ds-mwaa-dataproc@prj-grp-central-sa-prod-0b25.iam.gserviceaccount.com
+      internal_ip_only: true
+      tags:
+        - allow-iap-ssh
+        - dataproc-vm
+        - allow-google-apis
+      metadata:
+        artifact_urls: com/groupon/local-intelligence/pricing-composer/v.202504.002-staging/pricing-composer-v.202504.002-staging.zip
+        secret_name: tls--dnd-ds-pnp-service
+        key_store_file_name: mis--dnd-ds-pnp-service.jks
+    initialization_actions:
+      - executable_file: gs://grpn-dnd-prod-analytics-common/init/load-artifacts.sh
+      - executable_file: gs://grpn-dnd-prod-analytics-common/init/load-certificates.sh
+    lifecycle_config:
+      idle_delete_ttl:
+        seconds: 600
+    autoscaling_config:
+      policy_uri: projects/prj-grp-data-sci-prod-b425/regions/us-central1/autoscalingPolicies/ds-pnp-local-intelligence-policy
+    master_config:
+      num_instances: 1
+      machine_type_uri: n1-standard-8
+      disk_config:
+        boot_disk_type: pd-standard
+        boot_disk_size_gb: 512
+    worker_config:
+      num_instances: 3
+      machine_type_uri: n1-standard-8
+      disk_config:
+        boot_disk_type: pd-standard
+        boot_disk_size_gb: 512
+    software_config:
+      # optional_components:
+      #   - ZEPPELIN
+      properties:
+        dataproc:dataproc.logging.stackdriver.job.driver.enable: "false"
+        dataproc:dataproc.logging.stackdriver.enable: "false"
+        dataproc:jobs.file-backed-output.enable: "true"
+        dataproc:dataproc.logging.stackdriver.job.yarn.container.enable: "true"
+        hive:hive.server2.materializedviews.cache.at.startup: "false"
+      image_version: 1.5-debian10
+    metastore_config:
+      dataproc_metastore_service: projects/prj-grp-datalake-prod-8a19/locations/us-central1/services/grpn-dpms-prod-analytics
+    endpoint_config:
+      enable_http_port_access: true
+
+
+prj-grp-data-sci-stable-acd6:
+  region: us-central1
+  tags:
+    - DataProc
+    - pricing-n-promotions
+  labels:
+    service: ds-pnp-service
+    owner: dnd-ds-pnp
+    pipeline: unspecified
+  cluster_config:
+    gce_cluster_config:
+      zone_uri: us-central1-f
+      service_account_scopes:
+        - https://www.googleapis.com/auth/cloud-platform
+      subnetwork_uri: projects/prj-grp-shared-vpc-stable-134f/regions/us-central1/subnetworks/sub-vpc-stable-sharedvpc01-us-central1-private
+      service_account: loc-sa-pricing-promo-dataproc@prj-grp-data-sci-stable-acd6.iam.gserviceaccount.com
+      internal_ip_only: true
+      tags:
+        - allow-iap-ssh
+        - dataproc-vm
+        - allow-google-apis
+      metadata:
+        artifact_urls: com/groupon/local-intelligence/pricing-composer/v.202504.002-staging/pricing-composer-v.202504.002-staging.zip
+        secret_name: tls--dnd-ds-pnp-service
+        key_store_file_name: mis--dnd-ds-pnp-service.jks
+    initialization_actions:
+      - executable_file: gs://grpn-dnd-stable-analytics-common/init/load-artifacts.sh
+      - executable_file: gs://grpn-dnd-stable-analytics-common/init/load-certificates.sh
+    lifecycle_config:
+      idle_delete_ttl:
+        seconds: 600
+    master_config:
+      num_instances: 1
+      machine_type_uri: n1-standard-8
+      disk_config:
+        boot_disk_type: pd-standard
+        boot_disk_size_gb: 512
+    worker_config:
+      num_instances: 2
+      machine_type_uri: n1-standard-8
+      disk_config:
+        boot_disk_type: pd-standard
+        boot_disk_size_gb: 512
+    software_config:
+      properties:
+        dataproc:dataproc.logging.stackdriver.job.driver.enable: "true"
+        dataproc:dataproc.logging.stackdriver.enable: "true"
+        dataproc:jobs.file-backed-output.enable: "true"
+        dataproc:dataproc.logging.stackdriver.job.yarn.container.enable: "true"
+        hive:hive.server2.materializedviews.cache.at.startup: "false"
+      image_version: 1.5-debian10
+    metastore_config:
+      dataproc_metastore_service: projects/prj-grp-datalake-stable-dcf6/locations/us-central1/services/grpn-dpms-stable-analytics
+    endpoint_config:
+      enable_http_port_access: true
