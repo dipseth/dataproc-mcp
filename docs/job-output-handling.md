@@ -1,0 +1,134 @@
+# Job Output Handling
+
+This document describes the job output handling functionality implemented for the Dataproc MCP server.
+
+## Overview
+
+The system provides efficient handling of Dataproc job outputs with the following features:
+- GCS file download and caching
+- Multiple output format support (CSV, JSON, text)
+- Size-based hybrid caching strategy
+- Automatic format detection
+- Error handling and retries
+
+## Components
+
+### 1. GCS Service (`src/services/gcs.ts`)
+- Downloads files from Google Cloud Storage
+- Handles file metadata retrieval
+- Implements retry logic and timeout handling
+- Detects output formats
+
+### 2. Cache Manager (`src/services/cache-manager.ts`)
+- Implements size-based caching strategy
+- Manages cache eviction and cleanup
+- Tracks cache statistics
+- Configurable cache limits and TTL
+
+### 3. Output Parser (`src/services/output-parser.ts`)
+- Parses multiple output formats
+- Handles CSV, JSON, and text formats
+- Supports number parsing
+- CSV delimiter customization
+
+### 4. Job Output Handler (`src/services/job-output-handler.ts`)
+- Coordinates between components
+- Manages caching decisions
+- Handles errors and retries
+- Provides high-level API
+
+## Configuration
+
+Default cache configuration:
+```typescript
+{
+  enabled: true,
+  maxFileSize: 52428800, // 50MB per file
+  totalSize: 524288000,  // 500MB total
+  ttl: 14400,           // 4 hours
+  cleanupInterval: 3600 // 1 hour
+}
+```
+
+## Usage
+
+Basic usage with default options:
+```typescript
+const results = await getDataprocJobResults({
+  projectId: 'your-project',
+  region: 'us-central1',
+  jobId: 'job-id',
+  format: 'csv',
+  useCache: true
+});
+```
+
+With custom options:
+```typescript
+const results = await getDataprocJobResults({
+  projectId: 'your-project',
+  region: 'us-central1',
+  jobId: 'job-id',
+  format: 'json',
+  useCache: true,
+  parseNumbers: true,
+  wait: true,
+  waitTimeout: 60000,
+  cacheConfig: {
+    maxFileSize: 10485760, // 10MB
+    ttl: 7200            // 2 hours
+  }
+});
+```
+
+## Testing
+
+Run integration tests:
+```bash
+npm run test:integration
+```
+
+The tests verify:
+- Job submission and result retrieval
+- Caching functionality
+- Size limit enforcement
+- Error handling
+- Format parsing
+
+## Error Handling
+
+The system handles various error scenarios:
+- GCS access issues
+- Invalid file formats
+- Timeout conditions
+- Cache overflow
+- Hash validation failures
+
+Each error type has specific handling and retry logic where appropriate.
+
+## Monitoring
+
+Cache statistics available via `getCacheStats()`:
+- Hit/miss counts
+- Current size usage
+- Eviction counts
+- Total items in cache
+
+## Implementation Notes
+
+1. The caching strategy is optimized for frequent access to recent job outputs while preventing memory overflow.
+
+2. File format detection uses multiple methods:
+   - Content type headers
+   - File extensions
+   - Content inspection
+
+3. Security considerations:
+   - All GCS operations use authorized credentials
+   - Hash validation for file integrity
+   - Timeout protection for long operations
+
+4. Performance optimization:
+   - Streaming downloads for large files
+   - Efficient memory usage in parsers
+   - Cache size limits per file and total

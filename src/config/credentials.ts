@@ -36,10 +36,10 @@ import { IAMCredentialsClient } from '@google-cloud/iam-credentials';
  * @returns Access token from gcloud CLI
  */
 export function getGcloudAccessToken(): string {
-  console.log('[DEBUG] getGcloudAccessToken: Getting token from gcloud CLI');
+  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] getGcloudAccessToken: Getting token from gcloud CLI');
   try {
     const token = execSync('gcloud auth print-access-token', { encoding: 'utf8' }).trim();
-    console.log('[DEBUG] getGcloudAccessToken: Successfully obtained token from gcloud CLI');
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] getGcloudAccessToken: Successfully obtained token from gcloud CLI');
     return token;
   } catch (err) {
     console.error('[DEBUG] getGcloudAccessToken: Error getting token from gcloud CLI:', err);
@@ -63,12 +63,12 @@ export async function createDataprocClient(options: DataprocClientOptions = {}):
   if (region) {
     clientOptions.apiEndpoint = `${region}-dataproc.googleapis.com:443`;
     // Debug log: print the endpoint being used
-    console.log('[DEBUG] createDataprocClient: using apiEndpoint:', clientOptions.apiEndpoint);
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] createDataprocClient: using apiEndpoint:', clientOptions.apiEndpoint);
   }
 
   // Service account impersonation using gcloud CLI token
   if (impersonateServiceAccount) {
-    console.log('[DEBUG] createDataprocClient: using gcloud CLI token with impersonation');
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] createDataprocClient: using gcloud CLI token with impersonation');
     // Get token from gcloud CLI (which will use impersonation from gcloud config)
     const token = getGcloudAccessToken();
     
@@ -82,25 +82,25 @@ export async function createDataprocClient(options: DataprocClientOptions = {}):
     // Use the OAuth2Client as the auth object
     clientOptions.auth = oauth2Client;
     
-    console.log('[DEBUG] createDataprocClient: using OAuth2Client with token from gcloud CLI');
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] createDataprocClient: using OAuth2Client with token from gcloud CLI');
   } else if (useApplicationDefault || !keyFilename) {
     // Do not set auth property; let Dataproc client use ADC by default
-    console.log('[DEBUG] createDataprocClient: using application default credentials (no explicit auth property)');
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] createDataprocClient: using application default credentials (no explicit auth property)');
     // Note: Cannot reliably print the active service account email from ADC at runtime
-    console.log('[DEBUG] (Note) Could not determine active service account email from ADC at runtime');
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] (Note) Could not determine active service account email from ADC at runtime');
   } else if (keyFilename) {
     // Use service account key file
     clientOptions.keyFilename = keyFilename;
-    console.log('[DEBUG] createDataprocClient: using keyFilename:', keyFilename);
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] createDataprocClient: using keyFilename:', keyFilename);
     // Try to print the service account email from the key file
     try {
       const key = await import('fs').then(fs => fs.readFileSync(keyFilename, 'utf8'));
       const keyObj = JSON.parse(key);
       if (keyObj.client_email) {
-        console.log('[DEBUG] Service account from key file:', keyObj.client_email);
+        if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] Service account from key file:', keyObj.client_email);
       }
     } catch (e) {
-      console.log('[DEBUG] Could not read service account email from key file:', (e as any).message);
+      if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] Could not read service account email from key file:', (e as any).message);
     }
   }
 
@@ -129,12 +129,12 @@ export function createJobClient(options: DataprocClientOptions = {}): any {
   // Configure region-specific endpoint if provided
   if (region) {
     clientOptions.apiEndpoint = `${region}-dataproc.googleapis.com:443`;
-    console.log('[DEBUG] createJobClient: using apiEndpoint:', clientOptions.apiEndpoint);
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] createJobClient: using apiEndpoint:', clientOptions.apiEndpoint);
   }
   
   // Service account impersonation using gcloud CLI token
   if (impersonateServiceAccount) {
-    console.log('[DEBUG] createJobClient: using gcloud CLI token with impersonation');
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] createJobClient: using gcloud CLI token with impersonation');
     // Get token from gcloud CLI (which will use impersonation from gcloud config)
     const token = getGcloudAccessToken();
     
@@ -155,10 +155,10 @@ export function createJobClient(options: DataprocClientOptions = {}): any {
     // Use the GoogleAuth instance as the auth object
     clientOptions.auth = auth;
     
-    console.log('[DEBUG] createJobClient: using GoogleAuth with OAuth2Client from gcloud CLI token');
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] createJobClient: using GoogleAuth with OAuth2Client from gcloud CLI token');
   } else if (useApplicationDefault || !keyFilename) {
     // Use application default credentials
-    console.log('[DEBUG] createJobClient: using application default credentials');
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] createJobClient: using application default credentials');
     const auth = new GoogleAuth({
       scopes: ['https://www.googleapis.com/auth/cloud-platform'],
     });
@@ -166,19 +166,19 @@ export function createJobClient(options: DataprocClientOptions = {}): any {
     clientOptions.auth = auth;
   } else if (keyFilename) {
     // Use service account key file
-    console.log('[DEBUG] createJobClient: using keyFilename:', keyFilename);
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] createJobClient: using keyFilename:', keyFilename);
     clientOptions.keyFilename = keyFilename;
   }
   
   // Create and return the client
   // We need to dynamically import this to avoid TypeScript errors
   // since we're using the v1 namespace
-  console.log('[DEBUG] createJobClient: dynamically importing JobControllerClient');
+  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] createJobClient: dynamically importing JobControllerClient');
   
   // Use dynamic import for ES modules compatibility
   return import('@google-cloud/dataproc').then(dataproc => {
     const { JobControllerClient } = dataproc.v1;
-    console.log('[DEBUG] createJobClient: creating JobControllerClient');
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] createJobClient: creating JobControllerClient');
     return new JobControllerClient(clientOptions);
   });
 }

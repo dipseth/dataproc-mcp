@@ -51,7 +51,7 @@ export async function getServerConfig(configPath?: string): Promise<ServerConfig
       // Config file doesn't exist, create it with default config
       await fs.mkdir(path.dirname(filePath), { recursive: true });
       await fs.writeFile(filePath, JSON.stringify(DEFAULT_CONFIG, null, 2), 'utf8');
-      console.log(`[DEBUG] Created default server config at ${filePath}`);
+      if (process.env.LOG_LEVEL === 'debug') console.error(`[DEBUG] Created default server config at ${filePath}`);
       return DEFAULT_CONFIG;
     }
     
@@ -72,7 +72,7 @@ export async function getServerConfig(configPath?: string): Promise<ServerConfig
     };
   } catch (error) {
     console.error(`[ERROR] Error loading server config from ${filePath}:`, error);
-    console.log('[DEBUG] Using default server config');
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] Using default server config');
     return DEFAULT_CONFIG;
   }
 }
@@ -93,7 +93,7 @@ export async function saveServerConfig(config: ServerConfig, configPath?: string
     // Write the config file
     await fs.writeFile(filePath, JSON.stringify(config, null, 2), 'utf8');
     
-    console.log(`[DEBUG] Saved server config to ${filePath}`);
+    if (process.env.LOG_LEVEL === 'debug') console.error(`[DEBUG] Saved server config to ${filePath}`);
   } catch (error) {
     console.error(`[ERROR] Error saving server config to ${filePath}:`, error);
     throw error;

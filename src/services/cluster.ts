@@ -27,7 +27,7 @@ export async function createCluster(
   client?: ClusterControllerClient,
   impersonateServiceAccount?: string
 ): Promise<any> {
-  console.log('[DEBUG] createCluster: Starting with params:', { projectId, region, clusterName });
+  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] createCluster: Starting with params:', { projectId, region, clusterName });
   
   try {
     // Convert our ClusterConfig to the format expected by the Dataproc API
@@ -58,7 +58,7 @@ export async function createCluster(
     const finalConfig = clusterConfig ? apiConfig : defaultConfig;
 
     // Use the REST API directly instead of the client library to avoid authentication issues
-    console.log('[DEBUG] createCluster: Using REST API directly via createClusterWithRest');
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] createCluster: Using REST API directly via createClusterWithRest');
     return await createClusterWithRest(projectId, region, clusterName, finalConfig);
   } catch (error) {
     console.error('[DEBUG] createCluster: Error encountered:', error);
@@ -92,12 +92,12 @@ export async function createClusterWithRest(
   clusterName: string,
   clusterConfig: any
 ): Promise<any> {
-  console.log('[DEBUG] createClusterWithRest: Getting token from gcloud CLI');
+  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] createClusterWithRest: Getting token from gcloud CLI');
   const token = getGcloudAccessToken();
   
   const url = `https://${region}-dataproc.googleapis.com/v1/projects/${projectId}/regions/${region}/clusters`;
   
-  console.log('[DEBUG] createClusterWithRest: Making REST API request to:', url);
+  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] createClusterWithRest: Making REST API request to:', url);
   
   const requestBody = {
     projectId,
@@ -122,7 +122,7 @@ export async function createClusterWithRest(
     }
     
     const result = await response.json();
-    console.log('[DEBUG] createClusterWithRest: API request successful');
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] createClusterWithRest: API request successful');
     return result;
   } catch (error) {
     console.error('[DEBUG] createClusterWithRest: Error:', error);
@@ -153,19 +153,19 @@ export async function createClusterFromYaml(
     const { clusterName, config } = await getDataprocConfigFromYaml(yamlPath);
 
     // Debug log: print resolved clusterName, region, and config
-    console.log('[DEBUG] createClusterFromYaml:');
-    console.log('  clusterName:', clusterName);
-    console.log('  region:', region);
-    console.log('  config:', JSON.stringify(config, null, 2));
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] createClusterFromYaml:');
+    if (process.env.LOG_LEVEL === 'debug') console.error('  clusterName:', clusterName);
+    if (process.env.LOG_LEVEL === 'debug') console.error('  region:', region);
+    if (process.env.LOG_LEVEL === 'debug') console.error('  config:', JSON.stringify(config, null, 2));
     if (overrides) {
-      console.log('  overrides:', JSON.stringify(overrides, null, 2));
+      if (process.env.LOG_LEVEL === 'debug') console.error('  overrides:', JSON.stringify(overrides, null, 2));
     }
 
     // Apply any overrides
     const finalConfig = overrides ? { ...config, ...overrides } : config;
 
     // Use the REST API directly instead of the client library
-    console.log('[DEBUG] createClusterFromYaml: Using REST API directly');
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] createClusterFromYaml: Using REST API directly');
     return await createClusterWithRest(
       projectId,
       region,
@@ -196,11 +196,11 @@ export async function listClusters(
   pageSize?: number,
   pageToken?: string
 ): Promise<ClusterListResponse> {
-  console.log('[DEBUG] listClusters: Starting with params:', { projectId, region, filter, pageSize, pageToken });
+  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] listClusters: Starting with params:', { projectId, region, filter, pageSize, pageToken });
   
   try {
     // Use the REST API directly instead of the client library to avoid authentication issues
-    console.log('[DEBUG] listClusters: Using REST API directly via listClustersWithRest');
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] listClusters: Using REST API directly via listClustersWithRest');
     return await listClustersWithRest(projectId, region, filter, pageSize, pageToken);
   } catch (error) {
     console.error('[DEBUG] listClusters: Error encountered:', error);
@@ -228,7 +228,7 @@ export async function listClustersWithRest(
   pageSize?: number,
   pageToken?: string
 ): Promise<any> {
-  console.log('[DEBUG] listClustersWithRest: Getting token from gcloud CLI');
+  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] listClustersWithRest: Getting token from gcloud CLI');
   const token = getGcloudAccessToken();
   
   // Build the URL with query parameters
@@ -246,7 +246,7 @@ export async function listClustersWithRest(
     url += `?${queryString}`;
   }
   
-  console.log('[DEBUG] listClustersWithRest: Making REST API request to:', url);
+  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] listClustersWithRest: Making REST API request to:', url);
   
   try {
     const response = await fetch(url, {
@@ -264,7 +264,7 @@ export async function listClustersWithRest(
     }
     
     const result = await response.json() as any;
-    console.log('[DEBUG] listClustersWithRest: API request successful');
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] listClustersWithRest: API request successful');
     
     // Transform the response to our format
     const clusterInfos: ClusterInfo[] = (result.clusters || []).map((cluster: any) => ({
@@ -304,12 +304,12 @@ export async function getClusterWithRest(
   region: string,
   clusterName: string
 ): Promise<any> {
-  console.log('[DEBUG] getClusterWithRest: Getting token from gcloud CLI');
+  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] getClusterWithRest: Getting token from gcloud CLI');
   const token = getGcloudAccessToken();
   
   const url = `https://${region}-dataproc.googleapis.com/v1/projects/${projectId}/regions/${region}/clusters/${clusterName}`;
   
-  console.log('[DEBUG] getClusterWithRest: Making REST API request to:', url);
+  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] getClusterWithRest: Making REST API request to:', url);
   
   try {
     const response = await fetch(url, {
@@ -327,7 +327,7 @@ export async function getClusterWithRest(
     }
     
     const result = await response.json();
-    console.log('[DEBUG] getClusterWithRest: API request successful');
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] getClusterWithRest: API request successful');
     return result;
   } catch (error) {
     console.error('[DEBUG] getClusterWithRest: Error:', error);
@@ -351,11 +351,11 @@ export async function getCluster(
   clusterName: string,
   impersonateServiceAccount?: string
 ): Promise<any> {
-  console.log('[DEBUG] getCluster: Starting with params:', { projectId, region, clusterName });
+  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] getCluster: Starting with params:', { projectId, region, clusterName });
   
   try {
     // Use the REST API directly instead of the client library to avoid authentication issues
-    console.log('[DEBUG] getCluster: Using REST API directly via getClusterWithRest');
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] getCluster: Using REST API directly via getClusterWithRest');
     return await getClusterWithRest(projectId, region, clusterName);
   } catch (error) {
     console.error('[DEBUG] getCluster: Error encountered:', error);
@@ -379,12 +379,12 @@ export async function deleteClusterWithRest(
   region: string,
   clusterName: string
 ): Promise<any> {
-  console.log('[DEBUG] deleteClusterWithRest: Getting token from gcloud CLI');
+  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] deleteClusterWithRest: Getting token from gcloud CLI');
   const token = getGcloudAccessToken();
   
   const url = `https://${region}-dataproc.googleapis.com/v1/projects/${projectId}/regions/${region}/clusters/${clusterName}`;
   
-  console.log('[DEBUG] deleteClusterWithRest: Making REST API request to:', url);
+  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] deleteClusterWithRest: Making REST API request to:', url);
   
   try {
     const response = await fetch(url, {
@@ -402,7 +402,7 @@ export async function deleteClusterWithRest(
     }
     
     const result = await response.json();
-    console.log('[DEBUG] deleteClusterWithRest: API request successful');
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] deleteClusterWithRest: API request successful');
     return result;
   } catch (error) {
     console.error('[DEBUG] deleteClusterWithRest: Error:', error);
@@ -425,11 +425,11 @@ export async function deleteCluster(
   region: string,
   clusterName: string
 ): Promise<any> {
-  console.log('[DEBUG] deleteCluster: Starting with params:', { projectId, region, clusterName });
+  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] deleteCluster: Starting with params:', { projectId, region, clusterName });
   
   try {
     // Use the REST API directly instead of the client library to avoid authentication issues
-    console.log('[DEBUG] deleteCluster: Using REST API directly via deleteClusterWithRest');
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] deleteCluster: Using REST API directly via deleteClusterWithRest');
     return await deleteClusterWithRest(projectId, region, clusterName);
   } catch (error) {
     console.error('[DEBUG] deleteCluster: Error encountered:', error);
