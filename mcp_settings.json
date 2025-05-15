@@ -1,0 +1,31 @@
+{
+  "dataproc-server": {
+    "command": "node",
+    "args": [
+      "${workspaceFolder}/build/index.js"
+    ],
+    "disabled": false,
+    "timeout": 60,
+    "alwaysAllow": [
+      "start_dataproc_cluster",
+      "create_cluster_from_yaml",
+      "create_cluster_from_profile",
+      "list_clusters",
+      "list_tracked_clusters",
+      "list_profiles",
+      "get_profile",
+      "get_cluster",
+      "submit_hive_query",
+      "get_query_status",
+      "get_query_results"
+    ],
+    "env": {
+      "DEBUG": "*"
+    },
+    "config": {
+      "profileManager": {
+        "rootConfigPath": "${workspaceFolder}/profiles"
+      }
+    }
+  }
+}
