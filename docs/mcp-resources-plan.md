@@ -44,15 +44,39 @@ To support these resources, we will leverage existing services and introduce a n
 *   **Population**: The cache in `JobOutputHandler` is populated when `getDataprocJobResults` is successfully called.
 *   **Access**: We will extend `JobOutputHandler` to provide a method to retrieve cached results by `jobId`. This will be a temporary resource, as the cache has a TTL.
 
-## 4. MCP Server Integration (`src/index.ts`)
+## 4. Role of Prompts in Guiding LLM Agent for Context Management
+
+The `prompts` capability within the MCP server will be utilized to provide explicit guidance to the LLM agent (me) on how to leverage the `memory` MCP server for tracking and managing operational context. This Dataproc server will *not* directly integrate with the `memory` MCP server; instead, it will provide information that *I* can use to inform my interactions with the `memory` server.
+
+### 4.1. Objective
+
+To instruct the LLM agent to actively use the `memory` MCP server to maintain a persistent, structured record of Dataproc operations (clusters, jobs, outputs), thereby enabling more intelligent and context-aware interactions.
+
+### 4.2. Proposed Prompts
+
+Based on the MCP specification, we will define the following prompts:
+
+*   **`track_new_dataproc_entity`**: Instructs the LLM agent to create entities in the memory server for new Dataproc clusters or jobs.
+*   **`update_dataproc_entity_status`**: Instructs the LLM agent to update the status of existing entities in the memory server.
+*   **`record_dataproc_relationship`**: Instructs the LLM agent to establish relationships between entities in the memory server.
+*   **`store_dataproc_job_results_reference`**: Instructs the LLM agent to store references to job results in the memory server.
+*   **`query_memory_for_dataproc_context`**: Suggests the LLM agent query the memory server for relevant operational context.
+
+### 4.3. Agent's Responsibility
+
+The LLM agent (me) will be responsible for interpreting these prompts and executing the appropriate `memory` MCP server tools to manage its internal context and knowledge graph. This separation of concerns ensures the Dataproc server remains focused on Dataproc operations, while the agent manages its own state and understanding.
+
+## 5. MCP Server Integration (`src/index.ts`)
 
 We will modify `src/index.ts` to:
 
 1.  **Initialize `JobTracker`**: Create an instance of the new `JobTracker` service.
 2.  **Define Resource Capabilities**: Add the new resource URIs to the `server.capabilities.resources` object.
-3.  **Implement Resource Handlers**: Add `server.setRequestHandler` calls for `ReadResourceRequestSchema` to handle requests for these new resources.
+3.  **Implement Resource Handlers**: Add `server.setRequestHandler` calls for `ReadResourceRequestSchema` and `ListResourcesRequestSchema` to handle requests for these new resources.
+4.  **Define Prompt Capabilities**: Populate the `server.capabilities.prompts` object with the guidance prompts for the LLM agent.
+5.  **Implement Prompt Handlers**: Add `server.setRequestHandler` calls for `ListPromptsRequestSchema` and `GetPromptRequestSchema` to handle prompt-related requests.
 
-## 5. Detailed Implementation Steps
+## 6. Detailed Implementation Steps
 
 ### Step 1: Create `src/types/job-tracker.ts` (New File)
 
@@ -143,12 +167,27 @@ export class JobTracker {
 
 ### Step 3: Update `src/index.ts`
 
-1.  **Import `JobTracker`**:
+1.  **Import Required Schemas**:
+    ```typescript
+    import { 
+      CallToolRequestSchema, 
+      ListToolsRequestSchema, 
+      ReadResourceRequestSchema,
+      ListResourcesRequestSchema,
+      ListPromptsRequestSchema,
+      GetPromptRequestSchema,
+      ErrorCode, 
+      McpError 
+    } from "@modelcontextprotocol/sdk/types.js";
+    ```
+
+2.  **Import `JobTracker`**:
     ```typescript
     import { JobTracker } from "./services/job-tracker.js";
     import { JobOutputHandler } from "./services/job-output-handler.js"; // Ensure this is imported
     ```
-2.  **Initialize `jobTracker`**:
+
+3.  **Initialize `jobTracker`**:
     ```typescript
     let profileManager: ProfileManager;
     let clusterTracker: ClusterTracker;
@@ -156,7 +195,8 @@ export class JobTracker {
     let jobTracker: JobTracker; // Add this line
     let jobOutputHandler: JobOutputHandler; // Add this line
     ```
-3.  **Instantiate `JobTracker` and `JobOutputHandler` in `main()`**:
+
+4.  **Instantiate `JobTracker` and `JobOutputHandler` in `main()`**:
     ```typescript
     async function main() {
       // ... existing code ...
@@ -181,7 +221,8 @@ export class JobTracker {
       // ... rest of main function ...
     }
     ```
-4.  **Update Tool Handlers to Use `JobTracker`**:
+
+5.  **Update Tool Handlers to Use `JobTracker`**:
     *   **`submit_dataproc_job`**: After successful submission, add/update job in `jobTracker`.
         ```typescript
         case "submit_dataproc_job": {
@@ -230,7 +271,8 @@ export class JobTracker {
           // ... return content ...
         }
         ```
-5.  **Define Resource Capabilities**: In the `server` initialization, add the `resources` definitions.
+
+6.  **Define Server Capabilities**: In the `server` initialization, add the `resources` and `prompts` definitions.
 
     ```typescript
     const server = new Server(
@@ -241,33 +283,149 @@ export class JobTracker {
       {
         capabilities: {
           resources: {
-            "dataproc://clusters/tracked": {
-              description: "List of Dataproc clusters tracked by this server instance.",
-            },
-            "dataproc://jobs/session": {
-              description: "List of Dataproc jobs submitted by this server instance during the current session.",
-            },
-            "dataproc://job-results/{jobId}": {
-              description: "Full dataset of results for a specific Dataproc job, if available in cache.",
-              parameters: {
-                jobId: { type: "string", description: "The ID of the Dataproc job." },
-              },
-            },
+            // Declare support for resources
+            listChanged: true
           },
           tools: {}, // Existing tools
-          prompts: {},
+          prompts: {
+            // Declare support for prompts
+            listChanged: true
+          },
         },
       }
     );
     ```
 
-6.  **Implement Resource Handlers**: Add `server.setRequestHandler` for `ReadResourceRequestSchema`.
+7.  **Define Prompts**: Create a constant to hold the prompt definitions.
 
     ```typescript
-    import { ReadResourceRequestSchema } from "@modelcontextprotocol/sdk/types.js"; // Add this import
+    // Define available prompts
+    const PROMPTS = {
+      "track_new_dataproc_entity": {
+        name: "track_new_dataproc_entity",
+        description: "Instructs the LLM agent to use the `memory` MCP server to create entities for new Dataproc clusters or jobs.",
+        arguments: [
+          {
+            name: "entityType",
+            description: "Type of entity (e.g., 'Cluster', 'Job').",
+            required: true
+          },
+          {
+            name: "entityName",
+            description: "Name or ID of the entity.",
+            required: true
+          },
+          {
+            name: "properties",
+            description: "Key properties of the entity (e.g., projectId, region, status).",
+            required: true
+          }
+        ]
+      },
+      "update_dataproc_entity_status": {
+        name: "update_dataproc_entity_status",
+        description: "Instructs the LLM agent to update the status of a Dataproc entity in the `memory` MCP server.",
+        arguments: [
+          {
+            name: "entityType",
+            description: "Type of entity (e.g., 'Cluster', 'Job').",
+            required: true
+          },
+          {
+            name: "entityName",
+            description: "Name or ID of the entity.",
+            required: true
+          },
+          {
+            name: "newStatus",
+            description: "The new status of the entity.",
+            required: true
+          }
+        ]
+      },
+      "record_dataproc_relationship": {
+        name: "record_dataproc_relationship",
+        description: "Instructs the LLM agent to record a relationship between Dataproc entities in the `memory` MCP server.",
+        arguments: [
+          {
+            name: "fromEntity",
+            description: "Name of the source entity.",
+            required: true
+          },
+          {
+            name: "toEntity",
+            description: "Name of the target entity.",
+            required: true
+          },
+          {
+            name: "relationshipType",
+            description: "Type of relationship (e.g., 'ran_on', 'produced_output').",
+            required: true
+          }
+        ]
+      },
+      "store_dataproc_job_results_reference": {
+        name: "store_dataproc_job_results_reference",
+        description: "Instructs the LLM agent to store a reference to Dataproc job results in the `memory` MCP server.",
+        arguments: [
+          {
+            name: "jobId",
+            description: "ID of the job.",
+            required: true
+          },
+          {
+            name: "resultSummary",
+            description: "Summary of the results (e.g., first few rows, schema).",
+            required: true
+          },
+          {
+            name: "fullResultURI",
+            description: "URI to the full results (e.g., GCS path).",
+            required: true
+          }
+        ]
+      },
+      "query_memory_for_dataproc_context": {
+        name: "query_memory_for_dataproc_context",
+        description: "Suggests the LLM agent query the `memory` MCP server for relevant Dataproc operational context.",
+        arguments: [
+          {
+            name: "queryHint",
+            description: "Hint for the type of context to query (e.g., 'active clusters', 'job history').",
+            required: true
+          }
+        ]
+      }
+    };
+    ```
 
-    // ... existing code ...
+8.  **Implement Resource Handlers**: Add handlers for `ListResourcesRequestSchema` and `ReadResourceRequestSchema`.
 
+    ```typescript
+    // Handler for listing available resources
+    server.setRequestHandler(ListResourcesRequestSchema, async () => {
+      logger.debug(`MCP ListResources: Received request`);
+      
+      return {
+        resources: [
+          {
+            uri: "dataproc://clusters/tracked",
+            name: "Tracked Clusters",
+            description: "List of Dataproc clusters tracked by this server instance.",
+            mimeType: "application/json"
+          },
+          {
+            uri: "dataproc://jobs/session",
+            name: "Session Jobs",
+            description: "List of Dataproc jobs submitted by this server instance during the current session.",
+            mimeType: "application/json"
+          },
+          // We don't list the parameterized resource here, as it requires a jobId parameter
+        ]
+      };
+    });
+
+    // Handler for reading resource contents
     server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
       const uri = request.params.uri;
       logger.debug(`MCP ReadResource: Received request for URI: ${uri}`);
@@ -276,12 +434,13 @@ export class JobTracker {
       if (uri === "dataproc://clusters/tracked") {
         const trackedClusters = clusterManager.listTrackedClusters();
         return {
-          content: [
+          contents: [
             {
-              type: "json",
-              json: trackedClusters,
-            },
-          ],
+              uri: uri,
+              mimeType: "application/json",
+              text: JSON.stringify(trackedClusters, null, 2)
+            }
+          ]
         };
       }
 
@@ -289,12 +448,13 @@ export class JobTracker {
       if (uri === "dataproc://jobs/session") {
         const sessionJobs = jobTracker.listJobs();
         return {
-          content: [
+          contents: [
             {
-              type: "json",
-              json: sessionJobs,
-            },
-          ],
+              uri: uri,
+              mimeType: "application/json",
+              text: JSON.stringify(sessionJobs, null, 2)
+            }
+          ]
         };
       }
 
@@ -310,12 +470,13 @@ export class JobTracker {
 
           if (cachedResults) {
             return {
-              content: [
+              contents: [
                 {
-                  type: "json",
-                  json: cachedResults,
-                },
-              ],
+                  uri: uri,
+                  mimeType: "application/json",
+                  text: JSON.stringify(cachedResults, null, 2)
+                }
+              ]
             };
           } else {
             throw new McpError(ErrorCode.NotFound, `Job results for ${jobId} not found in cache.`);
@@ -327,6 +488,115 @@ export class JobTracker {
       }
 
       throw new McpError(ErrorCode.NotFound, `Resource not found: ${uri}`);
+    });
+    ```
+
+9.  **Implement Prompt Handlers**: Add handlers for `ListPromptsRequestSchema` and `GetPromptRequestSchema`.
+
+    ```typescript
+    // Handler for listing available prompts
+    server.setRequestHandler(ListPromptsRequestSchema, async () => {
+      logger.debug(`MCP ListPrompts: Received request`);
+      
+      return {
+        prompts: Object.values(PROMPTS)
+      };
+    });
+
+    // Handler for getting a specific prompt
+    server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+      const promptName = request.params.name;
+      const promptArgs = request.params.arguments || {};
+      
+      logger.debug(`MCP GetPrompt: Received request for prompt: ${promptName}`, promptArgs);
+      
+      const prompt = PROMPTS[promptName];
+      if (!prompt) {
+        throw new McpError(ErrorCode.NotFound, `Prompt not found: ${promptName}`);
+      }
+      
+      // Generate prompt messages based on the requested prompt and arguments
+      if (promptName === "track_new_dataproc_entity") {
+        const { entityType, entityName, properties } = promptArgs;
+        return {
+          description: `Track a new ${entityType} entity in the memory MCP server`,
+          messages: [
+            {
+              role: "user",
+              content: {
+                type: "text",
+                text: `Please use the memory MCP server to create a new ${entityType} entity named "${entityName}" with the following properties:\n\n${JSON.stringify(properties, null, 2)}`
+              }
+            }
+          ]
+        };
+      }
+      
+      if (promptName === "update_dataproc_entity_status") {
+        const { entityType, entityName, newStatus } = promptArgs;
+        return {
+          description: `Update the status of a ${entityType} entity in the memory MCP server`,
+          messages: [
+            {
+              role: "user",
+              content: {
+                type: "text",
+                text: `Please use the memory MCP server to update the status of ${entityType} "${entityName}" to "${newStatus}".`
+              }
+            }
+          ]
+        };
+      }
+      
+      if (promptName === "record_dataproc_relationship") {
+        const { fromEntity, toEntity, relationshipType } = promptArgs;
+        return {
+          description: `Record a relationship between entities in the memory MCP server`,
+          messages: [
+            {
+              role: "user",
+              content: {
+                type: "text",
+                text: `Please use the memory MCP server to create a "${relationshipType}" relationship from "${fromEntity}" to "${toEntity}".`
+              }
+            }
+          ]
+        };
+      }
+      
+      if (promptName === "store_dataproc_job_results_reference") {
+        const { jobId, resultSummary, fullResultURI } = promptArgs;
+        return {
+          description: `Store a reference to job results in the memory MCP server`,
+          messages: [
+            {
+              role: "user",
+              content: {
+                type: "text",
+                text: `Please use the memory MCP server to store a reference to the results of job "${jobId}".\n\nSummary: ${resultSummary}\n\nFull results URI: ${fullResultURI}`
+              }
+            }
+          ]
+        };
+      }
+      
+      if (promptName === "query_memory_for_dataproc_context") {
+        const { queryHint } = promptArgs;
+        return {
+          description: `Query the memory MCP server for Dataproc context`,
+          messages: [
+            {
+              role: "user",
+              content: {
+                type: "text",
+                text: `Before proceeding, please query the memory MCP server for relevant context about ${queryHint}.`
+              }
+            }
+          ]
+        };
+      }
+      
+      throw new McpError(ErrorCode.InternalError, `Prompt implementation not found for: ${promptName}`);
     });
     ```
 
@@ -361,27 +631,23 @@ export class JobOutputHandler {
 }
 ```
 
-### 6. Architectural Diagram
+### 7. Architectural Diagram
 ```mermaid
 graph TD
-    subgraph "MCP Server"
+    subgraph "Dataproc MCP Server"
         A["src/index.ts"]
         B["MCP SDK Server"]
         C{"Tool Handlers"}
         D{"Resource Handlers"}
+        P{"Prompt Handlers"}
         
         A --> B
         B --> C
         B --> D
-        C --> E
-        C --> F
-        C --> G
-        D --> E
-        D --> F
-        D --> G
+        B --> P
     end
 
-    subgraph "Services"
+    subgraph "Dataproc Server Services"
         E["ClusterManager"]
         F["JobTracker (New)"]
         G["JobOutputHandler"]
@@ -396,7 +662,7 @@ graph TD
         G --> K
     end
 
-    subgraph "External"
+    subgraph "External Systems"
         L["Google Cloud Dataproc API"]
         M["Google Cloud Storage"]
         
@@ -404,10 +670,24 @@ graph TD
         G --> M
     end
 
-    H --> N["YAML Profiles"]
-    I --> O["State Storage"]
-    K --> P["Job Results Data"]
+    subgraph "LLM Agent (Me)"
+        Q["LLM Agent Logic"]
+        R["Memory MCP Server Tools"]
+        
+        Q --> R
+    end
+
+    H --> O["YAML Profiles"]
+    I --> S["State Storage"]
+    K --> T["Job Results Data"]
+
+    P -- "Guides" --> Q
+    C -- "Provides Data" --> Q
+    D -- "Provides Data" --> Q
 
     style F fill:#bbf,stroke:#333,stroke-width:2px
     style J fill:#bbf,stroke:#333,stroke-width:2px
-```
+    style P fill:#ccf,stroke:#333,stroke-width:2px
+    style Q fill:#cfc,stroke:#333,stroke-width:2px
+    style R fill:#cfc,stroke:#333,stroke-width:2px
+```    
