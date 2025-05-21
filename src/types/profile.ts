@@ -40,6 +40,11 @@ export interface ProfileInfo {
    * Additional metadata for the profile
    */
   metadata?: Record<string, any>;
+
+  /**
+   * Profile-specific parameter overrides
+   */
+  parameters?: Record<string, any>;
 }
 
 /**
@@ -105,6 +110,21 @@ export interface ProfileManagerConfig {
    * How often to scan for profile changes (milliseconds)
    */
   profileScanInterval?: number;
+
+  /**
+   * Default parameter configuration
+   */
+  defaultParameters?: {
+    /**
+     * Environment to use for parameter resolution
+     */
+    environment?: string;
+
+    /**
+     * Whether to validate parameters against definitions
+     */
+    validateParameters?: boolean;
+  };
 }
 
 /**

@@ -141,6 +141,13 @@ export class JobOutputHandler {
     }
     // Special case: if all results have a 'tables' property, merge tables
     if (results.every(r => r && typeof r === 'object' && 'tables' in r)) {
+      // Add diagnostic log to check if results contain rawOutput
+      logger.debug('JobOutputHandler.getJobOutputs: Merging tables from multiple results', {
+        resultCount: results.length,
+        resultsWithRawOutput: results.filter((r: any) => 'rawOutput' in r).length,
+        sampleResultKeys: results.length > 0 ? Object.keys(results[0] as object) : []
+      });
+      
       const allTables = results.flatMap((r: any) => r.tables || []);
       return { tables: allTables } as unknown as T;
     }

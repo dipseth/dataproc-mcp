@@ -3,6 +3,7 @@
  */
 
 import { OutputFormat } from '../types/gcs-types.js';
+import { table, getBorderCharacters } from 'table';
 
 export class ParseError extends Error {
   constructor(
@@ -288,10 +289,11 @@ export class OutputParser {
       rows
     }];
     
-    // Return the processed output
+    // Return the processed output with formatted table
+    const formattedOutput = this.formatTablesOutput(tables);
     return {
       tables,
-      rawOutput: content
+      formattedOutput
     };
   }
   
@@ -390,11 +392,12 @@ export class OutputParser {
     );
     const csvContent = [csvHeader, ...csvRows].join('\n');
     
-    // Return the processed output with CSV
+    // Return the processed output with formatted table and CSV
+    const formattedOutput = this.formatTablesOutput(tables);
     return {
       tables,
       csv: csvContent,
-      rawOutput: content
+      formattedOutput
     };
   }
 
@@ -422,5 +425,74 @@ export class OutputParser {
     }
     
     return obj;
+  }
+
+  /**
+   * Format tables data into a clean, readable ASCII table
+   *
+   * This method transforms structured table data into a formatted ASCII table
+   * representation that's easy to read in console output. It handles multiple
+   * tables, empty tables, and configures the table appearance for optimal readability.
+   *
+   * @param tables Array of table objects with columns and rows
+   * @returns Formatted string representation of the tables
+   */
+  formatTablesOutput(tables: any[]): string {
+    // Handle case with no tables or empty array
+    if (!tables || tables.length === 0) {
+      return 'No table data available';
+    }
+
+    const formattedTables: string[] = [];
+
+    // Process each table in the array
+    for (let i = 0; i < tables.length; i++) {
+      const tableData = tables[i];
+      const { columns, rows } = tableData;
+      
+      // Handle tables with missing columns or rows
+      if (!columns || !rows || rows.length === 0) {
+        formattedTables.push(`Table ${i + 1}: No data`);
+        continue;
+      }
+
+      // Create header row from column names
+      const tableRows: string[][] = [columns];
+      
+      // Transform each data row into an array of string values
+      for (const row of rows) {
+        const rowData: string[] = columns.map((col: string) => {
+          const value = row[col];
+          // Convert values to strings, handling null/undefined as empty strings
+          return value !== undefined && value !== null ? String(value) : '';
+        });
+        tableRows.push(rowData);
+      }
+
+      // Configure table options for clean formatting
+      const tableConfig: any = {
+        // Use 'norc' border style for clean, minimal borders
+        border: getBorderCharacters('norc'),
+        // Add padding around cell content for readability
+        columnDefault: {
+          paddingLeft: 1,
+          paddingRight: 1
+        },
+        // Only draw horizontal lines at the top, after header, and at bottom
+        drawHorizontalLine: (index: number, size: number) => {
+          return index === 0 || index === 1 || index === size;
+        }
+      };
+
+      // Generate the formatted table using the 'table' library
+      const formattedTable = table(tableRows, tableConfig);
+      
+      // Add table number as header if there are multiple tables
+      const tableHeader = tables.length > 1 ? `Table ${i + 1}:\n` : '';
+      formattedTables.push(`${tableHeader}${formattedTable}`);
+    }
+
+    // Join all formatted tables with double newlines between them
+    return formattedTables.join('\n\n');
   }
 }

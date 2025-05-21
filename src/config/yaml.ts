@@ -16,6 +16,7 @@ const TraditionalClusterConfigSchema = z.object({
     name: z.string(),
     region: z.string().optional(),
     config: z.record(z.any()).optional(),
+    parameters: z.record(z.any()).optional(),
   }),
 });
 
@@ -28,6 +29,7 @@ const EnhancedClusterConfigSchema = z.record(z.object({
   labels: z.record(z.string()).optional(),
   cluster_config: z.record(z.any()).optional(),
   clusterConfig: z.record(z.any()).optional(),
+  parameters: z.record(z.any()).optional(),
 }));
 
 export type TraditionalYamlClusterConfig = {
@@ -35,6 +37,7 @@ export type TraditionalYamlClusterConfig = {
     name: string;
     region?: string;
     config?: Record<string, any>;
+    parameters?: Record<string, any>;
   };
 };
 
@@ -45,6 +48,7 @@ export type EnhancedYamlClusterConfig = {
     labels?: Record<string, string>;
     cluster_config?: Record<string, any>;
     clusterConfig?: Record<string, any>;
+    parameters?: Record<string, any>;
   };
 };
 
@@ -128,16 +132,18 @@ export function convertYamlToDataprocConfig(yamlConfig: YamlClusterConfig, fileP
   region?: string;
   config: ClusterConfig;
   labels?: Record<string, string>;
+  parameters?: Record<string, any>;
 } {
   // Check if it's the traditional format
   if ('cluster' in yamlConfig) {
     const traditionalConfig = yamlConfig as TraditionalYamlClusterConfig;
-    const { name, region, config = {} } = traditionalConfig.cluster;
+    const { name, region, config = {}, parameters } = traditionalConfig.cluster;
     
     return {
       clusterName: name,
       region,
       config: config as ClusterConfig,
+      parameters,
     };
   }
   // Enhanced format
@@ -170,6 +176,7 @@ export function convertYamlToDataprocConfig(yamlConfig: YamlClusterConfig, fileP
       region: projectConfig.region,
       config: camelCaseConfig as ClusterConfig,
       labels: projectConfig.labels,
+      parameters: projectConfig.parameters,
     };
   }
 }
@@ -184,6 +191,7 @@ export async function getDataprocConfigFromYaml(filePath: string): Promise<{
   region?: string;
   config: ClusterConfig;
   labels?: Record<string, string>;
+  parameters?: Record<string, any>;
 }> {
   const yamlConfig = await readYamlConfig(filePath);
   return convertYamlToDataprocConfig(yamlConfig, filePath);

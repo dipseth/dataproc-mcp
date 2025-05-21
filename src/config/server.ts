@@ -4,7 +4,14 @@
 
 import fs from 'fs/promises';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { ProfileManagerConfig, ClusterTrackerConfig } from '../types/profile.js';
+
+// Determine the application root directory
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const APP_ROOT = path.resolve(__dirname, '../..');
+console.error(`[DEBUG] Application root directory: ${APP_ROOT}`);
 
 /**
  * Authentication configuration
@@ -36,14 +43,14 @@ export interface ServerConfig {
   authentication?: AuthenticationConfig;
 }
 
-// Default configuration
+// Default configuration with absolute paths
 const DEFAULT_CONFIG: ServerConfig = {
   profileManager: {
-    rootConfigPath: './configs',
+    rootConfigPath: path.join(APP_ROOT, 'profiles'),
     profileScanInterval: 300000, // 5 minutes
   },
   clusterTracker: {
-    stateFilePath: './state/dataproc-state.json',
+    stateFilePath: path.join(APP_ROOT, 'state/dataproc-state.json'),
     stateSaveInterval: 60000, // 1 minute
   },
   authentication: {
@@ -58,8 +65,12 @@ const DEFAULT_CONFIG: ServerConfig = {
  * @returns Server configuration
  */
 export async function getServerConfig(configPath?: string): Promise<ServerConfig> {
-  // Use default config path if not provided
-  const filePath = configPath || './config/server.json';
+  // Use default config path if not provided (now absolute)
+  const filePath = configPath || path.join(APP_ROOT, 'config/server.json');
+  
+  // Log the current working directory and absolute config path for debugging
+  console.error(`[DIAGNOSTIC] Server Config: Current working directory: ${process.cwd()}`);
+  console.error(`[DIAGNOSTIC] Server Config: Absolute config path: ${filePath}`);
   
   try {
     // Check if the config file exists
@@ -105,8 +116,8 @@ export async function getServerConfig(configPath?: string): Promise<ServerConfig
  * @param configPath Path to the configuration file
  */
 export async function saveServerConfig(config: ServerConfig, configPath?: string): Promise<void> {
-  // Use default config path if not provided
-  const filePath = configPath || './config/server.json';
+  // Use default config path if not provided (now absolute)
+  const filePath = configPath || path.join(APP_ROOT, 'config/server.json');
   
   try {
     // Create the config directory if it doesn't exist
