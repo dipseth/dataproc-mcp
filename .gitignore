@@ -3,3 +3,6 @@ build/
 *.log
 .env*
 *.csv
+output/*
+config/server.json
+test-formatted-output.js

@@ -301,7 +301,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           properties: {
             projectId: { type: "string", description: "GCP project ID" },
             region: { type: "string", description: "Dataproc region (e.g., us-central1)" },
-            jobId: { type: "string", description: "Job ID to get results for" }
+            jobId: { type: "string", description: "Job ID to get results for" },
+            maxResults: { type: "number", description: "Optional: Maximum number of rows to display in the response (default: 10)" }
           },
           required: ["projectId", "region", "jobId"],
         },
@@ -518,7 +519,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           throw new McpError(ErrorCode.InvalidParams, "Missing required parameters");
         }
         
-        const { projectId, region, jobId } = args;
+        const { projectId, region, jobId, maxResults } = args;
+        
+        // Use maxResults as maxDisplayRows if provided, otherwise default to 10
+        const maxDisplayRows = maxResults ? Number(maxResults) : 10;
         
         logger.debug('MCP get_job_results: Called with params:', { projectId, region, jobId });
         
@@ -535,7 +539,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             projectId: String(projectId),
             region: String(region),
             jobId: String(jobId),
-            wait: true // Add wait parameter to ensure job completion
+            wait: true, // Add wait parameter to ensure job completion
+            maxDisplayRows // Pass the maxDisplayRows parameter
           });
           
           logger.debug('MCP get_job_results: Results from getDataprocJobResults:', {
@@ -545,22 +550,97 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           });
           
           if (results && typeof results === 'object' && 'parsedOutput' in results) {
-            logger.debug('MCP get_job_results: parsedOutput is present, returning full results');
+            logger.debug('MCP get_job_results: parsedOutput is present, formatting results');
+            
+            // Extract the tables from the parsed output
+            const parsedOutput = results.parsedOutput;
+            let formattedOutput = '';
+            
+            if (parsedOutput && parsedOutput.tables && parsedOutput.tables.length > 0) {
+              // Format as TSV for better readability
+              const table = parsedOutput.tables[0];
+              
+              // Add diagnostic log to check table structure
+              logger.debug('get_job_results: Table structure:', {
+                columnTypes: table.columns.map((col: string) => typeof col),
+                rowCount: table.rows.length,
+                sampleRow: table.rows.length > 0 ? Object.keys(table.rows[0]) : []
+              });
+              
+              // Add the column headers
+              formattedOutput += table.columns.join('\t') + '\n';
+              
+              // Add a separator line
+              formattedOutput += table.columns.map(() => '--------').join('\t') + '\n';
+              
+              // Add the rows (limit to maxDisplayRows for brevity)
+              const maxRows = Math.min(table.rows.length, maxDisplayRows);
+              for (let i = 0; i < maxRows; i++) {
+                const row = table.rows[i];
+                formattedOutput += table.columns.map((col: string) => row[col] || '').join('\t') + '\n';
+              }
+              
+              // Add a note if there are more rows
+              if (table.rows.length > maxDisplayRows) {
+                formattedOutput += `\n... (${table.rows.length - maxDisplayRows} more rows not shown)`;
+              }
+            } else if (parsedOutput && parsedOutput.csv) {
+              // If CSV is available, use that instead
+              const csvLines = parsedOutput.csv.split('\n');
+              const maxLines = Math.min(csvLines.length, maxDisplayRows + 1); // Header + maxDisplayRows rows
+              
+              // Add diagnostic log to check CSV structure
+              logger.debug('get_job_results: CSV structure:', {
+                totalLines: csvLines.length,
+                displayedLines: maxLines,
+                maxDisplayRows,
+                sampleLine: csvLines.length > 0 ? csvLines[0] : '',
+                hasRawOutput: 'rawOutput' in parsedOutput
+              });
+              
+              formattedOutput = csvLines.slice(0, maxLines).join('\n');
+              
+              // Add a note if there are more lines
+              if (csvLines.length > maxLines) {
+                formattedOutput += `\n... (${csvLines.length - maxLines} more rows not shown)`;
+              }
+            }
+            
+            // Include information about the TSV file
+            const tsvFileInfo = results.tsvFilePath
+              ? `\n\nComplete results saved to: ${results.tsvFilePath}`
+              : '';
+            
             return {
               content: [
                 {
                   type: "text",
-                  text: `Job results for ${jobId}:\n${JSON.stringify(results, null, 2)}`,
+                  text: `Job results for ${jobId}:\n\n${formattedOutput}${tsvFileInfo}`,
                 },
               ],
             };
           } else {
-            logger.debug('MCP get_job_results: parsedOutput is missing, returning results with note');
+            logger.debug('MCP get_job_results: parsedOutput is missing, returning basic job info');
+            
+            // Add diagnostic log to check job details structure
+            logger.debug('MCP get_job_results: Job details structure:', {
+              hasRawOutput: 'rawOutput' in results,
+              resultKeys: Object.keys(results),
+              jobType: Object.keys(results).find(key => key.endsWith('Job')) || 'UNKNOWN'
+            });
+            
+            // Return just basic job info without the full details
+            const basicInfo = {
+              jobId: results.jobId || results.reference?.jobId,
+              status: results.status?.state || 'UNKNOWN',
+              jobType: Object.keys(results).find(key => key.endsWith('Job')) || 'UNKNOWN'
+            };
+            
             return {
               content: [
                 {
                   type: "text",
-                  text: `Job results for ${jobId}:\n${JSON.stringify(results, null, 2)}\nNo parsed output available.`,
+                  text: `Job results for ${jobId}:\n${JSON.stringify(basicInfo, null, 2)}\nNo parsed output available.`,
                 },
               ],
             };

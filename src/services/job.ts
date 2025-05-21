@@ -37,6 +37,12 @@ export interface GetJobResultsOptions extends JobOutputOptions {
    * Expected output format
    */
   format?: OutputFormat;
+  
+  /**
+   * Maximum number of rows to display in the response
+   * @default 10
+   */
+  maxDisplayRows?: number;
 }
 
 /**
@@ -162,6 +168,56 @@ const outputHandler = new JobOutputHandler();
 /**
  * Get Dataproc job results (for jobs that produce output)
  */
+/**
+ * Save job results as a TSV file
+ * @param jobId Job ID
+ * @param tables Table data to save
+ * @returns Path to the saved file
+ */
+async function saveResultsAsTsv(jobId: string, tables: any[]): Promise<string> {
+  // Ensure the output directory exists
+  const fs = await import('fs/promises');
+  const path = await import('path');
+  const outputDir = 'output';
+  
+  try {
+    await fs.mkdir(outputDir, { recursive: true });
+  } catch (err) {
+    console.error(`Error creating output directory: ${err}`);
+  }
+  
+  const outputPath = path.join(outputDir, `job-${jobId}-results.tsv`);
+  
+  // If there are no tables or no rows, create an empty file
+  if (!tables || tables.length === 0 || !tables[0].rows || tables[0].rows.length === 0) {
+    await fs.writeFile(outputPath, 'No data available', 'utf8');
+    return outputPath;
+  }
+  
+  // Get the first table (most common case)
+  const table = tables[0];
+  const { columns, rows } = table;
+  
+  // Create TSV content
+  let tsvContent = columns.join('\t') + '\n';
+  
+  // Add all rows
+  for (const row of rows) {
+    const rowValues = columns.map((col: string) => {
+      const value = row[col];
+      // Handle null/undefined values and escape tabs in values
+      return value !== undefined && value !== null
+        ? String(value).replace(/\t/g, ' ') // Replace tabs with spaces
+        : '';
+    });
+    tsvContent += rowValues.join('\t') + '\n';
+  }
+  
+  // Write to file
+  await fs.writeFile(outputPath, tsvContent, 'utf8');
+  return outputPath;
+}
+
 export async function getDataprocJobResults<T>(
   options: {
     projectId: string;
@@ -169,9 +225,18 @@ export async function getDataprocJobResults<T>(
     jobId: string;
   } & GetJobResultsOptions
 ): Promise<T> {
-  const { projectId, region, jobId, wait, waitTimeout, format = 'text', ...outputOptions } = options;
+  const {
+    projectId,
+    region,
+    jobId,
+    wait,
+    waitTimeout,
+    format = 'text',
+    maxDisplayRows = 10,
+    ...outputOptions
+  } = options;
 
-  console.log(`[DEBUG] getDataprocJobResults: Starting with jobId=${jobId}, format=${format}, wait=${wait}`);
+  console.log(`[DEBUG] getDataprocJobResults: Starting with jobId=${jobId}, format=${format}, wait=${wait}, maxDisplayRows=${maxDisplayRows}`);
 
   // Wait for job completion if requested
   if (wait) {
@@ -231,9 +296,40 @@ export async function getDataprocJobResults<T>(
         
         // Check if we got a valid result
         if (parsedOutput) {
+          // Check if parsedOutput has formatted output and add it if missing
+          if (parsedOutput && typeof parsedOutput === 'object' && !('formattedOutput' in parsedOutput)) {
+            // If the output contains tables but no formatted representation,
+            // generate the formatted output using the OutputParser
+            try {
+              const outputParser = new (await import('./output-parser.js')).OutputParser();
+              const typedOutput = parsedOutput as any;
+              
+              // Only attempt to format if tables data is available
+              if (typedOutput.tables) {
+                // Generate a formatted ASCII table representation of the data
+                // This enhances readability for users viewing the results
+                typedOutput.formattedOutput = outputParser.formatTablesOutput(typedOutput.tables);
+              }
+            } catch (formatError) {
+              console.error('[DEBUG] getDataprocJobResults: Error formatting output:', formatError);
+            }
+          }
+          
+          // Save results as TSV if tables data is available
+          let tsvFilePath = '';
+          if (parsedOutput && typeof parsedOutput === 'object' && 'tables' in parsedOutput) {
+            try {
+              tsvFilePath = await saveResultsAsTsv(jobId, (parsedOutput as any).tables);
+              console.log(`[DEBUG] getDataprocJobResults: Saved results to TSV file: ${tsvFilePath}`);
+            } catch (saveError) {
+              console.error('[DEBUG] getDataprocJobResults: Error saving TSV file:', saveError);
+            }
+          }
+          
           return {
             ...jobDetails,
-            parsedOutput
+            parsedOutput,
+            tsvFilePath
           } as unknown as T;
         }
       } catch (directOutputError) {
@@ -271,9 +367,39 @@ export async function getDataprocJobResults<T>(
         
         console.log('[DEBUG] getDataprocJobResults: Successfully processed local output file');
         
+        // Add formatted output to local file parsing results if needed
+        if (parsedOutput && typeof parsedOutput === 'object' && !('formattedOutput' in parsedOutput)) {
+          // For local file parsing, we also want to ensure formatted output is available
+          // This provides consistent behavior regardless of where the data comes from
+          try {
+            const outputParser = new (await import('./output-parser.js')).OutputParser();
+            const typedOutput = parsedOutput as any;
+            
+            if (typedOutput.tables) {
+              // Generate formatted table output for better readability
+              // This uses the same formatting logic as the direct output approach
+              typedOutput.formattedOutput = outputParser.formatTablesOutput(typedOutput.tables);
+            }
+          } catch (formatError) {
+            console.error('[DEBUG] getDataprocJobResults: Error formatting local output:', formatError);
+          }
+        }
+        
+        // Save results as TSV if tables data is available
+        let tsvFilePath = '';
+        if (parsedOutput && typeof parsedOutput === 'object' && 'tables' in parsedOutput) {
+          try {
+            tsvFilePath = await saveResultsAsTsv(jobId, (parsedOutput as any).tables);
+            console.log(`[DEBUG] getDataprocJobResults: Saved results to TSV file: ${tsvFilePath}`);
+          } catch (saveError) {
+            console.error('[DEBUG] getDataprocJobResults: Error saving TSV file:', saveError);
+          }
+        }
+        
         return {
           ...jobDetails,
-          parsedOutput
+          parsedOutput,
+          tsvFilePath
         } as unknown as T;
       } catch (localFileError: any) {
         console.log(`[DEBUG] getDataprocJobResults: Local file not found or error: ${localFileError.message || 'Unknown error'}`);
@@ -335,9 +461,47 @@ export async function getDataprocJobResults<T>(
       logger.debug('getDataprocJobResults: Successfully processed job output, parsedOutput:',
         parsedOutput ? 'present' : 'missing');
       
+      // Add diagnostic log to check if parsedOutput contains rawOutput
+      if (parsedOutput && typeof parsedOutput === 'object') {
+        logger.debug('getDataprocJobResults: parsedOutput structure:', {
+          hasRawOutput: 'rawOutput' in parsedOutput,
+          keys: Object.keys(parsedOutput)
+        });
+      }
+      
+      // Ensure directory-based output also has formatted output
+      if (parsedOutput && typeof parsedOutput === 'object' && !('formattedOutput' in parsedOutput)) {
+        // This is the third approach where we process files from the driverControlFilesUri directory
+        // We still want to provide formatted output for consistency across all approaches
+        try {
+          const outputParser = new (await import('./output-parser.js')).OutputParser();
+          const typedOutput = parsedOutput as any;
+          
+          if (typedOutput.tables) {
+            // Generate formatted output for directory-based results
+            // This ensures all three approaches provide the same enhanced output format
+            typedOutput.formattedOutput = outputParser.formatTablesOutput(typedOutput.tables);
+          }
+        } catch (formatError) {
+          console.error('[DEBUG] getDataprocJobResults: Error formatting directory output:', formatError);
+        }
+      }
+      
+      // Save results as TSV if tables data is available
+      let tsvFilePath = '';
+      if (parsedOutput && typeof parsedOutput === 'object' && 'tables' in parsedOutput) {
+        try {
+          tsvFilePath = await saveResultsAsTsv(jobId, (parsedOutput as any).tables);
+          console.log(`[DEBUG] getDataprocJobResults: Saved results to TSV file: ${tsvFilePath}`);
+        } catch (saveError) {
+          console.error('[DEBUG] getDataprocJobResults: Error saving TSV file:', saveError);
+        }
+      }
+      
       return {
         ...jobDetails,
-        parsedOutput
+        parsedOutput,
+        tsvFilePath
       } as unknown as T;
     } catch (outputError: any) {
       console.error('[DEBUG] getDataprocJobResults: Error in outputHandler.getJobOutputs:', outputError);
@@ -365,6 +529,10 @@ export async function getDataprocJobResults<T>(
  * @returns Processed output in a structured format
  */
 function processHiveOutput(outputContents: string[]): any {
+  // Add diagnostic log to check if this deprecated function is still being called
+  logger.debug('DEPRECATED processHiveOutput function was called!', {
+    outputContentLength: outputContents.length
+  });
   // Join all output contents
   const fullOutput = outputContents.join('\n');
   
