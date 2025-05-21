@@ -6,5 +6,8 @@
   "clusterTracker": {
     "stateFilePath": "./state/dataproc-state.json",
     "stateSaveInterval": 60000
+  },
+  "authentication": {
+    "impersonateServiceAccount": "grpn-sa-ds-mwaa-dataproc@prj-grp-central-sa-prod-0b25.iam.gserviceaccount.com"
   }
 }

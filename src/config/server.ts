@@ -7,6 +7,16 @@ import path from 'path';
 import { ProfileManagerConfig, ClusterTrackerConfig } from '../types/profile.js';
 
 /**
+ * Authentication configuration
+ */
+export interface AuthenticationConfig {
+  /**
+   * Service account to impersonate
+   */
+  impersonateServiceAccount?: string;
+}
+
+/**
  * Server configuration
  */
 export interface ServerConfig {
@@ -19,6 +29,11 @@ export interface ServerConfig {
    * Cluster tracker configuration
    */
   clusterTracker: ClusterTrackerConfig;
+
+  /**
+   * Authentication configuration
+   */
+  authentication?: AuthenticationConfig;
 }
 
 // Default configuration
@@ -30,6 +45,9 @@ const DEFAULT_CONFIG: ServerConfig = {
   clusterTracker: {
     stateFilePath: './state/dataproc-state.json',
     stateSaveInterval: 60000, // 1 minute
+  },
+  authentication: {
+    impersonateServiceAccount: undefined,
   },
 };
 
@@ -68,6 +86,10 @@ export async function getServerConfig(configPath?: string): Promise<ServerConfig
       clusterTracker: {
         ...DEFAULT_CONFIG.clusterTracker,
         ...config.clusterTracker,
+      },
+      authentication: {
+        ...DEFAULT_CONFIG.authentication,
+        ...config.authentication,
       },
     };
   } catch (error) {

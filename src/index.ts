@@ -8,6 +8,9 @@
  * - Running Hive queries
  */
 
+// Import MCP stdio handler first to ensure all console output is properly handled
+import './utils/mcp-stdio-handler.js';
+
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
@@ -16,6 +19,7 @@ import {
   ErrorCode,
   McpError
 } from "@modelcontextprotocol/sdk/types.js";
+import { logger } from "./utils/logger.js";
 
 // Import our services
 import { createCluster, createClusterFromYaml, deleteCluster, listClusters, getCluster } from "./services/cluster.js";
@@ -340,7 +344,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
 
         const { projectId, region, clusterName, clusterConfig } = args;
-        if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] MCP start_dataproc_cluster: Called with params:', { projectId, region, clusterName, clusterConfig });
+        logger.debug('MCP start_dataproc_cluster: Called with params:', { projectId, region, clusterName, clusterConfig });
 
         let response;
         try {
@@ -350,9 +354,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             String(clusterName),
             clusterConfig as any
           );
-          if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] MCP start_dataproc_cluster: createCluster response:', response);
+          logger.debug('MCP start_dataproc_cluster: createCluster response:', response);
         } catch (error) {
-          console.error('[DEBUG] MCP start_dataproc_cluster: Error from createCluster:', error);
+          logger.error('MCP start_dataproc_cluster: Error from createCluster:', error);
           throw error;
         }
 
@@ -422,16 +426,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
         
         const { projectId, region, clusterName } = args;
-        if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] MCP get_cluster: Calling getCluster with params:', { projectId, region, clusterName });
-        
-        // Use the same service account for impersonation as in the test script
-        const impersonateServiceAccount = 'grpn-sa-terraform-data-science@prj-grp-central-sa-prod-0b25.iam.gserviceaccount.com';
+        logger.debug('MCP get_cluster: Calling getCluster with params:', { projectId, region, clusterName });
         
         const response = await getCluster(
           String(projectId),
           String(region),
-          String(clusterName),
-          impersonateServiceAccount
+          String(clusterName)
         );
         
         return {
@@ -452,7 +452,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
         
         const { projectId, region, clusterName, jobType, jobConfig, async } = args;
-        if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] MCP submit_dataproc_job: Called with params:', { projectId, region, clusterName, jobType, async });
+        logger.debug('MCP submit_dataproc_job: Called with params:', { projectId, region, clusterName, jobType, async });
         
         try {
           const { submitDataprocJob } = await import("./services/job.js");
@@ -476,7 +476,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             ]
           };
         } catch (error) {
-          console.error('[DEBUG] MCP submit_dataproc_job: Error:', error);
+          logger.error('MCP submit_dataproc_job: Error:', error);
           throw error;
         }
       }
@@ -488,7 +488,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
         
         const { projectId, region, jobId } = args;
-        if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] MCP get_job_status: Called with params:', { projectId, region, jobId });
+        logger.debug('MCP get_job_status: Called with params:', { projectId, region, jobId });
         
         try {
           const { getDataprocJobStatus } = await import("./services/job.js");
@@ -519,26 +519,59 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
         
         const { projectId, region, jobId } = args;
-        if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] MCP get_job_results: Called with params:', { projectId, region, jobId });
+        
+        logger.debug('MCP get_job_results: Called with params:', { projectId, region, jobId });
         
         try {
           const { getDataprocJobResults } = await import("./services/job.js");
-          const results = await getDataprocJobResults({
-            projectId: String(projectId),
-            region: String(region),
-            jobId: String(jobId)
+          logger.debug('MCP get_job_results: Calling getDataprocJobResults with params:', {
+            projectId,
+            region,
+            jobId,
+            wait: true // Add wait parameter to ensure job completion
           });
           
-          return {
-            content: [
-              {
-                type: "text",
-                text: `Job results for ${jobId}:\n${JSON.stringify(results, null, 2)}`
-              }
-            ]
-          };
-        } catch (error) {
-          console.error('[DEBUG] MCP get_job_results: Error:', error);
+          const results: any = await getDataprocJobResults({
+            projectId: String(projectId),
+            region: String(region),
+            jobId: String(jobId),
+            wait: true // Add wait parameter to ensure job completion
+          });
+          
+          logger.debug('MCP get_job_results: Results from getDataprocJobResults:', {
+            hasParsedOutput: 'parsedOutput' in results,
+            resultKeys: Object.keys(results),
+            status: results.status?.state
+          });
+          
+          if (results && typeof results === 'object' && 'parsedOutput' in results) {
+            logger.debug('MCP get_job_results: parsedOutput is present, returning full results');
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `Job results for ${jobId}:\n${JSON.stringify(results, null, 2)}`,
+                },
+              ],
+            };
+          } else {
+            logger.debug('MCP get_job_results: parsedOutput is missing, returning results with note');
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `Job results for ${jobId}:\n${JSON.stringify(results, null, 2)}\nNo parsed output available.`,
+                },
+              ],
+            };
+          }
+        } catch (error: any) {
+          logger.error('MCP get_job_results: Error:', error);
+          logger.error('MCP get_job_results: Error details:', {
+            message: error.message,
+            name: error.name,
+            stack: error.stack
+          });
           throw error;
         }
       }

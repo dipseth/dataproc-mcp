@@ -5,6 +5,7 @@
 import { GoogleAuth, OAuth2Client } from 'google-auth-library';
 import { ClusterControllerClient } from '@google-cloud/dataproc';
 import { execSync } from 'child_process';
+import { getServerConfig } from './server.js';
 
 /**
  * Options for creating a Dataproc client
@@ -32,19 +33,43 @@ import { IAMCredentialsClient } from '@google-cloud/iam-credentials';
  */
 /**
  * Gets an access token from gcloud CLI, which will use the impersonation
- * settings from gcloud config if present
+ * settings from gcloud config if present or use the provided service account
+ * @param serviceAccount Optional service account to impersonate
  * @returns Access token from gcloud CLI
  */
-export function getGcloudAccessToken(): string {
+export function getGcloudAccessToken(serviceAccount?: string): string {
   if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] getGcloudAccessToken: Getting token from gcloud CLI');
   try {
-    const token = execSync('gcloud auth print-access-token', { encoding: 'utf8' }).trim();
+    let command = 'gcloud auth print-access-token';
+    
+    // If service account is provided, use it for impersonation
+    if (serviceAccount) {
+      if (process.env.LOG_LEVEL === 'debug') console.error(`[DEBUG] getGcloudAccessToken: Using service account impersonation for ${serviceAccount}`);
+      command = `gcloud auth print-access-token --impersonate-service-account=${serviceAccount}`;
+    }
+    
+    const token = execSync(command, { encoding: 'utf8' }).trim();
     if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] getGcloudAccessToken: Successfully obtained token from gcloud CLI');
     return token;
   } catch (err) {
     console.error('[DEBUG] getGcloudAccessToken: Error getting token from gcloud CLI:', err);
     throw new Error(`Failed to get access token from gcloud CLI: ${err}`);
   }
+}
+
+/**
+ * Gets an access token from gcloud CLI with service account impersonation from server config
+ * @returns Access token from gcloud CLI
+ */
+export async function getGcloudAccessTokenWithConfig(): Promise<string> {
+  // Get the server configuration
+  const config = await getServerConfig();
+  
+  // Get the service account from the configuration
+  const serviceAccount = config.authentication?.impersonateServiceAccount;
+  
+  // Get the access token with the service account
+  return getGcloudAccessToken(serviceAccount);
 }
 
 /**
@@ -69,8 +94,8 @@ export async function createDataprocClient(options: DataprocClientOptions = {}):
   // Service account impersonation using gcloud CLI token
   if (impersonateServiceAccount) {
     if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] createDataprocClient: using gcloud CLI token with impersonation');
-    // Get token from gcloud CLI (which will use impersonation from gcloud config)
-    const token = getGcloudAccessToken();
+    // Get token from gcloud CLI with impersonation
+    const token = getGcloudAccessToken(impersonateServiceAccount);
     
     // Create an OAuth2Client with the token
     const oauth2Client = new OAuth2Client();
@@ -135,8 +160,8 @@ export function createJobClient(options: DataprocClientOptions = {}): any {
   // Service account impersonation using gcloud CLI token
   if (impersonateServiceAccount) {
     if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] createJobClient: using gcloud CLI token with impersonation');
-    // Get token from gcloud CLI (which will use impersonation from gcloud config)
-    const token = getGcloudAccessToken();
+    // Get token from gcloud CLI with impersonation
+    const token = getGcloudAccessToken(impersonateServiceAccount);
     
     // Create an OAuth2Client with the token
     const oauth2Client = new OAuth2Client();
