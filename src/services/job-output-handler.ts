@@ -7,6 +7,7 @@ import { CacheManager } from './cache-manager.js';
 import { OutputParser, ParseOptions } from './output-parser.js';
 import { GCSError, GCSErrorType, OutputFormat } from '../types/gcs-types.js';
 import { CacheConfig } from '../types/cache-types.js';
+import { logger } from '../utils/logger.js';
 
 export interface JobOutputOptions extends ParseOptions {
   /**
@@ -60,13 +61,17 @@ export class JobOutputHandler {
 
     try {
       // Check file size before downloading
+      logger.debug(`JobOutputHandler: Attempting to get metadata for ${uri}`);
       const metadata = await this.gcsService.getFileMetadata(uri);
+      logger.debug(`JobOutputHandler: Successfully got metadata for ${uri}. Size: ${metadata.size}`);
       const eligibleForCache = this.cacheManager.isEligibleForCache(metadata.size);
 
       // Download and parse content
+      logger.debug(`JobOutputHandler: Attempting to download file from ${uri}`);
       const content = await this.gcsService.downloadFile(uri, {
         validateHash: opts.validateHash
       });
+      logger.debug(`JobOutputHandler: Successfully downloaded file from ${uri}. Content length: ${content.length}`);
 
       // Auto-detect format if needed
       const detectedFormat = format === 'unknown' 
@@ -108,7 +113,7 @@ export class JobOutputHandler {
     uris: string[],
     format: OutputFormat = 'text',
     options: JobOutputOptions = {}
-  ): Promise<T[]> {
+  ): Promise<T> {
     const results: T[] = [];
     
     for (const uri of uris) {
@@ -116,7 +121,32 @@ export class JobOutputHandler {
       results.push(result);
     }
 
-    return results;
+    // Combine results for common formats
+    if (format === 'text') {
+      // Concatenate all text outputs
+      return results.map(r => (typeof r === 'string' ? r : JSON.stringify(r))).join('\n') as unknown as T;
+    }
+    if (format === 'json') {
+      // Merge arrays or objects
+      if (results.every(r => Array.isArray(r))) {
+        return ([] as any[]).concat(...(results as any[][])) as unknown as T;
+      }
+      if (results.every(r => typeof r === 'object')) {
+        return Object.assign({}, ...results) as T;
+      }
+    }
+    if (format === 'csv') {
+      // Concatenate CSV text
+      return results.map(r => (typeof r === 'string' ? r : JSON.stringify(r))).join('\n') as unknown as T;
+    }
+    // Special case: if all results have a 'tables' property, merge tables
+    if (results.every(r => r && typeof r === 'object' && 'tables' in r)) {
+      const allTables = results.flatMap((r: any) => r.tables || []);
+      return { tables: allTables } as unknown as T;
+    }
+
+    // Default: return array of results
+    return results as unknown as T;
   }
 
   /**

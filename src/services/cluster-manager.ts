@@ -190,7 +190,7 @@ export class ClusterManager {
     const trackedClusters = this.clusterTracker.getAllTrackedClusters();
     
     // Add tracking information to the clusters
-    const enhancedClusters: ClusterInfo[] = response.clusters.map(cluster => {
+    const enhancedClusters: ClusterInfo[] = response.clusters.map((cluster: ClusterInfo) => {
       const trackedCluster = trackedClusters.find(tc => tc.clusterId === cluster.clusterUuid);
       
       if (trackedCluster) {

@@ -1,0 +1,29 @@
+# Test Dataproc cluster configuration
+cluster:
+  name: test-cluster-1
+  region: us-central1
+  labels:
+    environment: test
+    purpose: demo
+  config:
+    gceClusterConfig:
+      tags:
+        - dataproc-test
+      metadata:
+        purpose: demo
+    masterConfig:
+      numInstances: 1
+      machineTypeUri: n1-standard-2
+      diskConfig:
+        bootDiskType: pd-standard
+        bootDiskSizeGb: 100
+    workerConfig:
+      numInstances: 2
+      machineTypeUri: n1-standard-2
+      diskConfig:
+        bootDiskType: pd-standard
+        bootDiskSizeGb: 100
+    softwareConfig:
+      imageVersion: 2.0-debian10
+      optionalComponents:
+        - JUPYTER

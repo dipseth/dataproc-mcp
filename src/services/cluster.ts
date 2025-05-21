@@ -3,7 +3,7 @@
  */
 
 import { ClusterControllerClient, protos } from '@google-cloud/dataproc';
-import { createDataprocClient, getGcloudAccessToken } from '../config/credentials.js';
+import { createDataprocClient, getGcloudAccessToken, getGcloudAccessTokenWithConfig } from '../config/credentials.js';
 import { getDataprocConfigFromYaml } from '../config/yaml.js';
 import { ClusterConfig } from '../types/cluster-config.js';
 import { ClusterInfo, ClusterListResponse } from '../types/response.js';
@@ -49,17 +49,10 @@ export async function createCluster(
       }
       // Add other properties as needed
     }
-
-    const defaultConfig = {
-      masterConfig: { numInstances: 1, machineTypeUri: 'n1-standard-2' },
-      workerConfig: { numInstances: 2, machineTypeUri: 'n1-standard-2' },
-    };
-
-    const finalConfig = clusterConfig ? apiConfig : defaultConfig;
-
+    
     // Use the REST API directly instead of the client library to avoid authentication issues
     if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] createCluster: Using REST API directly via createClusterWithRest');
-    return await createClusterWithRest(projectId, region, clusterName, finalConfig);
+    return await createClusterWithRest(projectId, region, clusterName, apiConfig);
   } catch (error) {
     console.error('[DEBUG] createCluster: Error encountered:', error);
     if (error instanceof Error) {
@@ -69,14 +62,6 @@ export async function createCluster(
   }
 }
 
-/**
- * Creates a new Dataproc cluster from a YAML configuration file
- * @param projectId GCP project ID
- * @param region Dataproc region
- * @param yamlPath Path to the YAML configuration file
- * @param overrides Optional runtime configuration overrides
- * @returns Created cluster details
- */
 /**
  * Creates a new Dataproc cluster using the REST API directly
  * This bypasses the client libraries and uses a token from gcloud CLI
@@ -92,18 +77,19 @@ export async function createClusterWithRest(
   clusterName: string,
   clusterConfig: any
 ): Promise<any> {
-  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] createClusterWithRest: Getting token from gcloud CLI');
-  const token = getGcloudAccessToken();
+  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] createClusterWithRest: Getting token from gcloud CLI with config');
+  const token = await getGcloudAccessTokenWithConfig();
   
   const url = `https://${region}-dataproc.googleapis.com/v1/projects/${projectId}/regions/${region}/clusters`;
   
-  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] createClusterWithRest: Making REST API request to:', url);
-  
+  // Prepare the request body
   const requestBody = {
     projectId,
     clusterName,
     config: clusterConfig
   };
+  
+  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] createClusterWithRest: Making REST API request to:', url);
   
   try {
     const response = await fetch(url, {
@@ -134,7 +120,7 @@ export async function createClusterWithRest(
 }
 
 /**
- * Creates a new Dataproc cluster from a YAML configuration file
+ * Creates a Dataproc cluster from a YAML configuration file
  * @param projectId GCP project ID
  * @param region Dataproc region
  * @param yamlPath Path to the YAML configuration file
@@ -145,34 +131,49 @@ export async function createClusterFromYaml(
   projectId: string,
   region: string,
   yamlPath: string,
-  overrides?: Partial<ClusterConfig>,
-  impersonateServiceAccount?: string
+  overrides?: any
 ): Promise<any> {
+  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] createClusterFromYaml: Starting with params:', { projectId, region, yamlPath });
+  
   try {
-    // Read and parse the YAML configuration
-    const { clusterName, config } = await getDataprocConfigFromYaml(yamlPath);
-
-    // Debug log: print resolved clusterName, region, and config
-    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] createClusterFromYaml:');
-    if (process.env.LOG_LEVEL === 'debug') console.error('  clusterName:', clusterName);
-    if (process.env.LOG_LEVEL === 'debug') console.error('  region:', region);
-    if (process.env.LOG_LEVEL === 'debug') console.error('  config:', JSON.stringify(config, null, 2));
+    // Load the cluster configuration from YAML
+    const configData = await getDataprocConfigFromYaml(yamlPath);
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] createClusterFromYaml: Loaded config from YAML');
+    
+    // Apply any runtime overrides to the config object
     if (overrides) {
-      if (process.env.LOG_LEVEL === 'debug') console.error('  overrides:', JSON.stringify(overrides, null, 2));
+      if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] createClusterFromYaml: Applying overrides');
+      
+      // Apply overrides to the config object
+      if (overrides.config && configData.config) {
+        configData.config = { ...configData.config, ...overrides.config };
+      }
+      
+      // Apply other overrides
+      if (overrides.clusterName) {
+        configData.clusterName = overrides.clusterName;
+      }
+      
+      if (overrides.region) {
+        configData.region = overrides.region;
+      }
+      
+      if (overrides.labels) {
+        configData.labels = { ...configData.labels, ...overrides.labels };
+      }
     }
-
-    // Apply any overrides
-    const finalConfig = overrides ? { ...config, ...overrides } : config;
-
-    // Use the REST API directly instead of the client library
-    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] createClusterFromYaml: Using REST API directly');
-    return await createClusterWithRest(
-      projectId,
-      region,
-      clusterName,
-      finalConfig
-    );
+    
+    // Use the region from the config if not provided in the parameters
+    const clusterRegion = region || configData.region;
+    if (!clusterRegion) {
+      throw new Error('Region must be specified either in the YAML config or as a parameter');
+    }
+    
+    // Create the cluster
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] createClusterFromYaml: Creating cluster with name:', configData.clusterName);
+    return await createCluster(projectId, clusterRegion, configData.clusterName, configData.config);
   } catch (error) {
+    console.error('[DEBUG] createClusterFromYaml: Error encountered:', error);
     if (error instanceof Error) {
       throw new Error(`Error creating cluster from YAML: ${error.message}`);
     }
@@ -195,7 +196,7 @@ export async function listClusters(
   filter?: string,
   pageSize?: number,
   pageToken?: string
-): Promise<ClusterListResponse> {
+): Promise<any> {
   if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] listClusters: Starting with params:', { projectId, region, filter, pageSize, pageToken });
   
   try {
@@ -228,8 +229,8 @@ export async function listClustersWithRest(
   pageSize?: number,
   pageToken?: string
 ): Promise<any> {
-  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] listClustersWithRest: Getting token from gcloud CLI');
-  const token = getGcloudAccessToken();
+  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] listClustersWithRest: Getting token from gcloud CLI with config');
+  const token = await getGcloudAccessTokenWithConfig();
   
   // Build the URL with query parameters
   let url = `https://${region}-dataproc.googleapis.com/v1/projects/${projectId}/regions/${region}/clusters`;
@@ -263,25 +264,9 @@ export async function listClustersWithRest(
       throw new Error(`API error: ${response.status} - ${errorText}`);
     }
     
-    const result = await response.json() as any;
+    const result = await response.json();
     if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] listClustersWithRest: API request successful');
-    
-    // Transform the response to our format
-    const clusterInfos: ClusterInfo[] = (result.clusters || []).map((cluster: any) => ({
-      projectId,
-      clusterName: cluster.clusterName,
-      status: cluster.status?.state || 'UNKNOWN',
-      createTime: cluster.createTime,
-      labels: cluster.labels,
-      metrics: cluster.metrics,
-      statusHistory: cluster.statusHistory,
-      clusterUuid: cluster.clusterUuid,
-    }));
-    
-    return {
-      clusters: clusterInfos,
-      nextPageToken: result.nextPageToken,
-    };
+    return result;
   } catch (error) {
     console.error('[DEBUG] listClustersWithRest: Error:', error);
     if (error instanceof Error) {
@@ -304,8 +289,8 @@ export async function getClusterWithRest(
   region: string,
   clusterName: string
 ): Promise<any> {
-  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] getClusterWithRest: Getting token from gcloud CLI');
-  const token = getGcloudAccessToken();
+  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] getClusterWithRest: Getting token from gcloud CLI with config');
+  const token = await getGcloudAccessTokenWithConfig();
   
   const url = `https://${region}-dataproc.googleapis.com/v1/projects/${projectId}/regions/${region}/clusters/${clusterName}`;
   
@@ -379,8 +364,8 @@ export async function deleteClusterWithRest(
   region: string,
   clusterName: string
 ): Promise<any> {
-  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] deleteClusterWithRest: Getting token from gcloud CLI');
-  const token = getGcloudAccessToken();
+  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] deleteClusterWithRest: Getting token from gcloud CLI with config');
+  const token = await getGcloudAccessTokenWithConfig();
   
   const url = `https://${region}-dataproc.googleapis.com/v1/projects/${projectId}/regions/${region}/clusters/${clusterName}`;
   

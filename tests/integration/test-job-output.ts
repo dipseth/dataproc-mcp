@@ -4,9 +4,9 @@ import {
   submitDataprocJob,
   getDataprocJobResults,
   DataprocJobType
-} from '../../src/services/job.ts';
-import { JobOutputHandler } from '../../src/services/job-output-handler.ts';
-import { GCSError } from '../../src/types/gcs-types.ts';
+} from '../../src/services/job.js';
+import { JobOutputHandler } from '../../src/services/job-output-handler.js';
+import { GCSError } from '../../src/types/gcs-types.js';
 
 describe('Job Output Handler Integration Tests', () => {
   // Test configuration

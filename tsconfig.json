@@ -11,14 +11,14 @@
     "forceConsistentCasingInFileNames": true,
     "allowJs": true,
     "resolveJsonModule": true,
-    "allowImportingTsExtensions": true,
-    "noEmit": true,
+    "allowImportingTsExtensions": false,
     "types": [
       "node",
       "mocha",
       "chai"
     ]
   },
+  "allowImportingTsExtensions": true,
   "include": [
     "src/**/*",
     "tests/**/*"
