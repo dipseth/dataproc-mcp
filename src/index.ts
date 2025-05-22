@@ -19,6 +19,7 @@ import {
   ErrorCode,
   McpError
 } from "@modelcontextprotocol/sdk/types.js";
+import { z } from 'zod';
 import { logger } from "./utils/logger.js";
 
 // Import our services
@@ -30,11 +31,14 @@ import {
   getJobStatusWithRest,
   getQueryResults
 } from "./services/query.js";
+import { JobState } from "./types/query.js";
 import { getCredentialsConfig } from "./config/credentials.js";
 import { getServerConfig } from "./config/server.js";
 import { ProfileManager } from "./services/profile.js";
 import { ClusterTracker } from "./services/tracker.js";
 import { ClusterManager } from "./services/cluster-manager.js";
+import { JobTracker } from "./services/job-tracker.js";
+import { JobOutputHandler } from "./services/job-output-handler.js";
 
 // Check for credentials
 const credentials = getCredentialsConfig();
@@ -46,8 +50,11 @@ if (!credentials.keyFilename && !credentials.useApplicationDefault) {
 let profileManager: ProfileManager;
 let clusterTracker: ClusterTracker;
 let clusterManager: ClusterManager;
+let jobTracker: JobTracker;
+let jobOutputHandler: JobOutputHandler;
 
-// Create the MCP server
+// Create the MCP server with basic initialization
+// Note: The full server with updated capabilities will be created in main()
 const server = new Server(
   {
     name: "dataproc-server",
@@ -466,6 +473,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             async: Boolean(async)
           });
           
+          jobTracker.addOrUpdateJob({
+            jobId: response.jobId || response.jobReference?.jobId,
+            toolName: toolName,
+            status: response.status || 'SUBMITTED',
+            projectId: String(projectId),
+            region: String(region),
+            clusterName: String(clusterName),
+            resultsCached: false // Initially no results cached
+          });
+
           return {
             content: [
               {
@@ -870,9 +887,37 @@ async function main() {
     clusterTracker = new ClusterTracker(serverConfig.clusterTracker);
     await clusterTracker.initialize();
     
+    // Initialize job output handler
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] MCP Server: Initializing JobOutputHandler');
+    jobOutputHandler = new JobOutputHandler();
+    
+    // Initialize job tracker
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] MCP Server: Initializing JobTracker');
+    jobTracker = new JobTracker();
+    
     // Initialize cluster manager
     if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] MCP Server: Initializing ClusterManager');
     clusterManager = new ClusterManager(profileManager, clusterTracker);
+    
+    // Create a new server with updated capabilities
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] MCP Server: Creating server with updated capabilities');
+    const updatedServer = new Server(
+      {
+        name: "dataproc-server",
+        version: "0.3.0",
+      },
+      {
+        capabilities: {
+          resources: {
+            listChanged: true
+          },
+          tools: {},
+          prompts: {
+            listChanged: true
+          },
+        },
+      }
+    );
     
     // Create and configure transport
     if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] MCP Server: Creating StdioServerTransport');
@@ -880,7 +925,243 @@ async function main() {
     
     // Connect server to transport with detailed error handling
     if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] MCP Server: Connecting server to transport');
-    await server.connect(transport);
+    // Add resource and prompt capabilities through request handlers
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] MCP Server: Setting up resource and prompt handlers');
+    
+    // Define resource list request schema using Zod
+    const ListResourcesRequestSchema = z.object({
+      method: z.literal("list_resources"),
+    });
+    
+    // Define resource read request schema using Zod
+    const ReadResourceRequestSchema = z.object({
+      method: z.literal("read_resource"),
+      params: z.object({
+        uri: z.string(),
+      }),
+    });
+    
+    // Define prompt list request schema using Zod
+    const ListPromptsRequestSchema = z.object({
+      method: z.literal("list_prompts"),
+    });
+    
+    // Define prompt read request schema using Zod
+    const ReadPromptRequestSchema = z.object({
+      method: z.literal("read_prompt"),
+      params: z.object({
+        id: z.string(),
+      }),
+    });
+    
+    // Define types for the request parameters
+    type ReadResourceRequest = z.infer<typeof ReadResourceRequestSchema>;
+    type ReadPromptRequest = z.infer<typeof ReadPromptRequestSchema>;
+    
+    // Handler for listing resources
+    updatedServer.setRequestHandler(ListResourcesRequestSchema, async () => {
+      if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] MCP Server: Resource list handler called');
+      
+      // Get tracked clusters
+      const trackedClusters = clusterManager.listTrackedClusters();
+      
+      // Get tracked jobs
+      const trackedJobs = jobTracker.listJobs();
+      
+      // Build resource list
+      const resources = [
+        // Cluster resources
+        ...trackedClusters.map((cluster) => {
+          // Get project ID and region from metadata if available
+          const projectId = cluster.metadata?.projectId || 'unknown';
+          const region = cluster.metadata?.region || 'unknown';
+          const status = cluster.metadata?.status || 'Unknown status';
+          
+          return {
+            uri: `dataproc://clusters/${projectId}/${region}/${cluster.clusterName}`,
+            name: `Cluster: ${cluster.clusterName}`,
+            description: `Dataproc cluster in ${region} (${status})`,
+          };
+        }),
+        
+        // Job resources
+        ...trackedJobs.map(job => ({
+          uri: `dataproc://jobs/${job.projectId}/${job.region}/${job.jobId}`,
+          name: `Job: ${job.jobId}`,
+          description: `Dataproc job (${job.toolName}) - ${job.status}`,
+        })),
+      ];
+      
+      if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] MCP Server: Returning resource list:', resources);
+      return { resources };
+    });
+    
+    // Handler for reading resources
+    updatedServer.setRequestHandler(ReadResourceRequestSchema, async (request: ReadResourceRequest) => {
+      if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] MCP Server: Resource read handler called with URI:', request.params.uri);
+      
+      const uri = request.params.uri;
+      
+      try {
+        // Parse the URI to determine resource type
+        if (uri.startsWith('dataproc://clusters/')) {
+          // Handle cluster resource
+          const parts = uri.replace('dataproc://clusters/', '').split('/');
+          if (parts.length !== 3) {
+            throw new McpError(ErrorCode.InvalidParams, `Invalid cluster URI format: ${uri}`);
+          }
+          
+          const [projectId, region, clusterName] = parts;
+          const cluster = await getCluster(projectId, region, clusterName);
+          
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(cluster, null, 2),
+              },
+            ],
+          };
+        } else if (uri.startsWith('dataproc://jobs/')) {
+          // Handle job resource
+          const parts = uri.replace('dataproc://jobs/', '').split('/');
+          if (parts.length !== 3) {
+            throw new McpError(ErrorCode.InvalidParams, `Invalid job URI format: ${uri}`);
+          }
+          
+          const [projectId, region, jobId] = parts;
+          
+          // Get job status
+          const status = await getJobStatus(projectId, region, jobId);
+          
+          // Get job results if available
+          let results = null;
+          if (status && status.status?.state === JobState.DONE) {
+            try {
+              results = await jobOutputHandler.getCachedOutput(jobId);
+            } catch (error) {
+              console.error(`[DEBUG] MCP Server: Error getting cached output for job ${jobId}:`, error);
+            }
+          }
+          
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify({ status, results }, null, 2),
+              },
+            ],
+          };
+        } else {
+          throw new McpError(ErrorCode.InvalidParams, `Unknown resource URI: ${uri}`);
+        }
+      } catch (error) {
+        console.error(`[DEBUG] MCP Server: Error reading resource ${uri}:`, error);
+        throw error;
+      }
+    });
+    
+    // Handler for listing prompts
+    updatedServer.setRequestHandler(ListPromptsRequestSchema, async () => {
+      if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] MCP Server: Prompt list handler called');
+      
+      // Define available prompts
+      const prompts = [
+        {
+          id: "dataproc-cluster-creation",
+          name: "Dataproc Cluster Creation",
+          description: "Guidelines for creating Dataproc clusters",
+        },
+        {
+          id: "dataproc-job-submission",
+          name: "Dataproc Job Submission",
+          description: "Guidelines for submitting jobs to Dataproc clusters",
+        },
+      ];
+      
+      if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] MCP Server: Returning prompt list:', prompts);
+      return { prompts };
+    });
+    
+    // Handler for reading prompts
+    updatedServer.setRequestHandler(ReadPromptRequestSchema, async (request: ReadPromptRequest) => {
+      if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] MCP Server: Prompt read handler called with ID:', request.params.id);
+      
+      const id = request.params.id;
+      
+      try {
+        if (id === "dataproc-cluster-creation") {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `# Dataproc Cluster Creation Guidelines
+
+When creating a Dataproc cluster, consider the following:
+
+1. **Region Selection**: Choose a region close to your data and users to minimize latency.
+2. **Machine Types**: Select appropriate machine types based on your workload:
+   - Standard machines for general-purpose workloads
+   - High-memory machines for memory-intensive applications
+   - High-CPU machines for compute-intensive tasks
+3. **Cluster Size**: Start with a small cluster and scale as needed.
+4. **Initialization Actions**: Use initialization actions to install additional software or configure the cluster.
+5. **Network Configuration**: Configure VPC and firewall rules appropriately.
+6. **Component Selection**: Choose only the components you need to minimize cluster startup time.
+7. **Autoscaling**: Enable autoscaling for workloads with variable resource requirements.
+
+For production workloads, consider using a predefined profile with the \`create_cluster_from_profile\` tool.`,
+              },
+            ],
+          };
+        } else if (id === "dataproc-job-submission") {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `# Dataproc Job Submission Guidelines
+
+When submitting jobs to Dataproc, follow these best practices:
+
+1. **Job Types**:
+   - Use Hive for SQL-like queries on structured data
+   - Use Spark for complex data processing
+   - Use PySpark for Python-based data processing
+   - Use Presto for interactive SQL queries
+
+2. **Performance Optimization**:
+   - Partition your data appropriately
+   - Use appropriate file formats (Parquet, ORC)
+   - Set appropriate executor memory and cores
+   - Use caching for frequently accessed data
+
+3. **Monitoring**:
+   - Monitor job progress using the \`get_job_status\` tool
+   - Retrieve results using the \`get_job_results\` or \`get_query_results\` tools
+
+4. **Error Handling**:
+   - Check job status before retrieving results
+   - Handle job failures gracefully
+   - Retry failed jobs with appropriate backoff
+
+5. **Resource Management**:
+   - Submit jobs to appropriately sized clusters
+   - Consider using preemptible VMs for cost savings
+   - Delete clusters when no longer needed`,
+              },
+            ],
+          };
+        } else {
+          throw new McpError(ErrorCode.InvalidParams, `Unknown prompt ID: ${id}`);
+        }
+      } catch (error) {
+        console.error(`[DEBUG] MCP Server: Error reading prompt ${id}:`, error);
+        throw error;
+      }
+    });
+    
+    // Connect server to transport
+    await updatedServer.connect(transport);
     
     if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] MCP Server: Successfully connected and ready to receive requests');
   } catch (error) {
