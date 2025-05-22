@@ -169,4 +169,41 @@ export class JobOutputHandler {
   destroy() {
     this.cacheManager.destroy();
   }
+
+  /**
+   * Retrieves cached output for a given job ID.
+   * @param jobId The ID of the job.
+   * @returns The cached output, or undefined if not found.
+   */
+  getCachedOutput(jobId: string): any | undefined {
+    // Iterate through all cached items using the public get method
+    // We need to check all cache keys since we don't have direct access to the cache
+    const cacheStats = this.cacheManager.getStats();
+    
+    // If cache is empty, return undefined immediately
+    if (cacheStats.size === 0) {
+      return undefined;
+    }
+    
+    // Try to find a cached result that contains the jobId in its key
+    // This is a simple approach that might need refinement in production
+    for (const uri of this.getRecentJobUris()) {
+      if (uri.includes(jobId)) {
+        return this.cacheManager.get(uri);
+      }
+    }
+    
+    return undefined;
+  }
+  
+  /**
+   * Helper method to get recent job URIs from recent job submissions
+   * In a real implementation, this would track URIs when jobs are submitted
+   * For now, we'll return an empty array as a placeholder
+   */
+  private getRecentJobUris(): string[] {
+    // This would be populated when jobs are submitted
+    // For now, return an empty array
+    return [];
+  }
 }
