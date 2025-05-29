@@ -34,6 +34,16 @@ export interface AuthenticationConfig {
   fallbackServiceAccount?: string;
   
   /**
+   * Default project ID for operations (can be overridden by tools)
+   */
+  projectId?: string;
+  
+  /**
+   * Default region for operations (can be overridden by tools)
+   */
+  region?: string;
+  
+  /**
    * Whether to prefer impersonation over direct key file usage
    * @default true
    */

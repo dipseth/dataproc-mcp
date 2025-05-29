@@ -1,0 +1,43 @@
+{
+  "defaultEnvironment": "production",
+  "parameters": [
+    {
+      "name": "projectId",
+      "type": "string",
+      "description": "Default GCP project ID",
+      "required": true
+    },
+    {
+      "name": "region",
+      "type": "string", 
+      "description": "Default Dataproc region",
+      "required": true,
+      "defaultValue": "us-central1"
+    },
+    {
+      "name": "zone",
+      "type": "string",
+      "description": "Default GCP zone",
+      "required": false,
+      "defaultValue": "us-central1-a"
+    }
+  ],
+  "environments": [
+    {
+      "environment": "production",
+      "parameters": {
+        "projectId": "prj-grp-data-sci-prod-b425",
+        "region": "us-central1",
+        "zone": "us-central1-a"
+      }
+    },
+    {
+      "environment": "development", 
+      "parameters": {
+        "projectId": "prj-grp-data-sci-prod-b425",
+        "region": "us-central1",
+        "zone": "us-central1-a"
+      }
+    }
+  ]
+}

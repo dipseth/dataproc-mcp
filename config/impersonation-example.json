@@ -3,7 +3,8 @@
     "impersonateServiceAccount": "grpn-sa-terraform-data-science@prj-grp-central-sa-prod-0b25.iam.gserviceaccount.com",
     "fallbackKeyPath": "/Users/srivers/Repositories/pricing-composer/orchestrator/classpath/gcp_prod_keyfile.json",
     "preferImpersonation": true,
-    "useApplicationDefaultFallback": false
+    "useApplicationDefaultFallback": false,
+    "projectId": "prj-grp-central-sa-prod-0b25"
   },
   "profileManager": {
     "rootConfigPath": "profiles",
