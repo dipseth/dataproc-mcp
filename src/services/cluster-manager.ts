@@ -80,11 +80,28 @@ export class ClusterManager {
     }
     
     // Read the profile YAML
-    const { clusterName, config } = await getDataprocConfigFromYaml(profile.path);
+    const { clusterName, config, labels } = await getDataprocConfigFromYaml(profile.path);
+    
+    if (process.env.LOG_LEVEL === 'debug') {
+      console.error('[DEBUG] ClusterManager: Profile path:', profile.path);
+      console.error('[DEBUG] ClusterManager: Loaded cluster name:', clusterName);
+      console.error('[DEBUG] ClusterManager: Loaded config:', JSON.stringify(config, null, 2));
+      console.error('[DEBUG] ClusterManager: Loaded labels:', JSON.stringify(labels, null, 2));
+    }
     
     // Apply overrides
     const finalClusterName = clusterNameOverride || clusterName;
-    const finalConfig = configOverrides ? { ...config, ...configOverrides } : config;
+    const finalConfig: any = configOverrides ? { ...config, ...configOverrides } : config;
+    
+    // Add labels to the config so they get passed to the API
+    if (labels) {
+      finalConfig.labels = labels;
+    }
+    
+    if (process.env.LOG_LEVEL === 'debug') {
+      console.error('[DEBUG] ClusterManager: Final cluster name:', finalClusterName);
+      console.error('[DEBUG] ClusterManager: Final config:', JSON.stringify(finalConfig, null, 2));
+    }
     
     // Create the cluster
     const response = await createCluster(

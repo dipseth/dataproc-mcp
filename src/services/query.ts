@@ -3,7 +3,8 @@
  */
 
 import { protos } from '@google-cloud/dataproc';
-import { createJobClient, getGcloudAccessToken } from '../config/credentials.js';
+import { getGcloudAccessToken, getGcloudAccessTokenWithConfig, createDataprocClient, createJobClient } from '../config/credentials.js';
+import { getServerConfig } from '../config/server.js';
 import {
   HiveQueryConfig,
   QueryOptions,
@@ -12,6 +13,33 @@ import {
   QueryResult
 } from '../types/query.js';
 import fetch from 'node-fetch';
+
+/**
+ * Fetch with timeout wrapper
+ * @param url URL to fetch
+ * @param options Fetch options
+ * @param timeoutMs Timeout in milliseconds (default: 30 seconds)
+ * @returns Promise that resolves to Response or rejects on timeout
+ */
+async function fetchWithTimeout(url: string, options: any, timeoutMs: number = 30000): Promise<any> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error(`Request timed out after ${timeoutMs}ms`);
+    }
+    throw error;
+  }
+}
 
 /**
  * Submits a Hive query to a Dataproc cluster
@@ -31,6 +59,8 @@ export async function submitHiveQuery(
   options?: QueryOptions,
   async: boolean = false
 ): Promise<QueryJob> {
+  const startTime = Date.now();
+  console.error(`[TIMING] submitHiveQuery: Starting MCP tool execution`);
   console.log('[DEBUG] submitHiveQuery: Starting with params:', {
     projectId,
     region,
@@ -39,63 +69,27 @@ export async function submitHiveQuery(
     async
   });
   
-  // Use the same service account for impersonation as in the cluster service
-  const impersonateServiceAccount = 'grpn-sa-terraform-data-science@prj-grp-central-sa-prod-0b25.iam.gserviceaccount.com';
-  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] submitHiveQuery: Using service account for impersonation:', impersonateServiceAccount);
-  
-  // createJobClient now returns a Promise
-  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] submitHiveQuery: Getting job client');
-  const jobClient = await createJobClient({
-    region,
-    impersonateServiceAccount
-  });
-  
-  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] submitHiveQuery: Created job client');
-  
   try {
-    // Create the Hive job configuration
-    const hiveJob: protos.google.cloud.dataproc.v1.IHiveJob = {
-      queryList: {
-        queries: [query],
-      },
-    };
+    // Use REST API by default (like working list_clusters)
+    console.error(`[TIMING] submitHiveQuery: Using REST API approach`);
+    const job = await submitHiveQueryWithRest(projectId, region, clusterName, query, options);
     
-    // Add optional properties if provided
-    if (options?.properties) {
-      hiveJob.properties = options.properties;
-    }
-    
-    // Create the job submission request
-    const request = {
-      projectId,
-      region,
-      job: {
-        placement: {
-          clusterName,
-        },
-        hiveJob,
-        labels: {
-          'created-by': 'dataproc-mcp-server',
-        },
-      },
-    };
-    
-    // Submit the job
-    const [job] = await jobClient.submitJob(request);
+    const totalDuration = Date.now() - startTime;
+    console.error(`[TIMING] submitHiveQuery: SUCCESS - total: ${totalDuration}ms`);
     
     // If async mode, return the job information immediately
     if (async) {
       return job as QueryJob;
     }
     
-    // Otherwise, wait for the job to complete
+    // Otherwise, wait for the job to complete using REST API
     const jobId = job.reference?.jobId;
     if (!jobId) {
       throw new Error('Job ID not found in response');
     }
     
-    // Poll for job completion
-    const completedJob = await waitForJobCompletion(
+    // Poll for job completion using REST API
+    const completedJob = await waitForJobCompletionWithRest(
       projectId,
       region,
       jobId,
@@ -104,6 +98,14 @@ export async function submitHiveQuery(
     
     return completedJob;
   } catch (error) {
+    const totalDuration = Date.now() - startTime;
+    console.error(`[TIMING] submitHiveQuery: FAILED after ${totalDuration}ms`);
+    console.error('[DEBUG] submitHiveQuery: Error details:', {
+      errorType: error?.constructor?.name,
+      errorMessage: error instanceof Error ? error.message : 'Unknown error',
+      errorStack: error instanceof Error ? error.stack : undefined
+    });
+    
     if (error instanceof Error) {
       throw new Error(`Error submitting Hive query: ${error.message}`);
     }
@@ -127,7 +129,17 @@ export async function waitForJobCompletion(
   timeoutMs: number = 600000,
   pollIntervalMs: number = 5000
 ): Promise<QueryJob> {
-  const jobClient = createJobClient({ region });
+  // Get server configuration for enhanced authentication
+  const config = await getServerConfig();
+  const authConfig = config.authentication;
+  
+  // Use enhanced authentication to create job client
+  const jobClient = await createJobClient({
+    region,
+    
+    
+  });
+  
   const startTime = Date.now();
   
   while (Date.now() - startTime < timeoutMs) {
@@ -167,32 +179,22 @@ export async function getJobStatus(
   region: string,
   jobId: string
 ): Promise<QueryJob> {
+  const startTime = Date.now();
+  console.error(`[TIMING] getJobStatus: Starting MCP tool execution`);
   if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] getJobStatus: Starting with params:', { projectId, region, jobId });
   
-  // Use the same service account for impersonation as in the cluster service
-  const impersonateServiceAccount = 'grpn-sa-terraform-data-science@prj-grp-central-sa-prod-0b25.iam.gserviceaccount.com';
-  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] getJobStatus: Using service account for impersonation:', impersonateServiceAccount);
-  
-  // createJobClient now returns a Promise
-  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] getJobStatus: Getting job client');
-  const jobClient = await createJobClient({
-    region,
-    impersonateServiceAccount
-  });
-  
-  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] getJobStatus: Created job client');
-  
   try {
-    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] getJobStatus: Calling getJob API');
-    const [job] = await jobClient.getJob({
-      projectId,
-      region,
-      jobId,
-    });
+    // Use REST API by default (like working list_clusters)
+    console.error(`[TIMING] getJobStatus: Using REST API approach`);
+    const job = await getJobStatusWithRest(projectId, region, jobId);
     
+    const totalDuration = Date.now() - startTime;
+    console.error(`[TIMING] getJobStatus: SUCCESS - total: ${totalDuration}ms`);
     if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] getJobStatus: API call successful, job status:', job.status?.state);
     return job as QueryJob;
   } catch (error) {
+    const totalDuration = Date.now() - startTime;
+    console.error(`[TIMING] getJobStatus: FAILED after ${totalDuration}ms`);
     console.error('[DEBUG] getJobStatus: Error encountered:', error);
     if (error instanceof Error) {
       throw new Error(`Error getting job status: ${error.message}`);
@@ -216,8 +218,8 @@ export async function getQueryResultsWithRest(
 ): Promise<any> {
   if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] getQueryResultsWithRest: Starting with params:', { projectId, region, jobId });
   
-  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] getQueryResultsWithRest: Getting token from gcloud CLI');
-  const token = getGcloudAccessToken();
+  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] getQueryResultsWithRest: Getting token from gcloud CLI with config');
+  const token = await getGcloudAccessTokenWithConfig();
   
   // First, check if the job is complete using REST API
   if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] getQueryResultsWithRest: Checking job status');
@@ -278,8 +280,8 @@ export async function submitHiveQueryWithRest(
     queryLength: query.length
   });
   
-  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] submitHiveQueryWithRest: Getting token from gcloud CLI');
-  const token = getGcloudAccessToken();
+  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] submitHiveQueryWithRest: Getting token from gcloud CLI with config');
+  const token = await getGcloudAccessTokenWithConfig();
   
   // Ensure the URL is correctly formed with the full domain and :submit suffix
   const url = `https://${region}-dataproc.googleapis.com/v1/projects/${projectId}/regions/${region}/jobs:submit`;
@@ -323,14 +325,14 @@ export async function submitHiveQueryWithRest(
     if (process.env.LOG_LEVEL === 'debug') console.error('- Headers: Authorization and Content-Type');
     if (process.env.LOG_LEVEL === 'debug') console.error('- Body length:', JSON.stringify(requestBody).length);
     
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(requestBody)
-    });
+    }, 30000); // 30 second timeout
     
     if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] submitHiveQueryWithRest: Received response with status:', response.status);
     
@@ -368,21 +370,21 @@ export async function getJobStatusWithRest(
 ): Promise<QueryJob> {
   if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] getJobStatusWithRest: Starting with params:', { projectId, region, jobId });
   
-  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] getJobStatusWithRest: Getting token from gcloud CLI');
-  const token = getGcloudAccessToken();
+  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] getJobStatusWithRest: Getting token from gcloud CLI with config');
+  const token = await getGcloudAccessTokenWithConfig();
   
   const url = `https://${region}-dataproc.googleapis.com/v1/projects/${projectId}/regions/${region}/jobs/${jobId}`;
   
   if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] getJobStatusWithRest: Making REST API request to:', url);
   
   try {
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       }
-    });
+    }, 30000); // 30 second timeout
     
     if (!response.ok) {
       const errorText = await response.text();
@@ -443,4 +445,43 @@ export async function getQueryResults(
     console.error('[DEBUG] getQueryResults: Error encountered:', error);
     throw error;
   }
+}
+
+/**
+ * Waits for a job to complete by polling its status using REST API
+ * @param projectId GCP project ID
+ * @param region Dataproc region
+ * @param jobId Job ID to monitor
+ * @param timeoutMs Timeout in milliseconds
+ * @param pollIntervalMs Polling interval in milliseconds
+ * @returns Completed job information
+ */
+export async function waitForJobCompletionWithRest(
+  projectId: string,
+  region: string,
+  jobId: string,
+  timeoutMs: number = 600000,
+  pollIntervalMs: number = 5000
+): Promise<QueryJob> {
+  const startTime = Date.now();
+  
+  while (Date.now() - startTime < timeoutMs) {
+    const job = await getJobStatusWithRest(projectId, region, jobId);
+    
+    const status = job.status?.state;
+    
+    // Check if the job is in a terminal state
+    if (
+      status === JobState.DONE ||
+      status === JobState.CANCELLED ||
+      status === JobState.ERROR
+    ) {
+      return job as QueryJob;
+    }
+    
+    // Wait before polling again
+    await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+  }
+  
+  throw new Error(`Job did not complete within the timeout period (${timeoutMs}ms)`);
 }

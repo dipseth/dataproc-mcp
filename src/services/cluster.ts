@@ -4,6 +4,7 @@
 
 import { ClusterControllerClient, protos } from '@google-cloud/dataproc';
 import { createDataprocClient, getGcloudAccessToken, getGcloudAccessTokenWithConfig } from '../config/credentials.js';
+import { getServerConfig } from '../config/server.js';
 import { getDataprocConfigFromYaml } from '../config/yaml.js';
 import { ClusterConfig } from '../types/cluster-config.js';
 import { ClusterInfo, ClusterListResponse } from '../types/response.js';
@@ -47,6 +48,9 @@ export async function createCluster(
       if (clusterConfig.softwareConfig) {
         apiConfig.softwareConfig = clusterConfig.softwareConfig as any;
       }
+      if (clusterConfig.gceClusterConfig) {
+        apiConfig.gceClusterConfig = clusterConfig.gceClusterConfig as any;
+      }
       // Add other properties as needed
     }
     
@@ -82,14 +86,24 @@ export async function createClusterWithRest(
   
   const url = `https://${region}-dataproc.googleapis.com/v1/projects/${projectId}/regions/${region}/clusters`;
   
-  // Prepare the request body
-  const requestBody = {
+  // Prepare the request body according to Dataproc REST API specification
+  const requestBody: any = {
     projectId,
     clusterName,
     config: clusterConfig
   };
   
-  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] createClusterWithRest: Making REST API request to:', url);
+  // Add labels at the top level if they exist (labels should be outside config)
+  if (clusterConfig.labels) {
+    requestBody.labels = clusterConfig.labels;
+    // Remove labels from config since they should be at cluster level
+    delete clusterConfig.labels;
+  }
+  
+  if (process.env.LOG_LEVEL === 'debug') {
+    console.error('[DEBUG] createClusterWithRest: Making REST API request to:', url);
+    console.error('[DEBUG] createClusterWithRest: Request body:', JSON.stringify(requestBody, null, 2));
+  }
   
   try {
     const response = await fetch(url, {
@@ -169,9 +183,21 @@ export async function createClusterFromYaml(
       throw new Error('Region must be specified either in the YAML config or as a parameter');
     }
     
-    // Create the cluster
+    // Create the cluster - pass the complete config including labels
     if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] createClusterFromYaml: Creating cluster with name:', configData.clusterName);
-    return await createCluster(projectId, clusterRegion, configData.clusterName, configData.config);
+    
+    // Prepare the complete cluster configuration including labels
+    // Labels need to be passed as a separate property since they're at cluster level, not config level
+    const completeConfig: any = { ...configData.config };
+    if (configData.labels) {
+      completeConfig.labels = configData.labels;
+    }
+    
+    if (process.env.LOG_LEVEL === 'debug') {
+      console.error('[DEBUG] createClusterFromYaml: Complete config with labels:', JSON.stringify(completeConfig, null, 2));
+    }
+    
+    return await createCluster(projectId, clusterRegion, configData.clusterName, completeConfig);
   } catch (error) {
     console.error('[DEBUG] createClusterFromYaml: Error encountered:', error);
     if (error instanceof Error) {
