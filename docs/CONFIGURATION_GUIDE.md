@@ -1,16 +1,54 @@
 # Dataproc MCP Server Configuration Guide
 
-This guide explains how to configure the Dataproc MCP server for different use cases.
+This guide explains how to configure the Dataproc MCP server for different use cases, including the new **intelligent default parameter management** system.
 
-## Simplified Configuration Approach
+## ✨ New: Default Parameter Management
 
-The MCP server now uses a simplified configuration approach that avoids auto-creating unnecessary directories and provides sensible defaults.
+The MCP server now supports **intelligent default parameters** that dramatically improve user experience by automatically injecting common parameters (like `projectId` and `region`) when they're not explicitly provided.
+
+### Quick Setup: Default Parameters
+
+Create `config/default-params.json` in your MCP server directory:
+
+```json
+{
+  "defaultEnvironment": "production",
+  "parameters": [
+    {"name": "projectId", "type": "string", "required": true},
+    {"name": "region", "type": "string", "required": true, "defaultValue": "us-central1"}
+  ],
+  "environments": [
+    {
+      "environment": "production",
+      "parameters": {
+        "projectId": "your-project-id",
+        "region": "us-central1"
+      }
+    },
+    {
+      "environment": "development",
+      "parameters": {
+        "projectId": "your-dev-project-id",
+        "region": "us-west1"
+      }
+    }
+  ]
+}
+```
+
+### Benefits of Default Parameters
+
+- **🎯 Simplified Tool Usage**: Call `get_job_status` with just `jobId` instead of `projectId`, `region`, and `jobId`
+- **🔄 Backward Compatibility**: Still accepts explicit parameters when provided
+- **🌍 Multi-Environment Support**: Different defaults per environment
+- **📊 Resource Integration**: Default configuration accessible via `dataproc://config/defaults` resource
 
 ## Configuration Hierarchy (Priority Order)
 
-1. **Default Configuration** (built-in)
-2. **MCP Environment Variables** (from global MCP settings)
-3. **Project-specific Config File** (optional, only if explicitly created)
+1. **Explicit Tool Parameters** (highest priority)
+2. **Default Parameter Configuration** (`config/default-params.json`)
+3. **MCP Environment Variables** (from global MCP settings)
+4. **Built-in Defaults** (lowest priority)
 
 ## Global MCP Configuration (Recommended)
 
@@ -72,6 +110,8 @@ The MCP server uses these defaults:
 - **Profile Scan Interval**: 5 minutes
 - **State Save Interval**: 1 minute
 - **Authentication**: Environment-independent service account impersonation
+- **Default Parameters**: Loaded from `config/default-params.json` (if exists)
+- **Default Environment**: `production` (configurable)
 
 ## Project-Specific Configuration (Optional)
 
@@ -195,12 +235,13 @@ The MCP server now supports **environment-independent authentication** through s
 
 ### ✅ Recommended Approach
 
-1. **Use environment-independent authentication** with service account impersonation
-2. **Use global MCP configuration** for most settings
-3. **Keep common profiles** in the MCP server's `./profiles/` directory
-4. **Only create project-specific configs** when you need different service accounts or custom settings
-5. **Don't auto-create directories** - create them manually when needed
-6. **Always specify `fallbackKeyPath`** for impersonation to ensure environment independence
+1. **Configure default parameters** in `config/default-params.json` for improved user experience
+2. **Use environment-independent authentication** with service account impersonation
+3. **Use global MCP configuration** for most settings
+4. **Keep common profiles** in the MCP server's `./profiles/` directory
+5. **Only create project-specific configs** when you need different service accounts or custom settings
+6. **Don't auto-create directories** - create them manually when needed
+7. **Always specify `fallbackKeyPath`** for impersonation to ensure environment independence
 
 ### ✅ Authentication Best Practices
 
@@ -279,4 +320,91 @@ If you were using the old auto-creating system:
 }
 ```
 
-This approach keeps configuration simple while providing flexibility when needed.
+## Default Parameter Examples
+
+### Basic Default Parameters Setup
+```json
+{
+  "defaultEnvironment": "production",
+  "parameters": [
+    {"name": "projectId", "type": "string", "required": true},
+    {"name": "region", "type": "string", "required": true, "defaultValue": "us-central1"}
+  ],
+  "environments": [
+    {
+      "environment": "production",
+      "parameters": {
+        "projectId": "prj-grp-data-sci-prod-b425",
+        "region": "us-central1"
+      }
+    }
+  ]
+}
+```
+
+### Multi-Environment Setup
+```json
+{
+  "defaultEnvironment": "production",
+  "parameters": [
+    {"name": "projectId", "type": "string", "required": true},
+    {"name": "region", "type": "string", "required": true, "defaultValue": "us-central1"},
+    {"name": "zone", "type": "string", "required": false, "defaultValue": "us-central1-a"}
+  ],
+  "environments": [
+    {
+      "environment": "development",
+      "parameters": {
+        "projectId": "dev-project-123",
+        "region": "us-west1",
+        "zone": "us-west1-a"
+      }
+    },
+    {
+      "environment": "staging",
+      "parameters": {
+        "projectId": "staging-project-456",
+        "region": "us-central1",
+        "zone": "us-central1-b"
+      }
+    },
+    {
+      "environment": "production",
+      "parameters": {
+        "projectId": "prj-grp-data-sci-prod-b425",
+        "region": "us-central1",
+        "zone": "us-central1-a"
+      }
+    }
+  ]
+}
+```
+
+### Usage Examples
+
+**Before (required explicit parameters):**
+```json
+{
+  "projectId": "prj-grp-data-sci-prod-b425",
+  "region": "us-central1",
+  "jobId": "my-job-id"
+}
+```
+
+**After (with defaults configured):**
+```json
+{
+  "jobId": "my-job-id"
+}
+```
+
+**Override defaults when needed:**
+```json
+{
+  "projectId": "different-project",
+  "region": "us-west1",
+  "jobId": "my-job-id"
+}
+```
+
+This approach keeps configuration simple while providing flexibility and dramatically improved user experience.

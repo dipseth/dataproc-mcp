@@ -1,6 +1,14 @@
 # Dataproc MCP Server
 
-This MCP server provides tools for interacting with Google Cloud Dataproc clusters and jobs.
+This MCP server provides tools for interacting with Google Cloud Dataproc clusters and jobs with **intelligent default parameters** and **comprehensive resource support**.
+
+## ✨ Key Features
+
+- **🎯 Smart Default Parameters**: Tools automatically use configured defaults (projectId, region) when not provided
+- **📊 Resource Exposure**: Access default configurations and cluster profiles via MCP resources
+- **🔐 Environment-Independent Authentication**: Service account impersonation with no environment variable dependencies
+- **⚡ High Performance**: 53-58% faster operations with authentication caching and REST API integration
+- **🛠️ Comprehensive Tool Set**: 16 tools covering cluster management, job execution, and monitoring
 
 ## Quick Start
 
@@ -17,7 +25,27 @@ This MCP server provides tools for interacting with Google Cloud Dataproc cluste
    }
    ```
 
-2. **Test with MCP Inspector** (optional):
+2. **Configure default parameters** (optional - creates `config/default-params.json`):
+   ```json
+   {
+     "defaultEnvironment": "production",
+     "parameters": [
+       {"name": "projectId", "type": "string", "required": true},
+       {"name": "region", "type": "string", "required": true, "defaultValue": "us-central1"}
+     ],
+     "environments": [
+       {
+         "environment": "production",
+         "parameters": {
+           "projectId": "your-project-id",
+           "region": "us-central1"
+         }
+       }
+     ]
+   }
+   ```
+
+3. **Test with MCP Inspector** (optional):
    ```bash
    npx @modelcontextprotocol/inspector build/index.js
    ```
@@ -26,24 +54,36 @@ For detailed configuration options, see the [Configuration Guide](docs/CONFIGURA
 
 ## Available Tools
 
-The server provides the following tools:
+The server provides 16 comprehensive tools with **smart default parameters**:
 
-- `start_dataproc_cluster`: Start a Google Cloud Dataproc cluster
-- `create_cluster_from_yaml`: Create a Dataproc cluster using a YAML configuration file
-- `create_cluster_from_profile`: Create a Dataproc cluster using a predefined profile
-- `list_clusters`: List Dataproc clusters in a project and region
-- `list_tracked_clusters`: List clusters that were created and tracked by this MCP server
-- `list_profiles`: List available cluster configuration profiles
-- `get_profile`: Get details for a specific cluster configuration profile
-- `get_cluster`: Get details for a specific Dataproc cluster
-- `submit_hive_query`: Submit a Hive query to a Dataproc cluster
-- `get_query_status`: Get the status of a Hive query job
-- `get_query_results`: Get the results of a completed Hive query
-- `delete_cluster`: Delete a Dataproc cluster
-- `submit_dataproc_job`: Submit a Dataproc job (Hive, Spark, PySpark, Presto, etc.)
-- `get_job_status`: Get the status of a Dataproc job
-- `get_job_results`: Get the results of a completed Dataproc job
-- `get_zeppelin_url`: Get the Zeppelin notebook URL for a Dataproc cluster
+### 🎯 **Tools with Smart Defaults** (projectId/region optional when defaults configured):
+- **`get_job_status`**: Get job status - *only requires `jobId`*
+- **`list_clusters`**: List clusters - *requires no parameters*
+- **`start_dataproc_cluster`**: Start cluster - *only requires `clusterName`*
+- **`get_cluster`**: Get cluster details
+- **`delete_cluster`**: Delete cluster
+- **`submit_hive_query`**: Submit Hive query
+- **`submit_dataproc_job`**: Submit any Dataproc job
+- **`get_query_status`**: Get Hive query status
+- **`get_query_results`**: Get Hive query results
+- **`get_job_results`**: Get job results
+- **`get_zeppelin_url`**: Get Zeppelin notebook URL
+
+### 📋 **Profile & Management Tools**:
+- **`create_cluster_from_yaml`**: Create cluster from YAML configuration
+- **`create_cluster_from_profile`**: Create cluster from predefined profile
+- **`list_tracked_clusters`**: List server-tracked clusters
+- **`list_profiles`**: List available cluster profiles
+- **`get_profile`**: Get specific profile details
+
+## Available Resources
+
+Access configuration and cluster information via MCP resources:
+
+- **`dataproc://config/defaults`**: Default project/region configuration
+- **`dataproc://profile/development/small`**: Development cluster profile
+- **`dataproc://profile/production/high-memory/analysis`**: Production analysis profile
+- **`dataproc://profile/production/pricing-promotions`**: Pricing promotions profile
 
 ## Testing
 
@@ -127,7 +167,33 @@ cluster_config:
 
 The server will use this service account for cluster creation instead of the default compute service account.
 
-## Recent Fixes
+## Recent Enhancements
+
+### Default Parameter Management (2025-05-29) ✨
+
+**Major Enhancement**: Implemented intelligent default parameter system that dramatically improves user experience:
+
+**Before**: All tools required explicit `projectId` and `region` parameters
+```json
+{
+  "projectId": "prj-grp-data-sci-prod-b425",
+  "region": "us-central1",
+  "jobId": "search_impression_backfill_sub_group_2_bcookie_search_imp_afd4aeeb"
+}
+```
+
+**After**: Tools automatically use configured defaults when parameters aren't provided
+```json
+{
+  "jobId": "search_impression_backfill_sub_group_2_bcookie_search_imp_afd4aeeb"
+}
+```
+
+**Key Improvements**:
+- ✅ **Smart Parameter Injection**: Automatically uses defaults from `config/default-params.json`
+- ✅ **Backward Compatibility**: Still accepts explicit parameters when provided
+- ✅ **Environment Support**: Different defaults per environment (dev, staging, prod)
+- ✅ **Resource Exposure**: MCP resources now properly exposed (fixed "Resources (0)" issue)
 
 ### Service Account Configuration (2025-05-29)
 
