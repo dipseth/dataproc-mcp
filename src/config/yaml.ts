@@ -2,11 +2,11 @@
  * YAML configuration parser for Dataproc cluster configurations
  */
 
-import fs from 'fs/promises';
-import yaml from 'js-yaml';
+import { promises as fs } from 'fs';
+import * as yaml from 'js-yaml';
 import { z } from 'zod';
 import { ClusterConfig } from '../types/cluster-config.js';
-import path from 'path';
+import * as path from 'path';
 
 /**
  * Zod schema for validating the traditional YAML cluster configuration
@@ -168,8 +168,23 @@ export function convertYamlToDataprocConfig(yamlConfig: YamlClusterConfig, fileP
     // Get the cluster config (support both snake_case and camelCase)
     const clusterConfig = projectConfig.cluster_config || projectConfig.clusterConfig || {};
     
+    if (process.env.LOG_LEVEL === 'debug') {
+      console.error('[DEBUG] YAML: Original cluster config:', JSON.stringify(clusterConfig, null, 2));
+    }
+    
     // Convert snake_case to camelCase for the entire config
     const camelCaseConfig = convertSnakeToCamel(clusterConfig);
+    
+    if (process.env.LOG_LEVEL === 'debug') {
+      console.error('[DEBUG] YAML: Transformed config:', JSON.stringify(camelCaseConfig, null, 2));
+    }
+    
+    // Ensure proper nesting of service account in gceClusterConfig
+    if (camelCaseConfig.gceClusterConfig?.serviceAccount) {
+      if (process.env.LOG_LEVEL === 'debug') {
+        console.error('[DEBUG] YAML: Service account found:', camelCaseConfig.gceClusterConfig.serviceAccount);
+      }
+    }
     
     return {
       clusterName,

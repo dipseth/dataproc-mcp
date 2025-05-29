@@ -4,12 +4,39 @@
  */
 
 import fetch from 'node-fetch';
-import { getGcloudAccessToken, getGcloudAccessTokenWithConfig } from '../config/credentials.js';
+import { getGcloudAccessToken, getGcloudAccessTokenWithConfig, createJobClient } from '../config/credentials.js';
 import { JobOutputHandler, JobOutputOptions } from './job-output-handler.js';
 import { OutputFormat } from '../types/gcs-types.js';
 import { CacheConfig } from '../types/cache-types.js';
 import { GCSService } from './gcs.js';
 import { logger } from '../utils/logger.js';
+
+/**
+ * Fetch with timeout wrapper
+ * @param url URL to fetch
+ * @param options Fetch options
+ * @param timeoutMs Timeout in milliseconds (default: 30 seconds)
+ * @returns Promise that resolves to Response or rejects on timeout
+ */
+async function fetchWithTimeout(url: string, options: any, timeoutMs: number = 30000): Promise<any> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error(`Request timed out after ${timeoutMs}ms`);
+    }
+    throw error;
+  }
+}
 
 export type DataprocJobType = 'hive' | 'spark' | 'pyspark' | 'presto' | 'pig' | 'hadoop' | 'sparkR' | 'sparkSql';
 
@@ -92,14 +119,14 @@ export async function submitDataprocJob(options: SubmitDataprocJobOptions): Prom
 
   const requestBody = { job };
 
-  const response = await fetch(url, {
+  const response = await fetchWithTimeout(url, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'
     },
     body: JSON.stringify(requestBody)
-  });
+  }, 30000); // 30 second timeout
 
   if (!response.ok) {
     const errorText = await response.text();
@@ -136,30 +163,57 @@ export async function submitDataprocJob(options: SubmitDataprocJobOptions): Prom
 }
 
 /**
- * Get Dataproc job status
+ * Get Dataproc job status with enhanced authentication fallback
  */
 export async function getDataprocJobStatus(options: { projectId: string, region: string, jobId: string }): Promise<any> {
+  const startTime = Date.now();
+  console.error(`[TIMING] getDataprocJobStatus: Starting MCP tool execution`);
   const { projectId, region, jobId } = options;
   
-  // Use the service account from the server configuration
-  const token = await getGcloudAccessTokenWithConfig();
-
-  const url = `https://${region}-dataproc.googleapis.com/v1/projects/${projectId}/regions/${region}/jobs/${jobId}`;
-
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
+  try {
+    // Use REST API approach (like working list_clusters)
+    console.error(`[TIMING] getDataprocJobStatus: Using REST API approach`);
+    const authStartTime = Date.now();
+    const token = await getGcloudAccessTokenWithConfig();
+    const authDuration = Date.now() - authStartTime;
+    
+    console.error(`[TIMING] getDataprocJobStatus: Auth completed in ${authDuration}ms`);
+    if (process.env.LOG_LEVEL === 'debug') {
+      console.error(`[DEBUG] getDataprocJobStatus: Using configured authentication`);
     }
-  });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Failed to get Dataproc job status: ${response.status} - ${errorText}`);
+    const url = `https://${region}-dataproc.googleapis.com/v1/projects/${projectId}/regions/${region}/jobs/${jobId}`;
+
+    const fetchStartTime = Date.now();
+    const response = await fetchWithTimeout(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    }, 30000); // 30 second timeout
+    const fetchDuration = Date.now() - fetchStartTime;
+
+    if (!response.ok) {
+      const totalDuration = Date.now() - startTime;
+      console.error(`[TIMING] getDataprocJobStatus: FAILED after ${totalDuration}ms (auth: ${authDuration}ms, fetch: ${fetchDuration}ms)`);
+      const errorText = await response.text();
+      throw new Error(`Failed to get Dataproc job status: ${response.status} - ${errorText}`);
+    }
+
+    const parseStartTime = Date.now();
+    const result = await response.json();
+    const parseDuration = Date.now() - parseStartTime;
+    const totalDuration = Date.now() - startTime;
+    
+    console.error(`[TIMING] getDataprocJobStatus: SUCCESS - auth: ${authDuration}ms, fetch: ${fetchDuration}ms, parse: ${parseDuration}ms, total: ${totalDuration}ms`);
+    return result;
+  } catch (error) {
+    const totalDuration = Date.now() - startTime;
+    console.error(`[TIMING] getDataprocJobStatus: FAILED after ${totalDuration}ms`);
+    console.error('[ERROR] getDataprocJobStatus: REST API failed:', error);
+    throw new Error(`Failed to get Dataproc job status: ${error}`);
   }
-
-  return await response.json();
 }
 
 // Output handler instance with default cache config
