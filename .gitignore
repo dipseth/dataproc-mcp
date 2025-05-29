@@ -22,3 +22,5 @@ config/server.json
 .roo/mcp.json
 .rooignore
 config/server.json
+old-tests/*.md
+
