@@ -28,6 +28,12 @@ export interface AuthenticationConfig {
   fallbackKeyPath?: string;
   
   /**
+   * Fallback service account for elevated permissions (e.g., cluster deletion)
+   * Used when the primary service account lacks sufficient permissions
+   */
+  fallbackServiceAccount?: string;
+  
+  /**
    * Whether to prefer impersonation over direct key file usage
    * @default true
    */

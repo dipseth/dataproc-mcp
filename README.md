@@ -71,15 +71,49 @@ See [`tests/README-mcp-resources.md`](tests/README-mcp-resources.md) for detaile
 
 ## Authentication
 
-The server uses Google Cloud authentication. You can configure the authentication method in the `config/server.json` file:
+The server supports multiple authentication strategies with **service account impersonation** as the preferred method for production environments.
+
+### Service Account Impersonation (Recommended)
+
+Configure the server to impersonate a service account internally without affecting your local gcloud configurations:
 
 ```json
 {
   "authentication": {
-    "impersonateServiceAccount": "your-service-account@your-project.iam.gserviceaccount.com"
+    "impersonateServiceAccount": "grpn-sa-terraform-data-science@prj-grp-central-sa-prod-0b25.iam.gserviceaccount.com",
+    "fallbackKeyPath": "/path/to/your/service-account-key.json",
+    "preferImpersonation": true,
+    "useApplicationDefaultFallback": true
   }
 }
 ```
+
+**Benefits:**
+- No impact on your local gcloud configurations
+- Automatic authentication for production environments
+- Graceful fallback to other authentication methods
+- Internal credential management
+
+### Authentication Strategy Priority
+
+1. **Service Account Impersonation** (Strategy 0 - Highest Priority)
+   - Uses configured target service account for impersonation
+   - Sources credentials from fallback key path or Application Default Credentials
+   - Completely internal to the MCP server
+
+2. **Configured Key File** (Strategy 1)
+   - Uses explicit key file path from configuration or environment
+   - Includes fallback key path from server config
+
+3. **Application Default Credentials** (Strategy 2)
+   - Uses gcloud default credentials as final fallback
+
+### Configuration Options
+
+- `impersonateServiceAccount`: Target service account to impersonate
+- `fallbackKeyPath`: Service account key file for source credentials
+- `preferImpersonation`: Whether to prefer impersonation over direct key file usage (default: true)
+- `useApplicationDefaultFallback`: Whether to use ADC as final fallback (default: true)
 
 ### Service Account Configuration
 

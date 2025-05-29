@@ -71,7 +71,7 @@ The MCP server uses these defaults:
 - **State File**: `./state/dataproc-state.json`
 - **Profile Scan Interval**: 5 minutes
 - **State Save Interval**: 1 minute
-- **Authentication**: Uses default Google Cloud credentials
+- **Authentication**: Environment-independent service account impersonation
 
 ## Project-Specific Configuration (Optional)
 
@@ -94,7 +94,10 @@ Only create project-specific configurations when you need to override defaults f
    ```json
    {
      "authentication": {
-       "impersonateServiceAccount": "project-specific-sa@your-project.iam.gserviceaccount.com"
+       "impersonateServiceAccount": "project-specific-sa@your-project.iam.gserviceaccount.com",
+       "fallbackKeyPath": "/absolute/path/to/source-service-account-key.json",
+       "preferImpersonation": true,
+       "useApplicationDefaultFallback": false
      },
      "profileManager": {
        "rootConfigPath": "./custom-profiles"
@@ -137,20 +140,82 @@ profiles/
 - Configure MCP to point to that directory
 - Useful when profiles contain project-specific configurations
 
+## Environment-Independent Authentication
+
+### Service Account Impersonation Configuration
+
+The MCP server now supports **environment-independent authentication** through service account impersonation, eliminating dependencies on environment variables like `GOOGLE_APPLICATION_CREDENTIALS`.
+
+#### Required Configuration
+```json
+{
+  "authentication": {
+    "impersonateServiceAccount": "target-service-account@project.iam.gserviceaccount.com",
+    "fallbackKeyPath": "/absolute/path/to/source-service-account-key.json",
+    "preferImpersonation": true,
+    "useApplicationDefaultFallback": false
+  }
+}
+```
+
+#### Configuration Parameters
+- **`impersonateServiceAccount`**: Target service account to impersonate for all operations
+- **`fallbackKeyPath`**: **REQUIRED** - Absolute path to source service account key file
+- **`preferImpersonation`**: Whether to prefer impersonation over direct key file usage
+- **`useApplicationDefaultFallback`**: Whether to allow Application Default Credentials as final fallback
+
+#### Environment Independence Benefits
+- ✅ **No Environment Variable Dependencies**: System ignores `GOOGLE_APPLICATION_CREDENTIALS`
+- ✅ **Predictable Behavior**: Authentication determined by configuration file only
+- ✅ **Fail-Fast Configuration**: Missing configuration results in clear error messages
+- ✅ **Production Ready**: Works consistently across different environments
+
+#### Authentication Strategy Priority
+1. **Service Account Impersonation** (if configured and preferred)
+2. **Configured Key File** (explicit configuration only)
+3. **Application Default Credentials** (only if explicitly enabled)
+
+### Example: Multi-Environment Setup
+```json
+{
+  "dataproc-server-dev": {
+    "env": {
+      "MCP_CONFIG": "{\"authentication\":{\"impersonateServiceAccount\":\"dev-sa@dev-project.iam.gserviceaccount.com\",\"fallbackKeyPath\":\"/path/to/dev-key.json\",\"preferImpersonation\":true,\"useApplicationDefaultFallback\":false}}"
+    }
+  },
+  "dataproc-server-prod": {
+    "env": {
+      "MCP_CONFIG": "{\"authentication\":{\"impersonateServiceAccount\":\"prod-sa@prod-project.iam.gserviceaccount.com\",\"fallbackKeyPath\":\"/path/to/prod-key.json\",\"preferImpersonation\":true,\"useApplicationDefaultFallback\":false}}"
+    }
+  }
+}
+```
+
 ## Best Practices
 
 ### ✅ Recommended Approach
 
-1. **Use global MCP configuration** for most settings
-2. **Keep common profiles** in the MCP server's `./profiles/` directory
-3. **Only create project-specific configs** when you need different service accounts or custom settings
-4. **Don't auto-create directories** - create them manually when needed
+1. **Use environment-independent authentication** with service account impersonation
+2. **Use global MCP configuration** for most settings
+3. **Keep common profiles** in the MCP server's `./profiles/` directory
+4. **Only create project-specific configs** when you need different service accounts or custom settings
+5. **Don't auto-create directories** - create them manually when needed
+6. **Always specify `fallbackKeyPath`** for impersonation to ensure environment independence
+
+### ✅ Authentication Best Practices
+
+1. **Use service account impersonation** instead of direct key file authentication
+2. **Set `useApplicationDefaultFallback: false`** to ensure environment independence
+3. **Use absolute paths** for `fallbackKeyPath` to avoid path resolution issues
+4. **Test configuration** in different environments to ensure consistency
 
 ### ❌ Avoid
 
-1. **Don't copy profiles to every project** - use the centralized profiles
-2. **Don't create unnecessary config directories** - use defaults when possible
-3. **Don't use complex configuration hierarchies** - keep it simple
+1. **Don't rely on environment variables** like `GOOGLE_APPLICATION_CREDENTIALS`
+2. **Don't copy profiles to every project** - use the centralized profiles
+3. **Don't create unnecessary config directories** - use defaults when possible
+4. **Don't use complex configuration hierarchies** - keep it simple
+5. **Don't enable `useApplicationDefaultFallback`** unless you specifically need environment variable fallbacks
 
 ## Troubleshooting
 
