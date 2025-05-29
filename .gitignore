@@ -21,3 +21,4 @@ old-tests/test-results.json
 config/server.json
 .roo/mcp.json
 .rooignore
+config/server.json
