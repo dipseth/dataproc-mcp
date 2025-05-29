@@ -6,25 +6,43 @@ This guide documents the comprehensive authentication system implemented in the 
 
 ## Authentication System Architecture
 
-### Consolidated Authentication Approach
+### Environment-Independent Authentication Approach
 
-The authentication system uses a simplified, consolidated approach that eliminates complex impersonation chains and provides reliable access to Google Cloud Dataproc APIs.
+The authentication system uses a **configuration-driven approach** that operates independently of environment variables and provides reliable access to Google Cloud Dataproc APIs through **service account impersonation**.
 
-#### Primary Authentication Strategy: Direct Key File
+#### Primary Authentication Strategy: Service Account Impersonation
 ```typescript
-// Uses GOOGLE_APPLICATION_CREDENTIALS environment variable
+// Strategy 0: Service Account Impersonation (Highest Priority)
+const sourceAuth = new GoogleAuth({
+  keyFilename: serverConfig.authentication.fallbackKeyPath,
+  scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+});
+
+const impersonatedClient = new Impersonated({
+  sourceClient: await sourceAuth.getClient(),
+  targetPrincipal: serverConfig.authentication.impersonateServiceAccount,
+  targetScopes: ['https://www.googleapis.com/auth/cloud-platform'],
+  delegates: [],
+});
+```
+
+#### Fallback Strategy 1: Configured Key File
+```typescript
+// Strategy 1: Uses explicit key file from configuration
 const auth = new GoogleAuth({
-  keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+  keyFilename: serverConfig.authentication.fallbackKeyPath,
   scopes: ['https://www.googleapis.com/auth/cloud-platform'],
 });
 ```
 
-#### Fallback Strategy: Application Default Credentials
+#### Fallback Strategy 2: Application Default Credentials (Optional)
 ```typescript
-// Falls back to ADC if key file not available
-const auth = new GoogleAuth({
-  scopes: ['https://www.googleapis.com/auth/cloud-platform'],
-});
+// Strategy 2: Only if explicitly enabled in configuration
+if (serverConfig.authentication.useApplicationDefaultFallback) {
+  const auth = new GoogleAuth({
+    scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+  });
+}
 ```
 
 ## Performance Improvements Achieved
@@ -45,51 +63,129 @@ const auth = new GoogleAuth({
 
 ## Authentication Configuration
 
-### Environment Variables
-- **`GOOGLE_APPLICATION_CREDENTIALS`**: Path to service account key file
-- **`USE_APPLICATION_DEFAULT`**: Set to 'true' to force ADC usage
+### Configuration-Driven Authentication (Environment Independent)
+
+The system now uses **explicit configuration** instead of environment variables to ensure predictable behavior across different environments.
+
+#### Required Configuration Structure
+```json
+{
+  "authentication": {
+    "impersonateServiceAccount": "target-service-account@project.iam.gserviceaccount.com",
+    "fallbackKeyPath": "/absolute/path/to/service-account-key.json",
+    "preferImpersonation": true,
+    "useApplicationDefaultFallback": false
+  }
+}
+```
+
+#### Configuration Parameters
+- **`impersonateServiceAccount`**: Target service account to impersonate for operations
+- **`fallbackKeyPath`**: **REQUIRED** - Absolute path to source service account key file
+- **`preferImpersonation`**: Whether to prefer impersonation over direct key file usage (default: true)
+- **`useApplicationDefaultFallback`**: Whether to allow ADC as final fallback (default: false for environment independence)
 
 ### Recommended Service Account Configuration
 Based on comprehensive testing, the optimal configuration uses:
 
-- **Service Account**: `grpn-sa-ds-mwaa-dataproc@prj-grp-central-sa-prod-0b25.iam.gserviceaccount.com`
-- **Key File**: `/Users/srivers/Repositories/pricing-composer/orchestrator/classpath/gcp_prod_keyfile.json`
+- **Target Service Account**: `grpn-sa-terraform-data-science@prj-grp-central-sa-prod-0b25.iam.gserviceaccount.com`
+- **Source Key File**: `/Users/srivers/Repositories/pricing-composer/orchestrator/classpath/gcp_prod_keyfile.json`
 - **Project**: `prj-grp-data-sci-prod-b425`
-- **Authentication Method**: Direct key file (no impersonation)
+- **Authentication Method**: Service account impersonation with explicit source credentials
 
-### Authentication Flow
+### Authentication Flow (Environment Independent)
 ```
-Environment Variable (GOOGLE_APPLICATION_CREDENTIALS)
+Server Configuration (config/server.json)
     ↓
-Key File Authentication
+Service Account Impersonation
+    ↓ (uses)
+Source Key File Authentication (fallbackKeyPath)
     ↓
 Authentication Caching (5-minute cache)
     ↓
 Google Cloud APIs (Dataproc, GCS, etc.)
 ```
 
+### Environment Independence Guarantees
+- ✅ **No Environment Variable Dependencies**: System ignores `GOOGLE_APPLICATION_CREDENTIALS`
+- ✅ **Explicit Configuration Required**: All authentication paths require explicit configuration
+- ✅ **Fail-Fast Behavior**: Missing configuration results in clear error messages
+- ✅ **Predictable Behavior**: Authentication determined by configuration file only
+
 ## Implementation Details
 
-### Consolidated Authentication Functions
+### Environment-Independent Authentication Functions
 
-#### `createAuth()` - Primary Authentication Function
+#### `createAuth()` - Multi-Strategy Authentication Function
 ```typescript
-export async function createAuth(): Promise<GoogleAuth> {
-  const keyFilename = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-  const useADC = process.env.USE_APPLICATION_DEFAULT === 'true';
+export async function createAuth(options: DataprocClientOptions = {}): Promise<AuthResult> {
+  // Get server configuration (no environment variable fallbacks)
+  const serverConfig = await getServerConfig();
   
-  if (!useADC && keyFilename) {
-    // Primary: Direct key file authentication
-    return new GoogleAuth({
-      keyFilename,
+  // Strategy 0: Service Account Impersonation (Highest Priority)
+  if (serverConfig?.authentication?.impersonateServiceAccount &&
+      (serverConfig?.authentication?.preferImpersonation !== false)) {
+    
+    // REQUIRE fallback key path - no environment fallback
+    if (!serverConfig.authentication.fallbackKeyPath) {
+      throw new Error(`Service account impersonation requires fallbackKeyPath in server configuration. No environment fallback to ensure independence.`);
+    }
+    
+    // Create source credentials from explicit key file
+    const sourceAuth = new GoogleAuth({
+      keyFilename: serverConfig.authentication.fallbackKeyPath,
       scopes: ['https://www.googleapis.com/auth/cloud-platform'],
     });
-  } else {
-    // Fallback: Application Default Credentials
+    
+    // Create impersonated credentials
+    const impersonatedClient = await createImpersonatedAuth(
+      serverConfig.authentication.impersonateServiceAccount,
+      sourceAuth
+    );
+    
+    return { strategy: AuthStrategy.KEY_FILE, success: true, auth: impersonatedClient };
+  }
+  
+  // Strategy 1: Configured Key File (explicit configuration only)
+  const keyPath = keyFilename || serverConfig?.authentication?.fallbackKeyPath;
+  if (keyPath && !useApplicationDefault) {
+    return new GoogleAuth({
+      keyFilename: keyPath,
+      scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+    });
+  }
+  
+  // Strategy 2: Application Default Credentials (only if explicitly enabled)
+  if (serverConfig?.authentication?.useApplicationDefaultFallback) {
     return new GoogleAuth({
       scopes: ['https://www.googleapis.com/auth/cloud-platform'],
     });
   }
+  
+  // Fail if no valid configuration found
+  throw new Error('No valid authentication configuration found. Requires explicit configuration.');
+}
+```
+
+#### `createImpersonatedAuth()` - Service Account Impersonation
+```typescript
+export async function createImpersonatedAuth(
+  targetServiceAccount: string,
+  sourceCredentials?: GoogleAuth
+): Promise<Impersonated> {
+  // Require explicit source credentials - no environment fallback
+  if (!sourceCredentials) {
+    throw new Error('Source credentials are required for impersonation. No fallback to ADC to avoid environment dependencies.');
+  }
+  
+  const sourceAuthClient = await sourceCredentials.getClient();
+  
+  return new Impersonated({
+    sourceClient: sourceAuthClient as OAuth2Client,
+    targetPrincipal: targetServiceAccount,
+    targetScopes: ['https://www.googleapis.com/auth/cloud-platform'],
+    delegates: [],
+  });
 }
 ```
 

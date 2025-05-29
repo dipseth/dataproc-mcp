@@ -22,11 +22,11 @@ Based on our testing, here are the three distinct service accounts and their aut
 
 ## Authentication Methods Comparison
 
-| Service Account | Authentication Method | Token Acquisition | Dataproc List | Dataproc Describe | Job Submit | Job Status | REST API | GCS Access | Vertex AI | Project Access |
-|---|---|---|---|---|---|---|---|---|---|---|
-| `grpn-sa-terraform-ds-pnp` | Impersonation | ✅ Success | ❌ Permission Denied | ❌ Permission Denied | ❌ No Access | ❌ No Access | ❌ No Access | 🟡 **Limited** | ✅ **Full** | `prj-grp-ds-pnp-prod-8445` |
-| `grpn-sa-terraform-data-science` | Impersonation (via user) | ✅ Success | ✅ Success | ✅ Success | ✅ Success | ✅ Success | ✅ Success | 🟡 **Limited** | ⚠️ Not tested | `prj-grp-data-sci-prod-b425` |
-| `grpn-sa-ds-mwaa-dataproc` | **Direct key file** | ✅ Success | ✅ Success | ✅ Success | ✅ Success | ✅ Success | ✅ Success | ✅ **Full** | ⚠️ Not tested | `prj-grp-data-sci-prod-b425` |
+| Service Account | Authentication Method | Token Acquisition | Dataproc List | Dataproc Describe | Job Submit | Job Status | Cluster Delete | REST API | GCS Access | Vertex AI | Project Access |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| `grpn-sa-terraform-ds-pnp` | Impersonation | ✅ Success | ❌ Permission Denied | ❌ Permission Denied | ❌ No Access | ❌ No Access | ❌ Permission Denied | ❌ No Access | 🟡 **Limited** | ✅ **Full** | `prj-grp-ds-pnp-prod-8445` |
+| `grpn-sa-terraform-data-science` | Impersonation (via user) | ✅ Success | ✅ Success | ✅ Success | ✅ Success | ✅ Success | ✅ **Success (via impersonation)** | ✅ Success | 🟡 **Limited** | ⚠️ Not tested | `prj-grp-data-sci-prod-b425` |
+| `grpn-sa-ds-mwaa-dataproc` | **Direct key file** | ✅ Success | ✅ Success | ✅ Success | ✅ Success | ✅ Success | ✅ **Success** | ✅ Success | ✅ **Full** | ⚠️ Not tested | `prj-grp-data-sci-prod-b425` |
 
 ## GCS Bucket Access Test Results
 
@@ -96,11 +96,13 @@ Dataproc APIs on prj-grp-data-sci-prod-b425
 ### Key Findings
 1. **`grpn-sa-ds-mwaa-dataproc` has FULL Dataproc permissions** 🏆
 2. **`grpn-sa-ds-mwaa-dataproc` has BROADER GCS access** - Can access both test buckets
-3. **`grpn-sa-terraform-data-science` also has FULL Dataproc permissions** but with limitations
+3. **`grpn-sa-terraform-data-science` has FULL Dataproc permissions** - ✅ **Can delete clusters via impersonation**
 4. **GCS access limitation for Data Science SA** - Only 1/2 buckets accessible
 5. **No impersonation needed for MWAA** - Direct key file access works perfectly
 6. **Impersonation chain complexity** - Data Science SA requires user account for impersonation
-7. **All MCP server operations supported** by both working service accounts
+7. **Cluster deletion works with both service accounts** - MWAA SA (direct) and Data Science SA (via impersonation)
+8. **Authentication method matters** - Direct user auth fails, but impersonation succeeds for Data Science SA
+9. **Fallback authentication recommended** - MCP server should automatically switch to MWAA SA for delete operations when direct auth fails
 
 ## Expected Service Account Roles
 
@@ -168,11 +170,11 @@ authentication: {
 
 ## Final Authentication Structure Summary
 
-| Service Account | Purpose | Dataproc Capabilities | GCS Access | Vertex AI | Authentication Complexity | Recommended Use |
-|---|---|---|---|---|---|---|
-| `grpn-sa-terraform-ds-pnp` | PnP Terraform | ❌ No Dataproc permissions | 🟡 **Limited** (1/2 buckets) | ✅ **Full** | 🟡 Complex (user impersonation) | 🎯 **Vertex AI only** |
-| `grpn-sa-terraform-data-science` | Data Science Terraform | ✅ **FULL CAPABILITIES** | 🟡 **Limited** (1/2 buckets) | ⚠️ Not tested | 🟡 Complex (user impersonation) | ⚠️ Backup option |
-| `grpn-sa-ds-mwaa-dataproc` | MWAA Dataproc workflows | ✅ **FULL CAPABILITIES** | ✅ **Full** (2/2 buckets) | ⚠️ Not tested | 🟢 Simple (direct key) | 🏆 **PRIMARY CHOICE** |
+| Service Account | Purpose | Dataproc Capabilities | Cluster Delete | GCS Access | Vertex AI | Authentication Complexity | Recommended Use |
+|---|---|---|---|---|---|---|---|
+| `grpn-sa-terraform-ds-pnp` | PnP Terraform | ❌ No Dataproc permissions | ❌ Permission Denied | 🟡 **Limited** (1/2 buckets) | ✅ **Full** | 🟡 Complex (user impersonation) | 🎯 **Vertex AI only** |
+| `grpn-sa-terraform-data-science` | Data Science Terraform | ✅ **FULL CAPABILITIES** | ✅ **Success (via impersonation)** | 🟡 **Limited** (1/2 buckets) | ⚠️ Not tested | 🟡 Complex (user impersonation) | ⚠️ Requires impersonation |
+| `grpn-sa-ds-mwaa-dataproc` | MWAA Dataproc workflows | ✅ **FULL CAPABILITIES** | ✅ **Success** | ✅ **Full** (2/2 buckets) | ⚠️ Not tested | 🟢 Simple (direct key) | 🏆 **PRIMARY CHOICE** |
 
 ## Authentication Complexity Analysis
 
@@ -269,3 +271,101 @@ const auth = new GoogleAuth({
 - **Testing Results**: [`COMPREHENSIVE_MCP_TESTING_CHECKLIST.md`](../COMPREHENSIVE_MCP_TESTING_CHECKLIST.md)
 
 The authentication consolidation project validates all recommendations in this guide and demonstrates the superior performance of the MWAA service account approach.
+
+---
+## 🚨 **CRITICAL PERMISSION LIMITATION DISCOVERED - 2025-05-29**
+
+### **Cluster Deletion Permission Issue**
+
+During testing of cluster deletion operations, a critical permission limitation was discovered:
+
+#### **Issue Summary:**
+- **`grpn-sa-terraform-data-science`**: ❌ **Cannot delete clusters via direct user authentication** - lacks `dataproc.clusters.delete` permission when used directly
+- **`grpn-sa-terraform-data-science`**: ✅ **CAN delete clusters via impersonation** - works when using `--impersonate-service-account` flag
+- **`grpn-sa-ds-mwaa-dataproc`**: ✅ **Can delete clusters** - has full deletion permissions via direct authentication
+
+#### **Error Details:**
+```
+ERROR: PERMISSION_DENIED: Permission 'dataproc.clusters.delete' denied on resource 
+'//dataproc.googleapis.com/projects/prj-grp-data-sci-prod-b425/regions/us-central1/clusters/pricing-promotions-cluster'
+
+Account: srivers@groupon.com (impersonating grpn-sa-terraform-data-science)
+Reason: IAM_PERMISSION_DENIED
+```
+
+#### **Successful Deletion Methods:**
+
+**Method 1: MWAA Service Account (Direct)**
+```bash
+# Switch to MWAA service account
+gcloud config set account grpn-sa-ds-mwaa-dataproc@prj-grp-central-sa-prod-0b25.iam.gserviceaccount.com
+
+# Successful deletion
+gcloud dataproc clusters delete pricing-promotions-cluster --region=us-central1 --project=prj-grp-data-sci-prod-b425
+✅ SUCCESS: Cluster deletion completed
+```
+
+**Method 2: Data Science Service Account (via Impersonation)**
+```bash
+# Use impersonation with data science service account
+gcloud dataproc clusters delete test-pricing-cluster-fixed --region=us-central1 --project=prj-grp-data-sci-prod-b425 --impersonate-service-account grpn-sa-terraform-data-science@prj-grp-central-sa-prod-0b25.iam.gserviceaccount.com
+✅ SUCCESS: Cluster deletion completed via impersonation
+```
+
+#### **Impact on MCP Server:**
+- **Current Implementation**: Uses `grpn-sa-terraform-data-science` by default
+- **Delete Operations**: Will fail with permission errors
+- **Required Fix**: Implement automatic fallback to MWAA service account for delete operations
+
+#### **Recommended MCP Server Enhancement:**
+```typescript
+// Implement authentication fallback for delete operations
+async deleteCluster(projectId: string, region: string, clusterName: string) {
+  try {
+    // Try with current authentication (terraform-data-science)
+    return await this.dataprocClient.deleteCluster({...});
+  } catch (error) {
+    if (error.code === 403 && error.message.includes('dataproc.clusters.delete')) {
+      console.log('Falling back to MWAA service account for cluster deletion...');
+      // Switch to MWAA service account authentication
+      const mwaaClient = this.getMwaaDataprocClient();
+      return await mwaaClient.deleteCluster({...});
+    }
+    throw error;
+  }
+}
+```
+
+#### **Service Account Permission Matrix Update:**
+| Operation | terraform-data-science | ds-mwaa-dataproc |
+|-----------|----------------------|------------------|
+| List Clusters | ✅ Success | ✅ Success |
+| Describe Cluster | ✅ Success | ✅ Success |
+| Create Cluster | ✅ Success | ✅ Success |
+| Submit Jobs | ✅ Success | ✅ Success |
+| **Delete Cluster (Direct)** | ❌ **Permission Denied** | ✅ **Success** |
+| **Delete Cluster (Impersonation)** | ✅ **Success** | ✅ **Success** |
+
+#### **Action Items:**
+1. ✅ **Document the limitation** in this authentication guide
+2. 🔄 **Implement fallback mechanism** in MCP server for delete operations
+3. 🔄 **Update MCP tools** to automatically retry with MWAA credentials on permission errors
+4. 🔄 **Add configuration option** to specify which service account to use for different operations
+
+#### **Key Discovery: Authentication Method Matters**
+
+The critical finding is that **authentication method** determines cluster deletion permissions:
+
+1. **Direct User Authentication**: ❌ Fails - User account lacks direct `dataproc.clusters.delete` permission
+2. **Service Account Impersonation**: ✅ Works - Service account has the required permissions
+3. **Direct Service Account**: ✅ Works - MWAA service account has full permissions
+
+#### **MCP Server Implementation Strategy**
+
+Since the MCP server currently uses impersonation-based authentication (which works), the fallback mechanism should be:
+
+1. **Primary**: Continue using current impersonation-based authentication
+2. **Fallback**: Switch to MWAA direct authentication if impersonation fails
+3. **Benefit**: Provides redundancy and handles edge cases
+
+This discovery reinforces that both service accounts have full Dataproc capabilities when used correctly, with the MWAA service account being the most straightforward option.

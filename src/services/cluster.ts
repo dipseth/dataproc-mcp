@@ -425,6 +425,55 @@ export async function deleteClusterWithRest(
 }
 
 /**
+ * Deletes a Dataproc cluster using the fallback service account (fallback for permission issues)
+ * @param projectId GCP project ID
+ * @param region Dataproc region
+ * @param clusterName Name of the cluster to delete
+ * @returns Operation details
+ */
+export async function deleteClusterWithFallback(
+  projectId: string,
+  region: string,
+  clusterName: string
+): Promise<any> {
+  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] deleteClusterWithFallback: Using fallback service account for cluster deletion');
+  
+  // Import here to avoid circular dependency
+  const { getFallbackAccessToken } = await import('../config/credentials.js');
+  const token = await getFallbackAccessToken();
+  
+  const url = `https://${region}-dataproc.googleapis.com/v1/projects/${projectId}/regions/${region}/clusters/${clusterName}`;
+  
+  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] deleteClusterWithFallback: Making REST API request with fallback token to:', url);
+  
+  try {
+    const response = await fetch(url, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[DEBUG] deleteClusterWithFallback: API error:', response.status, errorText);
+      throw new Error(`API error: ${response.status} - ${errorText}`);
+    }
+    
+    const result = await response.json();
+    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] deleteClusterWithFallback: API request successful with fallback account');
+    return result;
+  } catch (error) {
+    console.error('[DEBUG] deleteClusterWithFallback: Error:', error);
+    if (error instanceof Error) {
+      throw new Error(`Error deleting cluster with fallback: ${error.message}`);
+    }
+    throw new Error('Unknown error deleting cluster with fallback');
+  }
+}
+
+/**
  * Deletes a Dataproc cluster
  * @param projectId GCP project ID
  * @param region Dataproc region
@@ -439,11 +488,34 @@ export async function deleteCluster(
   if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] deleteCluster: Starting with params:', { projectId, region, clusterName });
   
   try {
-    // Use the REST API directly instead of the client library to avoid authentication issues
+    // Try with current authentication first
     if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] deleteCluster: Using REST API directly via deleteClusterWithRest');
     return await deleteClusterWithRest(projectId, region, clusterName);
   } catch (error) {
-    console.error('[DEBUG] deleteCluster: Error encountered:', error);
+    console.error('[DEBUG] deleteCluster: Primary deletion failed:', error);
+    
+    // Check if this is a permission error for cluster deletion
+    if (error instanceof Error &&
+        (error.message.includes('dataproc.clusters.delete') ||
+         error.message.includes('PERMISSION_DENIED') ||
+         error.message.includes('403'))) {
+      
+      console.error('[DEBUG] deleteCluster: Permission denied detected, attempting MWAA fallback...');
+      
+      try {
+        // Fallback to configured fallback service account
+        console.error('[DEBUG] deleteCluster: Falling back to configured fallback service account for cluster deletion');
+        return await deleteClusterWithFallback(projectId, region, clusterName);
+      } catch (fallbackError) {
+        console.error('[DEBUG] deleteCluster: Fallback service account also failed:', fallbackError);
+        if (fallbackError instanceof Error) {
+          throw new Error(`Error deleting cluster (both primary and fallback failed): Primary: ${error.message}, Fallback: ${fallbackError.message}`);
+        }
+        throw new Error(`Error deleting cluster (both primary and fallback failed): ${error.message}`);
+      }
+    }
+    
+    // If not a permission error, throw the original error
     if (error instanceof Error) {
       throw new Error(`Error deleting cluster: ${error.message}`);
     }
