@@ -13,12 +13,9 @@
     "resolveJsonModule": true,
     "allowImportingTsExtensions": false,
     "types": [
-      "node",
-      "mocha",
-      "chai"
+      "node"
     ]
   },
-  "allowImportingTsExtensions": true,
   "include": [
     "src/**/*"
   ],
