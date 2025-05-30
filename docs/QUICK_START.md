@@ -266,7 +266,7 @@ gcloud compute firewall-rules list
 - **[API Reference](API_REFERENCE.md)** - Complete tool documentation
 - **[Configuration Examples](CONFIGURATION_EXAMPLES.md)** - Real-world setups
 - **[Security Guide](SECURITY_GUIDE.md)** - Best practices
-- **[Troubleshooting](TROUBLESHOOTING.md)** - Common issues and solutions
+- **[Testing Guide](TESTING_GUIDE.md)** - Testing and debugging information
 
 ### Advanced Features
 - **Multi-environment setup** for dev/staging/production
@@ -288,4 +288,4 @@ Your Dataproc MCP Server is now configured and ready to use. Start by creating y
 
 ---
 
-**Need help?** Check our [troubleshooting guide](TROUBLESHOOTING.md) or [open an issue](https://github.com/dipseth/dataproc-mcp/issues).
+**Need help?** Check our [testing guide](TESTING_GUIDE.md) or [open an issue](https://github.com/dipseth/dataproc-mcp/issues).

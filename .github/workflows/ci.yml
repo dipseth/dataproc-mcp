@@ -146,25 +146,41 @@ jobs:
   # ============================================================================
   integration-validation:
     name: 🔗 Integration Validation
-      - name: Run unit tests
+    runs-on: ubuntu-latest
+    needs: [quality-gates]
+    timeout-minutes: 15
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 📦 Install Dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: 🔨 Build Project
+        run: npm run build
+
+      - name: 🧪 Run unit tests
         run: npm test
 
-      - name: Generate coverage report
+      - name: 📊 Generate coverage report
         run: npm run test:coverage
-        if: matrix.node-version == '20'
 
-      - name: Upload coverage to Codecov
+      - name: 📤 Upload coverage to Codecov
         uses: codecov/codecov-action@v4
-        if: matrix.node-version == '20'
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           file: ./coverage/lcov.info
           flags: unittests
           name: codecov-umbrella
 
-      - name: Check coverage threshold
+      - name: ✅ Check coverage threshold
         run: npm run test:coverage:check
-        if: matrix.node-version == '20'
 
   # Job 3: Documentation & Examples
   documentation:
