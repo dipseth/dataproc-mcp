@@ -91,12 +91,12 @@ jobs:
           echo "🔍 Checking if package.json and package-lock.json are in sync..."
           
           # Try npm ci first to check sync
-          if npm ci --dry-run --prefer-offline --no-audit; then
+          if npm ci --dry-run --prefer-offline --no-audit --ignore-scripts; then
             echo "✅ Package files are in sync"
           else
             echo "⚠️ Package files are out of sync - attempting to fix..."
             echo "📦 Running npm install to update lock file..."
-            npm install --package-lock-only
+            npm install --package-lock-only --ignore-scripts
             
             # Check if there are changes to commit
             if git diff --exit-code package-lock.json; then
@@ -135,9 +135,9 @@ jobs:
       - name: 📦 Install Dependencies
         run: |
           # Use npm install if ci fails due to sync issues
-          if ! npm ci --prefer-offline --no-audit; then
+          if ! npm ci --prefer-offline --no-audit --ignore-scripts; then
             echo "⚠️ npm ci failed, falling back to npm install..."
-            npm install --prefer-offline --no-audit
+            npm install --prefer-offline --no-audit --ignore-scripts
           fi
           echo "✅ Dependencies installed for Node.js ${{ matrix.node-version }}"
 
@@ -194,9 +194,9 @@ jobs:
       - name: 📦 Install Dependencies
         run: |
           # Use npm install if ci fails due to sync issues
-          if ! npm ci --prefer-offline --no-audit; then
+          if ! npm ci --prefer-offline --no-audit --ignore-scripts; then
             echo "⚠️ npm ci failed, falling back to npm install..."
-            npm install --prefer-offline --no-audit
+            npm install --prefer-offline --no-audit --ignore-scripts
           fi
 
       - name: 🔍 Security Audit
@@ -230,9 +230,9 @@ jobs:
       - name: 📦 Install Dependencies
         run: |
           # Use npm install if ci fails due to sync issues
-          if ! npm ci --prefer-offline --no-audit; then
+          if ! npm ci --prefer-offline --no-audit --ignore-scripts; then
             echo "⚠️ npm ci failed, falling back to npm install..."
-            npm install --prefer-offline --no-audit
+            npm install --prefer-offline --no-audit --ignore-scripts
           fi
 
       - name: 🔨 Build Project
@@ -277,9 +277,9 @@ jobs:
       - name: 📦 Install Dependencies
         run: |
           # Use npm install if ci fails due to sync issues
-          if ! npm ci --prefer-offline --no-audit; then
+          if ! npm ci --prefer-offline --no-audit --ignore-scripts; then
             echo "⚠️ npm ci failed, falling back to npm install..."
-            npm install --prefer-offline --no-audit
+            npm install --prefer-offline --no-audit --ignore-scripts
           fi
 
       - name: 🔨 Build Project
@@ -343,9 +343,9 @@ jobs:
       - name: 📦 Install Dependencies
         run: |
           # Use npm install if ci fails due to sync issues
-          if ! npm ci --prefer-offline --no-audit; then
+          if ! npm ci --prefer-offline --no-audit --ignore-scripts; then
             echo "⚠️ npm ci failed, falling back to npm install..."
-            npm install --prefer-offline --no-audit
+            npm install --prefer-offline --no-audit --ignore-scripts
           fi
 
       - name: 🔨 Build Production Assets
