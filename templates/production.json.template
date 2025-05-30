@@ -1,0 +1,17 @@
+{
+  "environment": "production",
+  "authentication": {
+    "impersonateServiceAccount": "dataproc-production@YOUR_PRODUCTION_PROJECT.iam.gserviceaccount.com",
+    "preferImpersonation": true
+  },
+  "security": {
+    "enableRateLimiting": true,
+    "maxRequestsPerMinute": 50,
+    "auditLogLevel": "warn"
+  },
+  "logging": {
+    "level": "error",
+    "enableFile": true,
+    "filePath": "/var/log/dataproc-mcp/production.log"
+  }
+}

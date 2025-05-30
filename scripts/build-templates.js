@@ -5,8 +5,12 @@
  * Creates ready-to-use configuration templates
  */
 
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 function buildTemplates() {
   console.log('📋 Building configuration templates...');
@@ -316,8 +320,9 @@ echo "🔧 Configuration examples: docs/CONFIGURATION_EXAMPLES.md"
   console.log('✅ Created setup.sh.template');
 }
 
-if (require.main === module) {
+// Check if this script is being run directly
+if (import.meta.url === `file://${process.argv[1]}`) {
   buildTemplates();
 }
 
-module.exports = { buildTemplates };
+export { buildTemplates };

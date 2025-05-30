@@ -5,20 +5,24 @@
     "moduleResolution": "Node",
     "outDir": "./build",
     "rootDir": "./src",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
+    "noImplicitAny": false,
     "forceConsistentCasingInFileNames": true,
     "allowJs": true,
     "resolveJsonModule": true,
     "allowImportingTsExtensions": false,
+    "typeRoots": [
+      "./node_modules/@types"
+    ],
     "types": [
-      "node",
-      "mocha",
-      "chai"
+      "node"
     ]
   },
-  "allowImportingTsExtensions": true,
   "include": [
     "src/**/*"
   ],

@@ -5,8 +5,12 @@
  * Usage: node scripts/extract-changelog.js v1.0.0
  */
 
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 function extractChangelog(version) {
   const changelogPath = path.join(__dirname, '..', 'CHANGELOG.md');
@@ -89,8 +93,9 @@ function main() {
   }
 }
 
-if (require.main === module) {
+// Check if this script is being run directly
+if (import.meta.url === `file://${process.argv[1]}`) {
   main();
 }
 
-module.exports = { extractChangelog, generateFallbackNotes };
+export { extractChangelog, generateFallbackNotes };

@@ -152,6 +152,98 @@ class ExampleValidator {
         }
     }
 
+    validateHiveQueries(filePath) {
+        try {
+            const content = fs.readFileSync(filePath, 'utf8');
+            
+            // Extract SQL queries from markdown code blocks
+            const sqlBlocks = content.match(/```sql\n([\s\S]*?)\n```/g);
+            
+            if (!sqlBlocks) {
+                this.warnings.push(`${filePath}: No SQL queries found in markdown file`);
+                return;
+            }
+
+            for (let i = 0; i < sqlBlocks.length; i++) {
+                const sqlContent = sqlBlocks[i].replace(/```sql\n/, '').replace(/\n```/, '');
+                this.validateSqlSyntax(sqlContent, filePath, i + 1);
+            }
+
+            // Extract JSON examples for MCP tool usage
+            const jsonBlocks = content.match(/```json\n([\s\S]*?)\n```/g);
+            
+            if (jsonBlocks) {
+                for (let i = 0; i < jsonBlocks.length; i++) {
+                    const jsonContent = jsonBlocks[i].replace(/```json\n/, '').replace(/\n```/, '');
+                    try {
+                        const parsed = JSON.parse(jsonContent);
+                        this.validateMcpToolExample(parsed, filePath, i + 1);
+                    } catch (error) {
+                        this.errors.push(`${filePath}: Invalid JSON in code block ${i + 1}: ${error.message}`);
+                    }
+                }
+            }
+        } catch (error) {
+            this.errors.push(`${filePath}: Error reading Hive query file - ${error.message}`);
+        }
+    }
+
+    validateSqlSyntax(sql, filePath, blockNumber) {
+        // Basic SQL syntax validation
+        const trimmedSql = sql.trim();
+        
+        if (!trimmedSql) {
+            this.warnings.push(`${filePath}: Empty SQL block ${blockNumber}`);
+            return;
+        }
+
+        // Check for common SQL keywords
+        const sqlKeywords = ['SELECT', 'CREATE', 'INSERT', 'UPDATE', 'DELETE', 'DROP', 'ALTER', 'LOAD'];
+        const hasValidKeyword = sqlKeywords.some(keyword =>
+            trimmedSql.toUpperCase().includes(keyword)
+        );
+
+        if (!hasValidKeyword) {
+            this.warnings.push(`${filePath}: SQL block ${blockNumber} may not contain valid SQL statements`);
+        }
+
+        // Check for placeholder values that should be replaced
+        const placeholders = ['your-bucket', 'your-project-id', 'your-cluster-name'];
+        for (const placeholder of placeholders) {
+            if (trimmedSql.includes(placeholder)) {
+                this.warnings.push(`${filePath}: SQL block ${blockNumber} contains placeholder '${placeholder}' - ensure examples are updated`);
+            }
+        }
+
+        // Check for proper semicolon termination
+        if (!trimmedSql.endsWith(';')) {
+            this.warnings.push(`${filePath}: SQL block ${blockNumber} should end with semicolon`);
+        }
+    }
+
+    validateMcpToolExample(example, filePath, blockNumber) {
+        // Validate MCP tool usage examples
+        const requiredFields = ['projectId', 'region', 'clusterName'];
+        
+        for (const field of requiredFields) {
+            if (!example[field]) {
+                this.errors.push(`${filePath}: JSON block ${blockNumber} missing required field '${field}'`);
+            } else if (typeof example[field] === 'string' && example[field].includes('your-')) {
+                this.warnings.push(`${filePath}: JSON block ${blockNumber} contains placeholder value in '${field}'`);
+            }
+        }
+
+        // Validate query field if present
+        if (example.query && typeof example.query !== 'string') {
+            this.errors.push(`${filePath}: JSON block ${blockNumber} 'query' field must be a string`);
+        }
+
+        // Validate async field if present
+        if (example.async !== undefined && typeof example.async !== 'boolean') {
+            this.errors.push(`${filePath}: JSON block ${blockNumber} 'async' field must be a boolean`);
+        }
+    }
+
     async validateExamples() {
         this.log('🔍 Validating Configuration Examples');
         this.log('=====================================');
@@ -161,7 +253,11 @@ class ExampleValidator {
             this.log('Creating examples directory...', 'info');
             fs.mkdirSync(EXAMPLES_DIR, { recursive: true });
             
-            // Create a basic example
+            // Create subdirectories
+            fs.mkdirSync(path.join(EXAMPLES_DIR, 'configs'), { recursive: true });
+            fs.mkdirSync(path.join(EXAMPLES_DIR, 'queries'), { recursive: true });
+            
+            // Create a basic cluster config example
             const basicExample = {
                 profile: {
                     name: 'basic-example',
@@ -187,36 +283,18 @@ class ExampleValidator {
             };
             
             fs.writeFileSync(
-                path.join(EXAMPLES_DIR, 'basic-cluster.yaml'),
+                path.join(EXAMPLES_DIR, 'configs', 'basic-cluster.yaml'),
                 yaml.dump(basicExample, { indent: 2 })
             );
-            this.log('Created basic example file', 'success');
+            this.log('Created basic cluster config example', 'success');
         }
 
-        // Validate all files in examples directory
-        const files = fs.readdirSync(EXAMPLES_DIR, { recursive: true });
-        
-        for (const file of files) {
-            const filePath = path.join(EXAMPLES_DIR, file);
-            const stat = fs.statSync(filePath);
-            
-            if (stat.isFile()) {
-                const ext = path.extname(file).toLowerCase();
-                
-                if (ext === '.yaml' || ext === '.yml') {
-                    this.log(`Validating YAML: ${file}`, 'info');
-                    this.validateYamlFile(filePath);
-                } else if (ext === '.json') {
-                    this.log(`Validating JSON: ${file}`, 'info');
-                    this.validateJsonFile(filePath);
-                } else {
-                    this.log(`Skipping non-config file: ${file}`, 'info');
-                }
-            }
-        }
+        // Validate all files in examples directory recursively
+        this.validateDirectory(EXAMPLES_DIR);
 
         // Validate existing config files
         if (fs.existsSync(CONFIG_DIR)) {
+            this.log('Validating configuration files...', 'info');
             const configFiles = fs.readdirSync(CONFIG_DIR);
             for (const file of configFiles) {
                 if (file.endsWith('.json')) {
@@ -229,6 +307,34 @@ class ExampleValidator {
 
         this.printSummary();
         return this.errors.length === 0;
+    }
+
+    validateDirectory(dirPath) {
+        const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+        
+        for (const entry of entries) {
+            const fullPath = path.join(dirPath, entry.name);
+            
+            if (entry.isDirectory()) {
+                this.validateDirectory(fullPath);
+            } else if (entry.isFile()) {
+                const ext = path.extname(entry.name).toLowerCase();
+                const relativePath = path.relative(EXAMPLES_DIR, fullPath);
+                
+                if (ext === '.yaml' || ext === '.yml') {
+                    this.log(`Validating YAML: ${relativePath}`, 'info');
+                    this.validateYamlFile(fullPath);
+                } else if (ext === '.json') {
+                    this.log(`Validating JSON: ${relativePath}`, 'info');
+                    this.validateJsonFile(fullPath);
+                } else if (ext === '.md') {
+                    this.log(`Validating Hive queries: ${relativePath}`, 'info');
+                    this.validateHiveQueries(fullPath);
+                } else {
+                    this.log(`Skipping non-config file: ${relativePath}`, 'info');
+                }
+            }
+        }
     }
 
     printSummary() {

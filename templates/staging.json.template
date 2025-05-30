@@ -1,0 +1,17 @@
+{
+  "environment": "staging",
+  "authentication": {
+    "impersonateServiceAccount": "dataproc-staging@YOUR_STAGING_PROJECT.iam.gserviceaccount.com",
+    "preferImpersonation": true
+  },
+  "security": {
+    "enableRateLimiting": true,
+    "maxRequestsPerMinute": 100,
+    "auditLogLevel": "info"
+  },
+  "logging": {
+    "level": "warn",
+    "enableFile": false,
+    "filePath": "./logs/staging.log"
+  }
+}

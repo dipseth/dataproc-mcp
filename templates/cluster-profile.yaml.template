@@ -1,0 +1,91 @@
+# Example Dataproc Cluster Profile
+# Copy this template and customize for your use case
+
+# Production Analytics Cluster
+my-company-analytics-prod-1234:
+  region: us-central1
+  tags:
+    - DataProc
+    - analytics
+    - production
+  labels:
+    service: analytics-service
+    owner: data-team
+    environment: production
+    cost-center: analytics
+  cluster_config:
+    gce_cluster_config:
+      zone_uri: us-central1-f
+      subnetwork_uri: projects/YOUR_SHARED_VPC_PROJECT/regions/us-central1/subnetworks/YOUR_SUBNET
+      service_account_scopes:
+        - https://www.googleapis.com/auth/cloud-platform
+      service_account: analytics-dataproc@YOUR_PROJECT.iam.gserviceaccount.com
+      internal_ip_only: true
+      tags:
+        - allow-iap-ssh
+        - dataproc-vm
+        - allow-google-apis
+    lifecycle_config:
+      idle_delete_ttl:
+        seconds: 600  # 10 minutes
+    master_config:
+      num_instances: 1
+      machine_type_uri: n1-standard-8
+      disk_config:
+        boot_disk_type: pd-standard
+        boot_disk_size_gb: 512
+    worker_config:
+      num_instances: 3
+      machine_type_uri: n1-standard-8
+      disk_config:
+        boot_disk_type: pd-standard
+        boot_disk_size_gb: 512
+    software_config:
+      image_version: 1.5-debian10
+      properties:
+        dataproc:dataproc.logging.stackdriver.enable: "true"
+        dataproc:jobs.file-backed-output.enable: "true"
+    endpoint_config:
+      enable_http_port_access: true
+
+# Development Cluster (Cost-Optimized)
+my-company-analytics-dev-5678:
+  region: us-west1
+  tags:
+    - DataProc
+    - analytics
+    - development
+  labels:
+    service: analytics-service
+    owner: data-team
+    environment: dev
+    cost-center: analytics
+  cluster_config:
+    gce_cluster_config:
+      zone_uri: us-west1-a
+      service_account: analytics-dataproc@YOUR_DEV_PROJECT.iam.gserviceaccount.com
+      internal_ip_only: true
+    lifecycle_config:
+      idle_delete_ttl:
+        seconds: 300  # 5 minutes for dev
+    master_config:
+      num_instances: 1
+      machine_type_uri: n1-standard-4
+      disk_config:
+        boot_disk_type: pd-standard
+        boot_disk_size_gb: 256
+    worker_config:
+      num_instances: 2
+      machine_type_uri: n1-standard-4
+      disk_config:
+        boot_disk_type: pd-standard
+        boot_disk_size_gb: 256
+      is_preemptible: true  # Cost savings
+    software_config:
+      optional_components:
+        - JUPYTER
+      image_version: 1.5-debian10
+      properties:
+        dataproc:dataproc.allow.zero.workers: "true"
+    endpoint_config:
+      enable_http_port_access: true

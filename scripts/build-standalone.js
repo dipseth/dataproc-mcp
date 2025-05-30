@@ -5,8 +5,12 @@
  * Creates a self-contained distribution with all necessary files
  */
 
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 function createStandaloneDistribution() {
   console.log('🔨 Building standalone distribution...');
@@ -39,6 +43,13 @@ function createStandaloneDistribution() {
     console.log('✅ Copied config templates');
   }
   
+  // Copy templates directory
+  const templatesDir = path.join(__dirname, '..', 'templates');
+  if (fs.existsSync(templatesDir)) {
+    copyDirectory(templatesDir, path.join(distDir, 'templates'));
+    console.log('✅ Copied configuration templates');
+  }
+  
   // Copy documentation
   const docsDir = path.join(__dirname, '..', 'docs');
   if (fs.existsSync(docsDir)) {
@@ -59,6 +70,9 @@ function createStandaloneDistribution() {
   
   // Create startup script
   createStartupScript(distDir);
+  
+  // Create distribution manifest
+  createDistributionManifest(distDir);
   
   console.log('🎉 Standalone distribution created in dist/');
   console.log('📦 Distribution contents:');
@@ -92,8 +106,12 @@ function createStartupScript(distDir) {
  * This script starts the Dataproc MCP Server with proper configuration
  */
 
-const path = require('path');
-const { spawn } = require('child_process');
+import path from 'path';
+import { spawn } from 'child_process';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const serverPath = path.join(__dirname, 'build', 'index.js');
 
@@ -173,6 +191,42 @@ See the \`docs/\` directory for comprehensive documentation:
   console.log('✅ Created standalone README');
 }
 
+function createDistributionManifest(distDir) {
+  const manifest = {
+    "name": "@dataproc/mcp-server",
+    "type": "standalone-distribution",
+    "version": "2.0.0",
+    "buildDate": new Date().toISOString(),
+    "contents": {
+      "build/": "Compiled TypeScript application",
+      "profiles/": "Cluster configuration profiles",
+      "config/": "Runtime configuration files",
+      "templates/": "Configuration templates for setup",
+      "docs/": "Complete documentation",
+      "start.js": "Standalone startup script",
+      "README-STANDALONE.md": "Distribution-specific documentation"
+    },
+    "requirements": {
+      "node": ">=18.0.0",
+      "npm": ">=8.0.0"
+    },
+    "quickStart": [
+      "node start.js",
+      "# or",
+      "node build/index.js"
+    ],
+    "configuration": {
+      "server": "config/server.json",
+      "defaults": "config/default-params.json",
+      "profiles": "profiles/*.yaml"
+    }
+  };
+  
+  const manifestPath = path.join(distDir, 'distribution-manifest.json');
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+  console.log('✅ Created distribution manifest');
+}
+
 function listDirectoryContents(dir, prefix = '') {
   const entries = fs.readdirSync(dir, { withFileTypes: true });
   
@@ -184,8 +238,9 @@ function listDirectoryContents(dir, prefix = '') {
   });
 }
 
-if (require.main === module) {
+// Check if this script is being run directly
+if (import.meta.url === `file://${process.argv[1]}`) {
   createStandaloneDistribution();
 }
 
-module.exports = { createStandaloneDistribution };
+export { createStandaloneDistribution };

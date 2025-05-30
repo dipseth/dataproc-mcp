@@ -1,0 +1,17 @@
+{
+  "environment": "development",
+  "authentication": {
+    "impersonateServiceAccount": "dataproc-development@YOUR_DEVELOPMENT_PROJECT.iam.gserviceaccount.com",
+    "preferImpersonation": true
+  },
+  "security": {
+    "enableRateLimiting": true,
+    "maxRequestsPerMinute": 200,
+    "auditLogLevel": "debug"
+  },
+  "logging": {
+    "level": "debug",
+    "enableFile": false,
+    "filePath": "./logs/development.log"
+  }
+}

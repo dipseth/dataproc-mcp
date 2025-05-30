@@ -1,0 +1,71 @@
+#!/bin/bash
+
+# Dataproc MCP Server Setup Script
+# This script helps you configure the server for your environment
+
+set -e
+
+echo "🚀 Setting up Dataproc MCP Server..."
+
+# Check if Node.js is installed
+if ! command -v node &> /dev/null; then
+    echo "❌ Node.js is not installed. Please install Node.js 18+ first."
+    exit 1
+fi
+
+# Check Node.js version
+NODE_VERSION=$(node -v | cut -d'v' -f2 | cut -d'.' -f1)
+if [ "$NODE_VERSION" -lt 18 ]; then
+    echo "❌ Node.js version 18+ is required. Current version: $(node -v)"
+    exit 1
+fi
+
+echo "✅ Node.js $(node -v) detected"
+
+# Create necessary directories
+mkdir -p config
+mkdir -p profiles
+mkdir -p logs
+
+echo "📁 Created directories"
+
+# Copy configuration templates
+if [ -f "templates/server.json.template" ]; then
+    if [ ! -f "config/server.json" ]; then
+        cp templates/server.json.template config/server.json
+        echo "📋 Created config/server.json from template"
+    else
+        echo "⚠️  config/server.json already exists, skipping"
+    fi
+fi
+
+if [ -f "templates/default-params.json.template" ]; then
+    if [ ! -f "config/default-params.json" ]; then
+        cp templates/default-params.json.template config/default-params.json
+        echo "📋 Created config/default-params.json from template"
+    else
+        echo "⚠️  config/default-params.json already exists, skipping"
+    fi
+fi
+
+# Copy profile template
+if [ -f "templates/cluster-profile.yaml.template" ]; then
+    if [ ! -f "profiles/example-cluster.yaml" ]; then
+        cp templates/cluster-profile.yaml.template profiles/example-cluster.yaml
+        echo "📋 Created profiles/example-cluster.yaml from template"
+    else
+        echo "⚠️  profiles/example-cluster.yaml already exists, skipping"
+    fi
+fi
+
+echo ""
+echo "🎉 Setup complete!"
+echo ""
+echo "Next steps:"
+echo "1. Edit config/server.json with your authentication settings"
+echo "2. Edit config/default-params.json with your project details"
+echo "3. Customize profiles/example-cluster.yaml for your clusters"
+echo "4. Start the server: node build/index.js"
+echo ""
+echo "📚 Documentation: docs/QUICK_START.md"
+echo "🔧 Configuration examples: docs/CONFIGURATION_EXAMPLES.md"
