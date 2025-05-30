@@ -8,8 +8,8 @@
     "stateSaveInterval": 60000
   },
   "authentication": {
-    "impersonateServiceAccount": "grpn-sa-terraform-data-science@prj-grp-central-sa-prod-0b25.iam.gserviceaccount.com",
-     "fallbackKeyPath": "/Users/srivers/Repositories/pricing-composer/orchestrator/classpath/gcp_prod_keyfile.json",
+    "impersonateServiceAccount": "sa-accounte@prj-number.iam.gserviceaccount.com",
+     "fallbackKeyPath": "./gcp_prod_keyfile.json",
       "preferImpersonation": true,
       "useApplicationDefaultFallback": true     
   },
