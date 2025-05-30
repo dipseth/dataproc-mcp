@@ -232,7 +232,30 @@ class LinkTester {
                     this.findMarkdownFiles(fullPath, files);
                 }
             } else if (entry.isFile() && entry.name.endsWith('.md')) {
-                files.push(fullPath);
+                // Skip files that are not being tracked
+                const excludedFiles = [
+                    'COMPREHENSIVE_MCP_TESTING_CHECKLIST.md',
+                    'SERVICE_ACCOUNT_AUTHENTICATION_GUIDE.md'
+                ];
+                
+                const excludedDirs = [
+                    'old-tests'
+                ];
+                
+                // Check if file should be excluded
+                if (excludedFiles.includes(entry.name)) {
+                    return files; // Skip this file
+                }
+                
+                // Check if file is in excluded directory
+                const relativePath = path.relative(ROOT_DIR, fullPath);
+                const isInExcludedDir = excludedDirs.some(excludedDir =>
+                    relativePath.startsWith(excludedDir + path.sep)
+                );
+                
+                if (!isInExcludedDir) {
+                    files.push(fullPath);
+                }
             }
         }
         
