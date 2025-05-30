@@ -105,9 +105,13 @@ Add to your Claude Desktop configuration:
 {
   "mcpServers": {
     "dataproc": {
-      "command": "dataproc-mcp",
+      "command": "npx",
+      "args": [
+        "@dipseth/dataproc-mcp-server@latest"
+      ],
       "env": {
-        "LOG_LEVEL": "info"
+        "LOG_LEVEL": "info",
+        "DATAPROC_CONFIG_PATH": "/path/to/your/config/server.json"
       }
     }
   }
@@ -116,20 +120,22 @@ Add to your Claude Desktop configuration:
 
 ### Roo (VS Code)
 
-Add to your VS Code settings:
+Add to your Roo MCP settings:
 
-**File: `.vscode/settings.json`**
+**File: `.roo/mcp.json`**
 ```json
 {
   "mcpServers": {
-    "dataproc-server": {
-      "command": "dataproc-mcp",
-      "disabled": false,
-      "alwaysAllow": [
-        "list_clusters",
-        "get_cluster",
-        "list_profiles"
-      ]
+    "dataproc": {
+      "command": "npx",
+      "args": [
+        "@dipseth/dataproc-mcp-server@latest"
+      ],
+      "env": {
+        "LOG_LEVEL": "info",
+        "DATAPROC_CONFIG_PATH": "/path/to/your/config/server.json"
+      },
+      "alwaysAllow": []
     }
   }
 }
