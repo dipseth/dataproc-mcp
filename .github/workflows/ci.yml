@@ -166,7 +166,7 @@ jobs:
         run: npm run build
 
       - name: 🧪 Run unit tests
-        run: npm test
+        run: npm run test:unit
 
       - name: 📊 Generate coverage report
         run: npm run test:coverage
