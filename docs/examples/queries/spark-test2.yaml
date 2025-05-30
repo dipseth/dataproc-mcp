@@ -1,38 +1,47 @@
-# Dataproc cluster configuration for spark-test2 (test case)
+# Dataproc cluster configuration for Spark analytics workloads
 cluster:
-  name: spark-test2
+  name: spark-analytics-cluster
   region: us-central1
   config:
     gceClusterConfig:
-      # No explicit zone in gcloud command; region is specified
-      subnetworkUri: projects/prj-grp-shared-vpc-prod-2511/regions/us-central1/subnetworks/sub-vpc-prod-sharedvpc01-us-central1-private
-      serviceAccount: loc-sa-pricing-promo-dataproc@prj-grp-data-sci-prod-b425.iam.gserviceaccount.com
+      # Example using a shared VPC setup
+      subnetworkUri: projects/your-project-id/regions/us-central1/subnetworks/your-subnet-name
+      serviceAccount: your-dataproc-service-account@your-project-id.iam.gserviceaccount.com
       tags:
         - allow-google-apis
         - allow-iap-ssh
         - dataproc-vm
       metadata:
-        artifact_urls: "com/groupon/local-intelligence/pricing-composer/v.0.13.051-staging/pricing-composer-v.0.13.051-staging.zip,com/groupon/local-intelligence/RetailPriceOptimization_POC/${GIT_TAG}/RetailPriceOptimization_POC-${GIT_TAG}.zip"
-        key_store_file_name: "mis--dnd-ds-pnp-service.jks"
-        secret_name: "tls--dnd-ds-pnp-service"
+        # Example metadata for custom artifacts
+        artifact_urls: "gs://your-bucket/artifacts/analytics-tools.zip"
+        environment: "production"
     masterConfig:
       numInstances: 1
       machineTypeUri: e2-standard-4
     workerConfig:
       numInstances: 3
+      machineTypeUri: e2-standard-2
     softwareConfig:
       imageVersion: 2.2-debian
       optionalComponents:
         - ZEPPELIN
-      # No explicit properties in gcloud command
+        - JUPYTER
+      properties:
+        # Spark configuration optimizations
+        "spark:spark.sql.adaptive.enabled": "true"
+        "spark:spark.sql.adaptive.coalescePartitions.enabled": "true"
     initializationActions:
-      - executableFile: gs://grpn-dnd-prod-analytics-common/init/load-artifacts.sh
-      - executableFile: gs://grpn-dnd-prod-analytics-common/init/load-certificates.sh
+      - executableFile: gs://your-bucket/init/setup-environment.sh
+      - executableFile: gs://your-bucket/init/install-dependencies.sh
     endpointConfig:
       enableHttpPortAccess: true
     metastoreConfig:
-      dataprocMetastoreService: projects/prj-grp-datalake-prod-8a19/locations/us-central1/services/grpn-dnd-dpms-prod-analytics-3x
+      # Optional: Use external Hive Metastore
+      dataprocMetastoreService: projects/your-project-id/locations/us-central1/services/your-metastore-service
     lifecycleConfig:
+      # Auto-delete cluster after 100 minutes of inactivity
       idleDeleteTtl: 6000s
-    # The following is not standard in Dataproc YAML, but included for completeness
-    # impersonateServiceAccount: grpn-sa-terraform-data-science@prj-grp-central-sa-prod-0b25.iam.gserviceaccount.com
+    # Security configuration
+    securityConfig:
+      kerberosConfig:
+        enableKerberos: false

@@ -1,0 +1,67 @@
+{
+  "entryPoints": ["src/index.ts"],
+  "out": "docs/api",
+  "theme": "default",
+  "readme": "README.md",
+  "name": "Dataproc MCP Server API Documentation",
+  "includeVersion": true,
+  "excludeExternals": true,
+  "excludePrivate": true,
+  "excludeProtected": false,
+  "excludeInternal": true,
+  "hideGenerator": false,
+  "disableSources": false,
+  "sourceLinkTemplate": "https://github.com/dipseth/dataproc-mcp/blob/{gitRevision}/{path}#L{line}",
+  "gitRevision": "main",
+  "exclude": [
+    "**/*.test.ts",
+    "**/node_modules/**",
+    "**/build/**",
+    "**/dist/**"
+  ],
+  "categorizeByGroup": true,
+  "categoryOrder": [
+    "Services",
+    "Types",
+    "Utilities",
+    "Configuration",
+    "*"
+  ],
+  "sort": ["source-order"],
+  "kindSortOrder": [
+    "Document",
+    "Project",
+    "Module",
+    "Namespace",
+    "Enum",
+    "EnumMember",
+    "Class",
+    "Interface",
+    "TypeAlias",
+    "Constructor",
+    "Property",
+    "Variable",
+    "Function",
+    "Accessor",
+    "Method",
+    "Parameter",
+    "TypeParameter",
+    "TypeLiteral",
+    "CallSignature",
+    "ConstructorSignature",
+    "IndexSignature",
+    "GetSignature",
+    "SetSignature"
+  ],
+  "navigation": {
+    "includeCategories": true,
+    "includeGroups": true
+  },
+  "searchInComments": true,
+  "cleanOutputDir": true,
+  "titleLink": "https://github.com/dipseth/dataproc-mcp",
+  "navigationLinks": {
+    "GitHub": "https://github.com/dipseth/dataproc-mcp",
+    "NPM": "https://www.npmjs.com/package/@dataproc/mcp-server"
+  }
+}
