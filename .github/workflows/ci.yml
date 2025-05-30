@@ -146,6 +146,29 @@ jobs:
   # ============================================================================
   integration-validation:
     name: 🔗 Integration Validation
+      - name: Run unit tests
+        run: npm test
+
+      - name: Generate coverage report
+        run: npm run test:coverage
+        if: matrix.node-version == '20'
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        if: matrix.node-version == '20'
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: ./coverage/lcov.info
+          flags: unittests
+          name: codecov-umbrella
+
+      - name: Check coverage threshold
+        run: npm run test:coverage:check
+        if: matrix.node-version == '20'
+
+  # Job 3: Documentation & Examples
+  documentation:
+    name: Documentation & Examples
     runs-on: ubuntu-latest
     needs: [quality-gates]
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
@@ -176,10 +199,21 @@ jobs:
           npm run docs:generate
           echo "✅ Documentation generated successfully"
 
+
       - name: 🔗 Documentation Link Validation
         run: |
           npm run docs:test-links
           echo "✅ Documentation links validated"
+          
+      - name: Upload documentation artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: documentation
+          path: |
+            docs/generated/
+            examples/
+          retention-days: 30
+
 
       - name: 📋 Example Configuration Validation
         run: |
