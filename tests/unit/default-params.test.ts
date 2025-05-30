@@ -80,25 +80,25 @@ describe('DefaultParameterManager', () => {
 
   describe('Parameter validation', () => {
     it('should validate numeric constraints', () => {
-      expect(() => 
-        manager.updateEnvironmentParameters('test', { numericParam: 0 })
-      ).to.throw('less than minimum');
+      expect(() => manager.updateEnvironmentParameters('test', { numericParam: 0 })).to.throw(
+        'less than minimum'
+      );
 
-      expect(() => 
-        manager.updateEnvironmentParameters('test', { numericParam: 101 })
-      ).to.throw('greater than maximum');
+      expect(() => manager.updateEnvironmentParameters('test', { numericParam: 101 })).to.throw(
+        'greater than maximum'
+      );
     });
 
     it('should validate parameter types', () => {
-      expect(() => 
+      expect(() =>
         manager.updateEnvironmentParameters('test', { numericParam: 'invalid' })
       ).to.throw('Invalid type');
     });
 
     it('should validate required parameters', () => {
-      expect(() =>
-        manager.updateEnvironmentParameters('test', { testParam: undefined })
-      ).to.throw('Required parameter');
+      expect(() => manager.updateEnvironmentParameters('test', { testParam: undefined })).to.throw(
+        'Required parameter'
+      );
     });
   });
 

@@ -2,12 +2,7 @@
  * Cache Manager service for handling cached GCS file contents
  */
 
-import {
-  CacheConfig,
-  CacheEntry,
-  CacheStats,
-  DEFAULT_CACHE_CONFIG
-} from '../types/cache-types.js';
+import { CacheConfig, CacheEntry, CacheStats, DEFAULT_CACHE_CONFIG } from '../types/cache-types.js';
 
 export class CacheManager {
   private cache: Map<string, CacheEntry>;
@@ -23,14 +18,11 @@ export class CacheManager {
       totalSize: 0,
       hits: 0,
       misses: 0,
-      evictions: 0
+      evictions: 0,
     };
 
     // Start cleanup interval
-    this.cleanupInterval = setInterval(
-      () => this.cleanup(),
-      this.config.cleanupInterval * 1000
-    );
+    this.cleanupInterval = setInterval(() => this.cleanup(), this.config.cleanupInterval * 1000);
   }
 
   /**
@@ -38,7 +30,7 @@ export class CacheManager {
    */
   get<T>(key: string): T | null {
     const entry = this.cache.get(key);
-    
+
     if (!entry) {
       this.stats.misses++;
       return null;
@@ -78,7 +70,7 @@ export class CacheManager {
       data: value,
       size,
       timestamp: Date.now(),
-      source: key
+      source: key,
     };
 
     const oldEntry = this.cache.get(key);
@@ -125,8 +117,9 @@ export class CacheManager {
    */
   private makeSpace(needed: number): void {
     // Sort entries by last access time
-    const entries = Array.from(this.cache.entries())
-      .sort(([, a], [, b]) => a.timestamp - b.timestamp);
+    const entries = Array.from(this.cache.entries()).sort(
+      ([, a], [, b]) => a.timestamp - b.timestamp
+    );
 
     for (const [key] of entries) {
       this.evict(key);
@@ -141,13 +134,12 @@ export class CacheManager {
    */
   private cleanup(): void {
     const now = Date.now();
-    const expired = Array.from(this.cache.keys())
-      .filter(key => {
-        const entry = this.cache.get(key);
-        return entry && (now - entry.timestamp > this.config.ttl * 1000);
-      });
+    const expired = Array.from(this.cache.keys()).filter((key) => {
+      const entry = this.cache.get(key);
+      return entry && now - entry.timestamp > this.config.ttl * 1000;
+    });
 
-    expired.forEach(key => this.evict(key));
+    expired.forEach((key) => this.evict(key));
   }
 
   /**

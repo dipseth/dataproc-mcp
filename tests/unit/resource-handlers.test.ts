@@ -17,9 +17,10 @@ function createStub<T extends (...args: any[]) => any>(returnValue: ReturnType<T
   };
   stub.calls = [] as Parameters<T>[];
   stub.calledWith = (...expectedArgs: Parameters<T>) => {
-    return stub.calls.some(callArgs => 
-      callArgs.length === expectedArgs.length && 
-      callArgs.every((arg, i) => arg === expectedArgs[i])
+    return stub.calls.some(
+      (callArgs) =>
+        callArgs.length === expectedArgs.length &&
+        callArgs.every((arg, i) => arg === expectedArgs[i])
     );
   };
   return stub;
@@ -28,27 +29,27 @@ function createStub<T extends (...args: any[]) => any>(returnValue: ReturnType<T
 describe('Resource Handlers', () => {
   // Define the schemas
   const ListResourcesRequestSchema = z.object({
-    method: z.literal("list_resources"),
+    method: z.literal('list_resources'),
   });
-  
+
   const ReadResourceRequestSchema = z.object({
-    method: z.literal("read_resource"),
+    method: z.literal('read_resource'),
     params: z.object({
       uri: z.string(),
     }),
   });
-  
+
   type ReadResourceRequest = z.infer<typeof ReadResourceRequestSchema>;
 
   // Test services
   let clusterManager: ClusterManager;
   let jobTracker: JobTracker;
   let jobOutputHandler: JobOutputHandler;
-  
+
   // Create stubs for external services
   let getClusterStub: ReturnType<typeof createStub>;
   let getJobStatusStub: ReturnType<typeof createStub>;
-  
+
   // Test data
   const mockClusters: ClusterTrackingInfo[] = [
     {
@@ -58,8 +59,8 @@ describe('Resource Handlers', () => {
       metadata: {
         projectId: 'test-project',
         region: 'us-central1',
-        status: 'RUNNING'
-      }
+        status: 'RUNNING',
+      },
     },
     {
       clusterId: 'cluster-2',
@@ -68,11 +69,11 @@ describe('Resource Handlers', () => {
       metadata: {
         projectId: 'test-project',
         region: 'us-central1',
-        status: 'STOPPED'
-      }
-    }
+        status: 'STOPPED',
+      },
+    },
   ];
-  
+
   const mockJobs: TrackedJobInfo[] = [
     {
       jobId: 'job-1',
@@ -83,7 +84,7 @@ describe('Resource Handlers', () => {
       projectId: 'test-project',
       region: 'us-central1',
       clusterName: 'test-cluster-1',
-      resultsCached: false
+      resultsCached: false,
     },
     {
       jobId: 'job-2',
@@ -94,82 +95,87 @@ describe('Resource Handlers', () => {
       projectId: 'test-project',
       region: 'us-central1',
       clusterName: 'test-cluster-2',
-      resultsCached: true
-    }
+      resultsCached: true,
+    },
   ];
-  
+
   beforeEach(() => {
     // Create test instances
     const profileManager = new ProfileManager({ rootConfigPath: './profiles' });
     const clusterTracker = new ClusterTracker();
-    
+
     clusterManager = new ClusterManager(profileManager, clusterTracker);
     jobTracker = new JobTracker();
     jobOutputHandler = new JobOutputHandler();
-    
+
     // Create stubs
     // Override the listTrackedClusters method
     clusterManager.listTrackedClusters = () => mockClusters;
-    
+
     // Override the listJobs method
     jobTracker.listJobs = () => mockJobs;
-    
+
     // Create a stub for getCachedOutput
     const originalGetCachedOutput = jobOutputHandler.getCachedOutput;
     jobOutputHandler.getCachedOutput = async (jobId: string) => {
-      (jobOutputHandler.getCachedOutput as any).calls = (jobOutputHandler.getCachedOutput as any).calls || [];
+      (jobOutputHandler.getCachedOutput as any).calls =
+        (jobOutputHandler.getCachedOutput as any).calls || [];
       (jobOutputHandler.getCachedOutput as any).calls.push([jobId]);
-      
+
       return {
         schema: { fields: [{ name: 'column1', type: 'string' }] },
-        rows: [{ values: ['value1'] }]
+        rows: [{ values: ['value1'] }],
       };
     };
-    
+
     (jobOutputHandler.getCachedOutput as any).calledWith = (jobId: string) => {
       return ((jobOutputHandler.getCachedOutput as any).calls || []).some(
         (args: string[]) => args[0] === jobId
       );
     };
-    
+
     // Create stubs for imported functions
-    getClusterStub = createStub(Promise.resolve({
-      clusterName: 'test-cluster',
-      status: { state: 'RUNNING' }
-    }));
-    
-    getJobStatusStub = createStub(Promise.resolve({
-      status: { state: JobState.DONE }
-    }));
+    getClusterStub = createStub(
+      Promise.resolve({
+        clusterName: 'test-cluster',
+        status: { state: 'RUNNING' },
+      })
+    );
+
+    getJobStatusStub = createStub(
+      Promise.resolve({
+        status: { state: JobState.DONE },
+      })
+    );
   });
-  
+
   afterEach(() => {
     // Reset stubs
     getClusterStub.calls = [];
     getJobStatusStub.calls = [];
     (jobOutputHandler.getCachedOutput as any).calls = [];
   });
-  
+
   it('should list resources correctly', async () => {
     // Create the handler
     const listResourcesHandler = async () => {
       const trackedClusters = clusterManager.listTrackedClusters();
       const trackedJobs = jobTracker.listJobs();
-      
+
       const resources = [
         // Cluster resources
         ...trackedClusters.map((cluster: ClusterTrackingInfo) => {
           const projectId = cluster.metadata?.projectId || 'unknown';
           const region = cluster.metadata?.region || 'unknown';
           const status = cluster.metadata?.status || 'Unknown status';
-          
+
           return {
             uri: `dataproc://clusters/${projectId}/${region}/${cluster.clusterName}`,
             name: `Cluster: ${cluster.clusterName}`,
             description: `Dataproc cluster in ${region} (${status})`,
           };
         }),
-        
+
         // Job resources
         ...trackedJobs.map((job: TrackedJobInfo) => ({
           uri: `dataproc://jobs/${job.projectId}/${job.region}/${job.jobId}`,
@@ -177,38 +183,42 @@ describe('Resource Handlers', () => {
           description: `Dataproc job (${job.toolName}) - ${job.status}`,
         })),
       ];
-      
+
       return { resources };
     };
-    
+
     // Call the handler
     const result = await listResourcesHandler();
-    
+
     // Verify the result
     expect(result).to.have.property('resources');
     expect(result.resources).to.have.length(4); // 2 clusters + 2 jobs
-    
+
     // Check cluster resources
-    const clusterResources = result.resources.filter(r => r.uri.startsWith('dataproc://clusters/'));
+    const clusterResources = result.resources.filter((r) =>
+      r.uri.startsWith('dataproc://clusters/')
+    );
     expect(clusterResources).to.have.length(2);
-    expect(clusterResources[0].uri).to.equal('dataproc://clusters/test-project/us-central1/test-cluster-1');
+    expect(clusterResources[0].uri).to.equal(
+      'dataproc://clusters/test-project/us-central1/test-cluster-1'
+    );
     expect(clusterResources[0].name).to.equal('Cluster: test-cluster-1');
     expect(clusterResources[0].description).to.contain('RUNNING');
-    
+
     // Check job resources
-    const jobResources = result.resources.filter(r => r.uri.startsWith('dataproc://jobs/'));
+    const jobResources = result.resources.filter((r) => r.uri.startsWith('dataproc://jobs/'));
     expect(jobResources).to.have.length(2);
     expect(jobResources[0].uri).to.equal('dataproc://jobs/test-project/us-central1/job-1');
     expect(jobResources[0].name).to.equal('Job: job-1');
     expect(jobResources[0].description).to.contain('submit_hive_query');
     expect(jobResources[0].description).to.contain('RUNNING');
   });
-  
+
   it('should read cluster resource correctly', async () => {
     // Create the handler
     const readResourceHandler = async (request: ReadResourceRequest) => {
       const uri = request.params.uri;
-      
+
       // Parse the URI to determine resource type
       if (uri.startsWith('dataproc://clusters/')) {
         // Handle cluster resource
@@ -216,52 +226,52 @@ describe('Resource Handlers', () => {
         if (parts.length !== 3) {
           throw new Error(`Invalid cluster URI format: ${uri}`);
         }
-        
+
         const [projectId, region, clusterName] = parts;
         // Use the stub directly instead of importing
         const cluster = await getClusterStub(projectId, region, clusterName);
-        
+
         return {
           content: [
             {
-              type: "text",
+              type: 'text',
               text: JSON.stringify(cluster, null, 2),
             },
           ],
         };
       }
-      
+
       throw new Error(`Unknown resource URI: ${uri}`);
     };
-    
+
     // Call the handler
     const result = await readResourceHandler({
       method: 'read_resource',
       params: {
-        uri: 'dataproc://clusters/test-project/us-central1/test-cluster'
-      }
+        uri: 'dataproc://clusters/test-project/us-central1/test-cluster',
+      },
     });
-    
+
     // Verify the result
     expect(result).to.have.property('content');
     expect(result.content).to.have.length(1);
     expect(result.content[0].type).to.equal('text');
-    
+
     // Parse the content
     const content = JSON.parse(result.content[0].text);
     expect(content).to.have.property('clusterName', 'test-cluster');
     expect(content).to.have.property('status');
     expect(content.status).to.have.property('state', 'RUNNING');
-    
+
     // Verify getCluster was called with the correct parameters
     expect(getClusterStub.calledWith('test-project', 'us-central1', 'test-cluster')).to.be.true;
   });
-  
+
   it('should read job resource correctly', async () => {
     // Create the handler
     const readResourceHandler = async (request: ReadResourceRequest) => {
       const uri = request.params.uri;
-      
+
       // Parse the URI to determine resource type
       if (uri.startsWith('dataproc://jobs/')) {
         // Handle job resource
@@ -269,12 +279,12 @@ describe('Resource Handlers', () => {
         if (parts.length !== 3) {
           throw new Error(`Invalid job URI format: ${uri}`);
         }
-        
+
         const [projectId, region, jobId] = parts;
-        
+
         // Get job status using the stub
         const status = await getJobStatusStub(projectId, region, jobId);
-        
+
         // Get job results if available
         let results = null;
         if (status && status.status?.state === JobState.DONE) {
@@ -284,43 +294,43 @@ describe('Resource Handlers', () => {
             console.error(`Error getting cached output for job ${jobId}:`, error);
           }
         }
-        
+
         return {
           content: [
             {
-              type: "text",
+              type: 'text',
               text: JSON.stringify({ status, results }, null, 2),
             },
           ],
         };
       }
-      
+
       throw new Error(`Unknown resource URI: ${uri}`);
     };
-    
+
     // Call the handler
     const result = await readResourceHandler({
       method: 'read_resource',
       params: {
-        uri: 'dataproc://jobs/test-project/us-central1/job-1'
-      }
+        uri: 'dataproc://jobs/test-project/us-central1/job-1',
+      },
     });
-    
+
     // Verify the result
     expect(result).to.have.property('content');
     expect(result.content).to.have.length(1);
     expect(result.content[0].type).to.equal('text');
-    
+
     // Parse the content
     const content = JSON.parse(result.content[0].text);
     expect(content).to.have.property('status');
     expect(content).to.have.property('results');
     expect(content.status).to.have.property('status');
     expect(content.status.status).to.have.property('state', JobState.DONE);
-    
+
     // Verify getJobStatus was called with the correct parameters
     expect(getJobStatusStub.calledWith('test-project', 'us-central1', 'job-1')).to.be.true;
-    
+
     // Verify getCachedOutput was called with the correct parameters
     expect((jobOutputHandler.getCachedOutput as any).calledWith('job-1')).to.be.true;
   });

@@ -3,11 +3,7 @@
  * Handles loading and validating default parameters with environment-specific overrides
  */
 
-import {
-  DefaultParameterManagerConfig,
-  EnvironmentParams,
-  ParameterDefinition
-} from '../types/default-params.js';
+import { DefaultParameterManagerConfig, ParameterDefinition } from '../types/default-params.js';
 
 export class DefaultParameterManager {
   private config: DefaultParameterManagerConfig;
@@ -157,10 +153,7 @@ export class DefaultParameterManager {
    * @param environment Environment name
    * @param parameters Parameter values to update
    */
-  updateEnvironmentParameters(
-    environment: string,
-    parameters: Record<string, any>
-  ): void {
+  updateEnvironmentParameters(environment: string, parameters: Record<string, any>): void {
     // Validate all parameters before updating
     for (const [paramName, value] of Object.entries(parameters)) {
       const paramDef = this.parameterDefinitions.get(paramName);
@@ -174,7 +167,7 @@ export class DefaultParameterManager {
     const existing = this.environmentParams.get(environment) || {};
     this.environmentParams.set(environment, {
       ...existing,
-      ...parameters
+      ...parameters,
     });
   }
 

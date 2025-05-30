@@ -11,7 +11,7 @@ logs/
 
 # Environment files
 .env*
-
+profiles/**
 # Output and temporary files
 *.csv
 output/*

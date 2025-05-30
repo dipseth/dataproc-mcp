@@ -1,9 +1,9 @@
 /**
  * Console Interceptor for MCP Server
- * 
+ *
  * This module intercepts all console.log and console.error calls
  * to ensure debug logs don't interfere with the MCP protocol.
- * 
+ *
  * It should be imported at the very beginning of the application.
  */
 
@@ -23,7 +23,7 @@ function formatDebugLog(message: string, ...args: any[]): string {
 }
 
 // Override console.log
-console.log = function(message: any, ...args: any[]): void {
+console.log = function (message: any, ...args: any[]): void {
   // Check if this is a debug log
   if (typeof message === 'string' && debugLogRegex.test(message)) {
     // For debug logs, write to stderr with special formatting
@@ -35,7 +35,7 @@ console.log = function(message: any, ...args: any[]): void {
 };
 
 // Override console.error
-console.error = function(message: any, ...args: any[]): void {
+console.error = function (message: any, ...args: any[]): void {
   // Check if this is a debug log
   if (typeof message === 'string' && debugLogRegex.test(message)) {
     // For debug logs, write to stderr with special formatting

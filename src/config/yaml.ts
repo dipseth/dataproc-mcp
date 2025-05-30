@@ -23,14 +23,16 @@ const TraditionalClusterConfigSchema = z.object({
 /**
  * Zod schema for validating the enhanced YAML cluster configuration
  */
-const EnhancedClusterConfigSchema = z.record(z.object({
-  region: z.string(),
-  tags: z.array(z.string()).optional(),
-  labels: z.record(z.string()).optional(),
-  cluster_config: z.record(z.any()).optional(),
-  clusterConfig: z.record(z.any()).optional(),
-  parameters: z.record(z.any()).optional(),
-}));
+const EnhancedClusterConfigSchema = z.record(
+  z.object({
+    region: z.string(),
+    tags: z.array(z.string()).optional(),
+    labels: z.record(z.string()).optional(),
+    cluster_config: z.record(z.any()).optional(),
+    clusterConfig: z.record(z.any()).optional(),
+    parameters: z.record(z.any()).optional(),
+  })
+);
 
 export type TraditionalYamlClusterConfig = {
   cluster: {
@@ -65,11 +67,11 @@ function convertSnakeToCamel(obj: any): any {
   }
 
   if (Array.isArray(obj)) {
-    return obj.map(item => convertSnakeToCamel(item));
+    return obj.map((item) => convertSnakeToCamel(item));
   }
 
   const camelCaseObj: Record<string, any> = {};
-  
+
   for (const key in obj) {
     if (Object.prototype.hasOwnProperty.call(obj, key)) {
       // Convert snake_case to camelCase
@@ -77,7 +79,7 @@ function convertSnakeToCamel(obj: any): any {
       camelCaseObj[camelKey] = convertSnakeToCamel(obj[key]);
     }
   }
-  
+
   return camelCaseObj;
 }
 
@@ -90,18 +92,20 @@ export async function readYamlConfig(filePath: string): Promise<YamlClusterConfi
   try {
     const fileContent = await fs.readFile(filePath, 'utf8');
     const parsedConfig = yaml.load(fileContent) as unknown;
-    
+
     // Try to validate against both schemas
     try {
       // First try traditional format
       const validatedConfig = TraditionalClusterConfigSchema.parse(parsedConfig);
-      if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] YAML: Using traditional cluster config format');
+      if (process.env.LOG_LEVEL === 'debug')
+        console.error('[DEBUG] YAML: Using traditional cluster config format');
       return validatedConfig;
     } catch (traditionalError) {
       try {
         // Then try enhanced format
         const validatedConfig = EnhancedClusterConfigSchema.parse(parsedConfig);
-        if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] YAML: Using enhanced cluster config format');
+        if (process.env.LOG_LEVEL === 'debug')
+          console.error('[DEBUG] YAML: Using enhanced cluster config format');
         return validatedConfig;
       } catch (enhancedError) {
         // If both fail, throw the traditional error for backward compatibility
@@ -112,11 +116,11 @@ export async function readYamlConfig(filePath: string): Promise<YamlClusterConfi
     if (error instanceof z.ZodError) {
       throw new Error(`Invalid YAML configuration: ${error.message}`);
     }
-    
+
     if (error instanceof Error) {
       throw new Error(`Failed to read YAML configuration: ${error.message}`);
     }
-    
+
     throw new Error('Unknown error reading YAML configuration');
   }
 }
@@ -127,7 +131,10 @@ export async function readYamlConfig(filePath: string): Promise<YamlClusterConfi
  * @param filePath Path to the YAML file (used for generating cluster name if needed)
  * @returns Dataproc API compatible cluster configuration
  */
-export function convertYamlToDataprocConfig(yamlConfig: YamlClusterConfig, filePath?: string): {
+export function convertYamlToDataprocConfig(
+  yamlConfig: YamlClusterConfig,
+  filePath?: string
+): {
   clusterName: string;
   region?: string;
   config: ClusterConfig;
@@ -138,7 +145,7 @@ export function convertYamlToDataprocConfig(yamlConfig: YamlClusterConfig, fileP
   if ('cluster' in yamlConfig) {
     const traditionalConfig = yamlConfig as TraditionalYamlClusterConfig;
     const { name, region, config = {}, parameters } = traditionalConfig.cluster;
-    
+
     return {
       clusterName: name,
       region,
@@ -149,11 +156,11 @@ export function convertYamlToDataprocConfig(yamlConfig: YamlClusterConfig, fileP
   // Enhanced format
   else {
     const enhancedConfig = yamlConfig as EnhancedYamlClusterConfig;
-    
+
     // Get the project ID (first key in the object)
     const projectId = Object.keys(enhancedConfig)[0];
     const projectConfig = enhancedConfig[projectId];
-    
+
     // Generate a cluster name if not provided
     let clusterName = '';
     if (filePath) {
@@ -164,28 +171,34 @@ export function convertYamlToDataprocConfig(yamlConfig: YamlClusterConfig, fileP
       // Generate a random name
       clusterName = `cluster-${Math.random().toString(36).substring(2, 7)}`;
     }
-    
+
     // Get the cluster config (support both snake_case and camelCase)
     const clusterConfig = projectConfig.cluster_config || projectConfig.clusterConfig || {};
-    
+
     if (process.env.LOG_LEVEL === 'debug') {
-      console.error('[DEBUG] YAML: Original cluster config:', JSON.stringify(clusterConfig, null, 2));
+      console.error(
+        '[DEBUG] YAML: Original cluster config:',
+        JSON.stringify(clusterConfig, null, 2)
+      );
     }
-    
+
     // Convert snake_case to camelCase for the entire config
     const camelCaseConfig = convertSnakeToCamel(clusterConfig);
-    
+
     if (process.env.LOG_LEVEL === 'debug') {
       console.error('[DEBUG] YAML: Transformed config:', JSON.stringify(camelCaseConfig, null, 2));
     }
-    
+
     // Ensure proper nesting of service account in gceClusterConfig
     if (camelCaseConfig.gceClusterConfig?.serviceAccount) {
       if (process.env.LOG_LEVEL === 'debug') {
-        console.error('[DEBUG] YAML: Service account found:', camelCaseConfig.gceClusterConfig.serviceAccount);
+        console.error(
+          '[DEBUG] YAML: Service account found:',
+          camelCaseConfig.gceClusterConfig.serviceAccount
+        );
       }
     }
-    
+
     return {
       clusterName,
       region: projectConfig.region,

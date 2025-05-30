@@ -27,20 +27,17 @@ export class ProfileManager {
   private profiles: Map<string, ProfileInfo> = new Map();
   private scanInterval?: NodeJS.Timeout;
   private parameterManager?: DefaultParameterManager;
-  
+
   /**
    * Creates a new ProfileManager instance
    * @param config Configuration for the profile manager
    * @param parameterManager Optional DefaultParameterManager instance
    */
-  constructor(
-    config?: Partial<ProfileManagerConfig>,
-    parameterManager?: DefaultParameterManager
-  ) {
+  constructor(config?: Partial<ProfileManagerConfig>, parameterManager?: DefaultParameterManager) {
     this.config = { ...DEFAULT_CONFIG, ...config };
     this.parameterManager = parameterManager;
   }
-  
+
   /**
    * Initializes the profile manager
    * Creates the root config directory if it doesn't exist
@@ -50,23 +47,23 @@ export class ProfileManager {
     if (process.env.LOG_LEVEL === 'debug') {
       console.error('[DEBUG] ProfileManager: Initializing with config:', this.config);
     }
-    
+
     try {
       // Create the root config directory if it doesn't exist
       await fs.mkdir(this.config.rootConfigPath, { recursive: true });
-      
+
       // Scan for profiles
       await this.scanProfiles();
-      
+
       // Start the profile scan interval if configured
       if (this.config.profileScanInterval) {
         this.scanInterval = setInterval(() => {
-          this.scanProfiles().catch(error => {
+          this.scanProfiles().catch((error) => {
             console.error('[ERROR] ProfileManager: Error scanning profiles:', error);
           });
         }, this.config.profileScanInterval);
       }
-      
+
       if (process.env.LOG_LEVEL === 'debug') {
         console.error('[DEBUG] ProfileManager: Initialization complete');
       }
@@ -75,7 +72,7 @@ export class ProfileManager {
       throw error;
     }
   }
-  
+
   /**
    * Stops the profile manager
    * Clears the profile scan interval
@@ -86,23 +83,26 @@ export class ProfileManager {
       this.scanInterval = undefined;
     }
   }
-  
+
   /**
    * Scans for profiles in the root config directory
    * Recursively searches for YAML files and extracts profile information
    */
   async scanProfiles(): Promise<void> {
     if (process.env.LOG_LEVEL === 'debug') {
-      console.error('[DEBUG] ProfileManager: Scanning for profiles in:', this.config.rootConfigPath);
+      console.error(
+        '[DEBUG] ProfileManager: Scanning for profiles in:',
+        this.config.rootConfigPath
+      );
     }
-    
+
     try {
       // Clear existing profiles
       this.profiles.clear();
-      
+
       // Recursively scan for profiles
       await this.scanDirectory(this.config.rootConfigPath);
-      
+
       if (process.env.LOG_LEVEL === 'debug') {
         console.error(`[DEBUG] ProfileManager: Found ${this.profiles.size} profiles`);
       }
@@ -111,7 +111,7 @@ export class ProfileManager {
       throw error;
     }
   }
-  
+
   /**
    * Recursively scans a directory for YAML files
    * @param dirPath Directory path to scan
@@ -120,11 +120,11 @@ export class ProfileManager {
   private async scanDirectory(dirPath: string, relativePath: string = ''): Promise<void> {
     try {
       const entries = await fs.readdir(dirPath, { withFileTypes: true });
-      
+
       for (const entry of entries) {
         const entryPath = path.join(dirPath, entry.name);
         const entryRelativePath = path.join(relativePath, entry.name);
-        
+
         if (entry.isDirectory()) {
           // Recursively scan subdirectories
           await this.scanDirectory(entryPath, entryRelativePath);
@@ -138,7 +138,7 @@ export class ProfileManager {
       throw error;
     }
   }
-  
+
   /**
    * Processes a YAML file and extracts profile information
    * @param filePath Path to the YAML file
@@ -148,18 +148,18 @@ export class ProfileManager {
     try {
       // Read and parse the YAML file
       const yamlConfig = await readYamlConfig(filePath);
-      
+
       // Extract profile information
       const profileInfo = this.extractProfileInfo(yamlConfig, filePath, relativePath);
-      
+
       // Validate parameters if enabled
       if (this.config.defaultParameters?.validateParameters && this.parameterManager) {
         this.validateProfileParameters(profileInfo);
       }
-      
+
       // Add the profile to the map
       this.profiles.set(profileInfo.id, profileInfo);
-      
+
       if (process.env.LOG_LEVEL === 'debug') {
         console.error(`[DEBUG] ProfileManager: Processed profile: ${profileInfo.id}`);
       }
@@ -168,7 +168,7 @@ export class ProfileManager {
       // Don't throw, just log the error and continue
     }
   }
-  
+
   /**
    * Extracts profile information from a YAML configuration
    * @param yamlConfig YAML cluster configuration
@@ -176,64 +176,70 @@ export class ProfileManager {
    * @param relativePath Relative path from the root config directory
    * @returns Profile information
    */
-  private extractProfileInfo(yamlConfig: YamlClusterConfig, filePath: string, relativePath: string): ProfileInfo {
+  private extractProfileInfo(
+    yamlConfig: YamlClusterConfig,
+    filePath: string,
+    relativePath: string
+  ): ProfileInfo {
     // Extract the category from the relative path
     const category = path.dirname(relativePath) !== '.' ? path.dirname(relativePath) : 'default';
-    
+
     // Generate a unique ID for the profile
-    const id = category !== 'default' ? 
-      `${category}/${path.basename(relativePath, '.yaml')}` : 
-      path.basename(relativePath, '.yaml');
-    
+    const id =
+      category !== 'default'
+        ? `${category}/${path.basename(relativePath, '.yaml')}`
+        : path.basename(relativePath, '.yaml');
+
     // Extract metadata from the YAML
     const metadata: Record<string, any> = {};
-    
+
     let clusterName: string;
     let parameters: Record<string, any> | undefined;
-    
+
     // Check if it's the traditional format
     if ('cluster' in yamlConfig) {
       // Traditional format
-      const traditionalConfig = yamlConfig as import('../config/yaml.js').TraditionalYamlClusterConfig;
+      const traditionalConfig =
+        yamlConfig as import('../config/yaml.js').TraditionalYamlClusterConfig;
       clusterName = traditionalConfig.cluster.name;
-      
+
       // Add description if available
       if (traditionalConfig.cluster.config?.description) {
         metadata.description = traditionalConfig.cluster.config.description;
       }
-      
+
       // Extract parameters from traditional config
       parameters = traditionalConfig.cluster.parameters;
     } else {
       // Enhanced format
       const projectId = Object.keys(yamlConfig)[0];
       const projectConfig = yamlConfig[projectId];
-      
+
       // Use the filename without extension as the cluster name
       clusterName = path.basename(filePath, '.yaml') + '-cluster';
-      
+
       // Add project ID to metadata
       metadata.projectId = projectId;
-      
+
       // Add tags and labels to metadata if available
       if (projectConfig.tags) {
         metadata.tags = projectConfig.tags;
       }
-      
+
       if (projectConfig.labels) {
         metadata.labels = projectConfig.labels;
       }
-      
+
       // Add description if available in either snake_case or camelCase
       const config = projectConfig.cluster_config || projectConfig.clusterConfig;
       if (config?.description) {
         metadata.description = config.description;
       }
-      
+
       // Extract parameters from enhanced config
       parameters = config?.parameters;
     }
-    
+
     // Create the profile info
     return {
       id,
@@ -245,7 +251,7 @@ export class ProfileManager {
       parameters,
     };
   }
-  
+
   /**
    * Validates profile parameters against the parameter manager
    * @param profile Profile to validate
@@ -306,7 +312,7 @@ export class ProfileManager {
   getAllProfiles(): ProfileInfo[] {
     return Array.from(this.profiles.values());
   }
-  
+
   /**
    * Gets a profile by ID
    * @param id Profile ID
@@ -315,29 +321,29 @@ export class ProfileManager {
   getProfile(id: string): ProfileInfo | undefined {
     return this.profiles.get(id);
   }
-  
+
   /**
    * Gets profiles by category
    * @param category Category to filter by
    * @returns Array of profile information
    */
   getProfilesByCategory(category: string): ProfileInfo[] {
-    return Array.from(this.profiles.values()).filter(profile => profile.category === category);
+    return Array.from(this.profiles.values()).filter((profile) => profile.category === category);
   }
-  
+
   /**
    * Updates profile usage statistics
    * @param id Profile ID
    */
   updateProfileUsage(id: string): void {
     const profile = this.profiles.get(id);
-    
+
     if (profile) {
       profile.lastUsed = new Date().toISOString();
       profile.timesUsed += 1;
     }
   }
-  
+
   /**
    * Imports profiles from a state store
    * @param profiles Map of profile IDs to profile information
@@ -346,25 +352,25 @@ export class ProfileManager {
     for (const [id, profile] of Object.entries(profiles)) {
       // Only import usage statistics for existing profiles
       const existingProfile = this.profiles.get(id);
-      
+
       if (existingProfile) {
         existingProfile.lastUsed = profile.lastUsed;
         existingProfile.timesUsed = profile.timesUsed;
       }
     }
   }
-  
+
   /**
    * Exports profiles to a state store
    * @returns Map of profile IDs to profile information
    */
   exportProfiles(): Record<string, ProfileInfo> {
     const result: Record<string, ProfileInfo> = {};
-    
+
     for (const [id, profile] of this.profiles.entries()) {
       result[id] = profile;
     }
-    
+
     return result;
   }
 }

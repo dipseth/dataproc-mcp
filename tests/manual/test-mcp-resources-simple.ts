@@ -1,14 +1,14 @@
 /**
  * Simple test script for MCP resources and prompts
- * 
+ *
  * This script demonstrates how to use the MCP resources and prompts functionality
  * without relying on any testing frameworks or mocking libraries.
- * 
+ *
  * Run with: npx ts-node tests/manual/test-mcp-resources-simple.ts
  */
 
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 
 /**
@@ -16,63 +16,63 @@ import { z } from 'zod';
  */
 async function main() {
   console.log('=== MCP Resources and Prompts Demo ===');
-  
+
   try {
     // Create a new server with resource and prompt capabilities
     console.log('\nCreating server with resource and prompt capabilities...');
     const server = new Server(
       {
-        name: "dataproc-server-demo",
-        version: "0.3.0",
+        name: 'dataproc-server-demo',
+        version: '0.3.0',
       },
       {
         capabilities: {
           resources: {
-            listChanged: true
+            listChanged: true,
           },
           tools: {},
           prompts: {
-            listChanged: true
+            listChanged: true,
           },
         },
       }
     );
-    
+
     // Define resource list request schema using Zod
     const ListResourcesRequestSchema = z.object({
-      method: z.literal("list_resources"),
+      method: z.literal('list_resources'),
     });
-    
+
     // Define resource read request schema using Zod
     const ReadResourceRequestSchema = z.object({
-      method: z.literal("read_resource"),
+      method: z.literal('read_resource'),
       params: z.object({
         uri: z.string(),
       }),
     });
-    
+
     // Define prompt list request schema using Zod
     const ListPromptsRequestSchema = z.object({
-      method: z.literal("list_prompts"),
+      method: z.literal('list_prompts'),
     });
-    
+
     // Define prompt read request schema using Zod
     const ReadPromptRequestSchema = z.object({
-      method: z.literal("read_prompt"),
+      method: z.literal('read_prompt'),
       params: z.object({
         id: z.string(),
       }),
     });
-    
+
     // Define types for the request parameters
     type ReadResourceRequest = z.infer<typeof ReadResourceRequestSchema>;
     type ReadPromptRequest = z.infer<typeof ReadPromptRequestSchema>;
-    
+
     // Handler for listing resources
     console.log('\nRegistering resource list handler...');
     server.setRequestHandler(ListResourcesRequestSchema, async () => {
       console.log('Resource list handler called');
-      
+
       // Define sample resources
       const resources = [
         {
@@ -86,18 +86,18 @@ async function main() {
           description: 'Dataproc job (submit_hive_query) - DONE',
         },
       ];
-      
+
       console.log('Returning resources:', JSON.stringify(resources, null, 2));
       return { resources };
     });
-    
+
     // Handler for reading resources
     console.log('\nRegistering resource read handler...');
     server.setRequestHandler(ReadResourceRequestSchema, async (request: ReadResourceRequest) => {
       console.log('Resource read handler called with URI:', request.params.uri);
-      
+
       const uri = request.params.uri;
-      
+
       try {
         // Parse the URI to determine resource type
         if (uri.startsWith('dataproc://clusters/')) {
@@ -106,35 +106,39 @@ async function main() {
           if (parts.length !== 3) {
             throw new Error(`Invalid cluster URI format: ${uri}`);
           }
-          
+
           const [projectId, region, clusterName] = parts;
           console.log(`Getting cluster: ${projectId}/${region}/${clusterName}`);
-          
+
           // Return sample cluster data
           const result = {
             content: [
               {
-                type: "text",
-                text: JSON.stringify({
-                  clusterName,
-                  projectId,
-                  region,
-                  status: { state: 'RUNNING' },
-                  config: {
-                    masterConfig: {
-                      machineType: 'n1-standard-4',
-                      numInstances: 1
+                type: 'text',
+                text: JSON.stringify(
+                  {
+                    clusterName,
+                    projectId,
+                    region,
+                    status: { state: 'RUNNING' },
+                    config: {
+                      masterConfig: {
+                        machineType: 'n1-standard-4',
+                        numInstances: 1,
+                      },
+                      workerConfig: {
+                        machineType: 'n1-standard-4',
+                        numInstances: 2,
+                      },
                     },
-                    workerConfig: {
-                      machineType: 'n1-standard-4',
-                      numInstances: 2
-                    }
-                  }
-                }, null, 2),
+                  },
+                  null,
+                  2
+                ),
               },
             ],
           };
-          
+
           console.log('Returning cluster data');
           return result;
         } else if (uri.startsWith('dataproc://jobs/')) {
@@ -143,41 +147,42 @@ async function main() {
           if (parts.length !== 3) {
             throw new Error(`Invalid job URI format: ${uri}`);
           }
-          
+
           const [projectId, region, jobId] = parts;
           console.log(`Getting job: ${projectId}/${region}/${jobId}`);
-          
+
           // Return sample job data
           const result = {
             content: [
               {
-                type: "text",
-                text: JSON.stringify({
-                  jobId,
-                  projectId,
-                  region,
-                  status: {
-                    state: 'DONE',
-                    details: 'Job completed successfully',
-                    stateStartTime: new Date().toISOString()
-                  },
-                  results: {
-                    schema: {
-                      fields: [
-                        { name: 'id', type: 'INTEGER' },
-                        { name: 'name', type: 'STRING' }
-                      ]
+                type: 'text',
+                text: JSON.stringify(
+                  {
+                    jobId,
+                    projectId,
+                    region,
+                    status: {
+                      state: 'DONE',
+                      details: 'Job completed successfully',
+                      stateStartTime: new Date().toISOString(),
                     },
-                    rows: [
-                      { values: [1, 'Item 1'] },
-                      { values: [2, 'Item 2'] }
-                    ]
-                  }
-                }, null, 2),
+                    results: {
+                      schema: {
+                        fields: [
+                          { name: 'id', type: 'INTEGER' },
+                          { name: 'name', type: 'STRING' },
+                        ],
+                      },
+                      rows: [{ values: [1, 'Item 1'] }, { values: [2, 'Item 2'] }],
+                    },
+                  },
+                  null,
+                  2
+                ),
               },
             ],
           };
-          
+
           console.log('Returning job data');
           return result;
         } else {
@@ -188,43 +193,43 @@ async function main() {
         throw error;
       }
     });
-    
+
     // Handler for listing prompts
     console.log('\nRegistering prompt list handler...');
     server.setRequestHandler(ListPromptsRequestSchema, async () => {
       console.log('Prompt list handler called');
-      
+
       // Define available prompts
       const prompts = [
         {
-          id: "dataproc-cluster-creation",
-          name: "Dataproc Cluster Creation",
-          description: "Guidelines for creating Dataproc clusters",
+          id: 'dataproc-cluster-creation',
+          name: 'Dataproc Cluster Creation',
+          description: 'Guidelines for creating Dataproc clusters',
         },
         {
-          id: "dataproc-job-submission",
-          name: "Dataproc Job Submission",
-          description: "Guidelines for submitting jobs to Dataproc clusters",
+          id: 'dataproc-job-submission',
+          name: 'Dataproc Job Submission',
+          description: 'Guidelines for submitting jobs to Dataproc clusters',
         },
       ];
-      
+
       console.log('Returning prompts:', JSON.stringify(prompts, null, 2));
       return { prompts };
     });
-    
+
     // Handler for reading prompts
     console.log('\nRegistering prompt read handler...');
     server.setRequestHandler(ReadPromptRequestSchema, async (request: ReadPromptRequest) => {
       console.log('Prompt read handler called with ID:', request.params.id);
-      
+
       const id = request.params.id;
-      
+
       try {
-        if (id === "dataproc-cluster-creation") {
+        if (id === 'dataproc-cluster-creation') {
           const result = {
             content: [
               {
-                type: "text",
+                type: 'text',
                 text: `# Dataproc Cluster Creation Guidelines
 
 When creating a Dataproc cluster, consider the following:
@@ -244,14 +249,14 @@ For production workloads, consider using a predefined profile with the \`create_
               },
             ],
           };
-          
+
           console.log('Returning cluster creation prompt');
           return result;
-        } else if (id === "dataproc-job-submission") {
+        } else if (id === 'dataproc-job-submission') {
           const result = {
             content: [
               {
-                type: "text",
+                type: 'text',
                 text: `# Dataproc Job Submission Guidelines
 
 When submitting jobs to Dataproc, follow these best practices:
@@ -284,7 +289,7 @@ When submitting jobs to Dataproc, follow these best practices:
               },
             ],
           };
-          
+
           console.log('Returning job submission prompt');
           return result;
         } else {
@@ -295,20 +300,26 @@ When submitting jobs to Dataproc, follow these best practices:
         throw error;
       }
     });
-    
-    console.log('\nServer setup complete. In a real application, you would connect the server to a transport.');
+
+    console.log(
+      '\nServer setup complete. In a real application, you would connect the server to a transport.'
+    );
     console.log('For example:');
     console.log('  const transport = new StdioServerTransport();');
     console.log('  await server.connect(transport);');
-    
+
     console.log('\n=== Demo completed successfully ===');
     console.log('\nTo test this functionality in the actual server:');
     console.log('1. Start the server: node build/index.js');
     console.log('2. Use the MCP client to send requests to the server');
     console.log('3. Try listing resources with: { "method": "list_resources" }');
-    console.log('4. Try reading a resource with: { "method": "read_resource", "params": { "uri": "dataproc://clusters/project/region/cluster" } }');
+    console.log(
+      '4. Try reading a resource with: { "method": "read_resource", "params": { "uri": "dataproc://clusters/project/region/cluster" } }'
+    );
     console.log('5. Try listing prompts with: { "method": "list_prompts" }');
-    console.log('6. Try reading a prompt with: { "method": "read_prompt", "params": { "id": "dataproc-cluster-creation" } }');
+    console.log(
+      '6. Try reading a prompt with: { "method": "read_prompt", "params": { "id": "dataproc-cluster-creation" } }'
+    );
   } catch (error) {
     console.error('Demo failed:', error);
     process.exit(1);
@@ -316,7 +327,7 @@ When submitting jobs to Dataproc, follow these best practices:
 }
 
 // Run the demo
-main().catch(error => {
+main().catch((error) => {
   console.error('Fatal error:', error);
   process.exit(1);
 });

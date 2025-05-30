@@ -2,16 +2,8 @@
  * Query service for executing Hive queries on Dataproc clusters
  */
 
-import { protos } from '@google-cloud/dataproc';
-import { getGcloudAccessToken, getGcloudAccessTokenWithConfig, createDataprocClient, createJobClient } from '../config/credentials.js';
-import { getServerConfig } from '../config/server.js';
-import {
-  HiveQueryConfig,
-  QueryOptions,
-  QueryJob,
-  JobState,
-  QueryResult
-} from '../types/query.js';
+import { getGcloudAccessTokenWithConfig, createJobClient } from '../config/credentials.js';
+import { QueryOptions, QueryJob, JobState, QueryResult } from '../types/query.js';
 import fetch from 'node-fetch';
 
 /**
@@ -21,14 +13,18 @@ import fetch from 'node-fetch';
  * @param timeoutMs Timeout in milliseconds (default: 30 seconds)
  * @returns Promise that resolves to Response or rejects on timeout
  */
-async function fetchWithTimeout(url: string, options: any, timeoutMs: number = 30000): Promise<any> {
+async function fetchWithTimeout(
+  url: string,
+  options: any,
+  timeoutMs: number = 30000
+): Promise<any> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-  
+
   try {
     const response = await fetch(url, {
       ...options,
-      signal: controller.signal
+      signal: controller.signal,
     });
     clearTimeout(timeoutId);
     return response;
@@ -66,28 +62,28 @@ export async function submitHiveQuery(
     region,
     clusterName,
     queryLength: query.length,
-    async
+    async,
   });
-  
+
   try {
     // Use REST API by default (like working list_clusters)
     console.error(`[TIMING] submitHiveQuery: Using REST API approach`);
     const job = await submitHiveQueryWithRest(projectId, region, clusterName, query, options);
-    
+
     const totalDuration = Date.now() - startTime;
     console.error(`[TIMING] submitHiveQuery: SUCCESS - total: ${totalDuration}ms`);
-    
+
     // If async mode, return the job information immediately
     if (async) {
       return job as QueryJob;
     }
-    
+
     // Otherwise, wait for the job to complete using REST API
     const jobId = job.reference?.jobId;
     if (!jobId) {
       throw new Error('Job ID not found in response');
     }
-    
+
     // Poll for job completion using REST API
     const completedJob = await waitForJobCompletionWithRest(
       projectId,
@@ -95,7 +91,7 @@ export async function submitHiveQuery(
       jobId,
       options?.timeoutMs || 600000 // Default timeout: 10 minutes
     );
-    
+
     return completedJob;
   } catch (error) {
     const totalDuration = Date.now() - startTime;
@@ -103,9 +99,9 @@ export async function submitHiveQuery(
     console.error('[DEBUG] submitHiveQuery: Error details:', {
       errorType: error?.constructor?.name,
       errorMessage: error instanceof Error ? error.message : 'Unknown error',
-      errorStack: error instanceof Error ? error.stack : undefined
+      errorStack: error instanceof Error ? error.stack : undefined,
     });
-    
+
     if (error instanceof Error) {
       throw new Error(`Error submitting Hive query: ${error.message}`);
     }
@@ -130,40 +126,34 @@ export async function waitForJobCompletion(
   pollIntervalMs: number = 5000
 ): Promise<QueryJob> {
   // Get server configuration for enhanced authentication
-  const config = await getServerConfig();
-  const authConfig = config.authentication;
-  
+  // const config = await getServerConfig(); // Unused variable
+  // const _authConfig = config.authentication; // Unused variable
+
   // Use enhanced authentication to create job client
   const jobClient = await createJobClient({
     region,
-    
-    
   });
-  
+
   const startTime = Date.now();
-  
+
   while (Date.now() - startTime < timeoutMs) {
     const [job] = await jobClient.getJob({
       projectId,
       region,
       jobId,
     });
-    
+
     const status = job.status?.state;
-    
+
     // Check if the job is in a terminal state
-    if (
-      status === JobState.DONE ||
-      status === JobState.CANCELLED ||
-      status === JobState.ERROR
-    ) {
+    if (status === JobState.DONE || status === JobState.CANCELLED || status === JobState.ERROR) {
       return job as QueryJob;
     }
-    
+
     // Wait before polling again
-    await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
   }
-  
+
   throw new Error(`Job did not complete within the timeout period (${timeoutMs}ms)`);
 }
 
@@ -181,16 +171,18 @@ export async function getJobStatus(
 ): Promise<QueryJob> {
   const startTime = Date.now();
   console.error(`[TIMING] getJobStatus: Starting MCP tool execution`);
-  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] getJobStatus: Starting with params:', { projectId, region, jobId });
-  
+  if (process.env.LOG_LEVEL === 'debug')
+    console.error('[DEBUG] getJobStatus: Starting with params:', { projectId, region, jobId });
+
   try {
     // Use REST API by default (like working list_clusters)
     console.error(`[TIMING] getJobStatus: Using REST API approach`);
     const job = await getJobStatusWithRest(projectId, region, jobId);
-    
+
     const totalDuration = Date.now() - startTime;
     console.error(`[TIMING] getJobStatus: SUCCESS - total: ${totalDuration}ms`);
-    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] getJobStatus: API call successful, job status:', job.status?.state);
+    if (process.env.LOG_LEVEL === 'debug')
+      console.error('[DEBUG] getJobStatus: API call successful, job status:', job.status?.state);
     return job as QueryJob;
   } catch (error) {
     const totalDuration = Date.now() - startTime;
@@ -216,33 +208,43 @@ export async function getQueryResultsWithRest(
   region: string,
   jobId: string
 ): Promise<any> {
-  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] getQueryResultsWithRest: Starting with params:', { projectId, region, jobId });
-  
-  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] getQueryResultsWithRest: Getting token from gcloud CLI with config');
-  const token = await getGcloudAccessTokenWithConfig();
-  
+  if (process.env.LOG_LEVEL === 'debug')
+    console.error('[DEBUG] getQueryResultsWithRest: Starting with params:', {
+      projectId,
+      region,
+      jobId,
+    });
+
+  if (process.env.LOG_LEVEL === 'debug')
+    console.error('[DEBUG] getQueryResultsWithRest: Getting token from gcloud CLI with config');
+  // const _token = await getGcloudAccessTokenWithConfig(); // Unused variable
+
   // First, check if the job is complete using REST API
-  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] getQueryResultsWithRest: Checking job status');
+  if (process.env.LOG_LEVEL === 'debug')
+    console.error('[DEBUG] getQueryResultsWithRest: Checking job status');
   const jobStatus = await getJobStatusWithRest(projectId, region, jobId);
-  
-  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] getQueryResultsWithRest: Job status:', jobStatus.status?.state);
-  
+
+  if (process.env.LOG_LEVEL === 'debug')
+    console.error('[DEBUG] getQueryResultsWithRest: Job status:', jobStatus.status?.state);
+
   if (jobStatus.status?.state !== 'DONE') {
-    console.error('[DEBUG] getQueryResultsWithRest: Job not complete, current state:', jobStatus.status?.state);
+    console.error(
+      '[DEBUG] getQueryResultsWithRest: Job not complete, current state:',
+      jobStatus.status?.state
+    );
     throw new Error(`Job is not complete. Current state: ${jobStatus.status?.state}`);
   }
-  
+
   // Get the driver output URI from the job status
   const driverOutputUri = jobStatus.driverOutputResourceUri;
-  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] getQueryResultsWithRest: Driver output URI:', driverOutputUri);
-  
+  if (process.env.LOG_LEVEL === 'debug')
+    console.error('[DEBUG] getQueryResultsWithRest: Driver output URI:', driverOutputUri);
+
   // For now, return a placeholder result
   // In a real implementation, you would download and parse the driver output files
   return {
     schema: {
-      fields: [
-        { name: 'database_name', type: 'STRING' },
-      ],
+      fields: [{ name: 'database_name', type: 'STRING' }],
     },
     rows: [
       { values: ['default'] },
@@ -252,7 +254,7 @@ export async function getQueryResultsWithRest(
     ],
     totalRows: 4,
     jobId: jobId,
-    driverOutputUri: driverOutputUri
+    driverOutputUri: driverOutputUri,
   };
 }
 
@@ -277,31 +279,35 @@ export async function submitHiveQueryWithRest(
     projectId,
     region,
     clusterName,
-    queryLength: query.length
+    queryLength: query.length,
   });
-  
-  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] submitHiveQueryWithRest: Getting token from gcloud CLI with config');
+
+  if (process.env.LOG_LEVEL === 'debug')
+    console.error('[DEBUG] submitHiveQueryWithRest: Getting token from gcloud CLI with config');
   const token = await getGcloudAccessTokenWithConfig();
-  
+
   // Ensure the URL is correctly formed with the full domain and :submit suffix
   const url = `https://${region}-dataproc.googleapis.com/v1/projects/${projectId}/regions/${region}/jobs:submit`;
-  
-  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] submitHiveQueryWithRest: Making REST API request to:', url);
-  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] submitHiveQueryWithRest: Request method: POST');
-  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] submitHiveQueryWithRest: Authorization header: Bearer [token]');
-  
+
+  if (process.env.LOG_LEVEL === 'debug')
+    console.error('[DEBUG] submitHiveQueryWithRest: Making REST API request to:', url);
+  if (process.env.LOG_LEVEL === 'debug')
+    console.error('[DEBUG] submitHiveQueryWithRest: Request method: POST');
+  if (process.env.LOG_LEVEL === 'debug')
+    console.error('[DEBUG] submitHiveQueryWithRest: Authorization header: Bearer [token]');
+
   // Create the Hive job configuration
   const hiveJob: any = {
     queryList: {
       queries: [query],
     },
   };
-  
+
   // Add optional properties if provided
   if (options?.properties) {
     hiveJob.properties = options.properties;
   }
-  
+
   // Create the job submission request
   const requestBody = {
     job: {
@@ -314,37 +320,56 @@ export async function submitHiveQueryWithRest(
       },
     },
   };
-  
+
   try {
-    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] submitHiveQueryWithRest: Request body:', JSON.stringify(requestBody, null, 2));
-    
+    if (process.env.LOG_LEVEL === 'debug')
+      console.error(
+        '[DEBUG] submitHiveQueryWithRest: Request body:',
+        JSON.stringify(requestBody, null, 2)
+      );
+
     // Log the full request details
-    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] submitHiveQueryWithRest: Making fetch request with:');
+    if (process.env.LOG_LEVEL === 'debug')
+      console.error('[DEBUG] submitHiveQueryWithRest: Making fetch request with:');
     if (process.env.LOG_LEVEL === 'debug') console.error('- URL:', url);
     if (process.env.LOG_LEVEL === 'debug') console.error('- Method: POST');
-    if (process.env.LOG_LEVEL === 'debug') console.error('- Headers: Authorization and Content-Type');
-    if (process.env.LOG_LEVEL === 'debug') console.error('- Body length:', JSON.stringify(requestBody).length);
-    
-    const response = await fetchWithTimeout(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
+    if (process.env.LOG_LEVEL === 'debug')
+      console.error('- Headers: Authorization and Content-Type');
+    if (process.env.LOG_LEVEL === 'debug')
+      console.error('- Body length:', JSON.stringify(requestBody).length);
+
+    const response = await fetchWithTimeout(
+      url,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
       },
-      body: JSON.stringify(requestBody)
-    }, 30000); // 30 second timeout
-    
-    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] submitHiveQueryWithRest: Received response with status:', response.status);
-    
+      30000
+    ); // 30 second timeout
+
+    if (process.env.LOG_LEVEL === 'debug')
+      console.error(
+        '[DEBUG] submitHiveQueryWithRest: Received response with status:',
+        response.status
+      );
+
     if (!response.ok) {
       const errorText = await response.text();
       console.error('[DEBUG] submitHiveQueryWithRest: API error:', response.status, errorText);
-      console.error('[DEBUG] submitHiveQueryWithRest: Response headers:', JSON.stringify(Object.fromEntries([...response.headers]), null, 2));
+      console.error(
+        '[DEBUG] submitHiveQueryWithRest: Response headers:',
+        JSON.stringify(Object.fromEntries([...response.headers]), null, 2)
+      );
       throw new Error(`API error: ${response.status} - ${errorText}`);
     }
-    
+
     const result = await response.json();
-    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] submitHiveQueryWithRest: API request successful');
+    if (process.env.LOG_LEVEL === 'debug')
+      console.error('[DEBUG] submitHiveQueryWithRest: API request successful');
     return result as QueryJob;
   } catch (error) {
     console.error('[DEBUG] submitHiveQueryWithRest: Error:', error);
@@ -368,32 +393,44 @@ export async function getJobStatusWithRest(
   region: string,
   jobId: string
 ): Promise<QueryJob> {
-  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] getJobStatusWithRest: Starting with params:', { projectId, region, jobId });
-  
-  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] getJobStatusWithRest: Getting token from gcloud CLI with config');
+  if (process.env.LOG_LEVEL === 'debug')
+    console.error('[DEBUG] getJobStatusWithRest: Starting with params:', {
+      projectId,
+      region,
+      jobId,
+    });
+
+  if (process.env.LOG_LEVEL === 'debug')
+    console.error('[DEBUG] getJobStatusWithRest: Getting token from gcloud CLI with config');
   const token = await getGcloudAccessTokenWithConfig();
-  
+
   const url = `https://${region}-dataproc.googleapis.com/v1/projects/${projectId}/regions/${region}/jobs/${jobId}`;
-  
-  if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] getJobStatusWithRest: Making REST API request to:', url);
-  
+
+  if (process.env.LOG_LEVEL === 'debug')
+    console.error('[DEBUG] getJobStatusWithRest: Making REST API request to:', url);
+
   try {
-    const response = await fetchWithTimeout(url, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    }, 30000); // 30 second timeout
-    
+    const response = await fetchWithTimeout(
+      url,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      },
+      30000
+    ); // 30 second timeout
+
     if (!response.ok) {
       const errorText = await response.text();
       console.error('[DEBUG] getJobStatusWithRest: API error:', response.status, errorText);
       throw new Error(`API error: ${response.status} - ${errorText}`);
     }
-    
+
     const result = await response.json();
-    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] getJobStatusWithRest: API request successful');
+    if (process.env.LOG_LEVEL === 'debug')
+      console.error('[DEBUG] getJobStatusWithRest: API request successful');
     return result as QueryJob;
   } catch (error) {
     console.error('[DEBUG] getJobStatusWithRest: Error:', error);
@@ -425,21 +462,19 @@ export async function getQueryResults(
     region,
     jobId,
     maxResults,
-    pageToken
+    pageToken,
   });
-  
+
   try {
-    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] getQueryResults: Using REST API implementation');
-    
+    if (process.env.LOG_LEVEL === 'debug')
+      console.error('[DEBUG] getQueryResults: Using REST API implementation');
+
     // Use the REST API implementation instead of the client library
-    const result = await getQueryResultsWithRest(
-      projectId,
-      region,
-      jobId
-    );
-    
-    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] getQueryResults: REST API call successful');
-    
+    const result = await getQueryResultsWithRest(projectId, region, jobId);
+
+    if (process.env.LOG_LEVEL === 'debug')
+      console.error('[DEBUG] getQueryResults: REST API call successful');
+
     return result;
   } catch (error) {
     console.error('[DEBUG] getQueryResults: Error encountered:', error);
@@ -464,24 +499,20 @@ export async function waitForJobCompletionWithRest(
   pollIntervalMs: number = 5000
 ): Promise<QueryJob> {
   const startTime = Date.now();
-  
+
   while (Date.now() - startTime < timeoutMs) {
     const job = await getJobStatusWithRest(projectId, region, jobId);
-    
+
     const status = job.status?.state;
-    
+
     // Check if the job is in a terminal state
-    if (
-      status === JobState.DONE ||
-      status === JobState.CANCELLED ||
-      status === JobState.ERROR
-    ) {
+    if (status === JobState.DONE || status === JobState.CANCELLED || status === JobState.ERROR) {
       return job as QueryJob;
     }
-    
+
     // Wait before polling again
-    await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
   }
-  
+
   throw new Error(`Job did not complete within the timeout period (${timeoutMs}ms)`);
 }

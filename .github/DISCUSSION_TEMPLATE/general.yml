@@ -1,0 +1,43 @@
+body:
+  - type: markdown
+    attributes:
+      value: |
+        👋 Welcome to the Dataproc MCP Server community discussions!
+        
+        Please use this template for general discussions about the project.
+        
+        Before posting, please:
+        1. Search existing discussions to avoid duplicates
+        2. Read our [Community Support Guide](../docs/COMMUNITY_SUPPORT.md)
+        3. Follow our [Code of Conduct](../CODE_OF_CONDUCT.md)
+
+  - type: textarea
+    id: discussion-topic
+    attributes:
+      label: Discussion Topic
+      description: What would you like to discuss?
+      placeholder: Describe your topic or question here...
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Any additional context, links, or information that might be helpful
+      placeholder: Add any relevant context, links, or background information...
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      description: Please confirm you have done the following
+      options:
+        - label: I have searched existing discussions for similar topics
+          required: true
+        - label: I have read the community guidelines
+          required: true
+        - label: This discussion is appropriate for the community
+          required: true
