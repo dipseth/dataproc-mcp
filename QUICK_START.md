@@ -480,6 +480,6 @@ npm run setup
 
 - Explore the [example profiles](profiles/)
 - Read the [Configuration Guide](docs/CONFIGURATION_GUIDE.md)
-- Check out the [Production Readiness Plan](PRODUCTION_READINESS_PLAN.md)
+- Check out the [Production Readiness Plan](./PRODUCTION_READINESS_PLAN.md)
 
 Happy clustering! 🎉

@@ -272,7 +272,7 @@ if (!version) {
 }
 
 const changelog = fs.readFileSync('CHANGELOG.md', 'utf8');
-const versionRegex = new RegExp(`## \\[${version.replace('v', '')}\\]([\\\s\\\S]*?)(?=## \\[|$)`);
+const versionRegex = new RegExp(`## \\[${version.replace('v', '')}\\]([\\s\\S]*?)(?=## \\[|$)`);
 const match = changelog.match(versionRegex);
 
 if (match) {
