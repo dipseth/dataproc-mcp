@@ -5,6 +5,61 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+<!-- semantic-release-changelog -->
+
+## 1.0.0 (2025-05-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* Complete production readiness implementation
+
+Major features:
+- Comprehensive CI/CD pipeline with GitHub Actions workflows
+- Advanced security middleware and credential management
+- Intelligent default parameter injection system
+- Enhanced error handling and validation schemas
+- Production-ready testing suite with unit, integration, and e2e tests
+- Automated release management with semantic versioning
+- Complete documentation and community support infrastructure
+
+Technical improvements:
+- Resolved all 26 critical ESLint errors for code quality compliance
+- Fixed TypeScript compatibility issues with Node.js experimental features
+- Implemented proper import/export resolution across all modules
+- Added comprehensive security scanning and vulnerability management
+- Enhanced MCP protocol implementation with robust error handling
+
+This release establishes the foundation for a production-ready MCP server
+with enterprise-grade reliability, security, and maintainability.
+
+### 🚀 Features
+
+* Add profile management and cluster operations to server request handlers ([ac071da](https://github.com/dipseth/dataproc-mcp/commit/ac071dab9dfefac8992ebaf9a89733d5d4d5085f))
+* Clean logging, robust GCS output handler, and working TypeScript integration test setup. All debug/info logs now go to stderr and are controlled by LOG_LEVEL. Test runner and imports fixed for ts-node/esm. Marking project milestone. ([00c4c89](https://github.com/dipseth/dataproc-mcp/commit/00c4c892583e41451a24bb035e89b6e7062d0756))
+* Enhance OutputParser to support Hive table output parsing ([4a1fa0e](https://github.com/dipseth/dataproc-mcp/commit/4a1fa0ecc5c6ce6247a1066d2763b6e8eb86e8c9))
+* Implement Default Parameter Manager for environment-specific parameter handling ([c44e818](https://github.com/dipseth/dataproc-mcp/commit/c44e8182f867512bbafc5331938007cabde97587))
+* production-ready dataproc mcp server with comprehensive ci/cd pipeline ([66efdb0](https://github.com/dipseth/dataproc-mcp/commit/66efdb018288648806fd85d09b6d21f2cf5e7ad2))
+* **tests:** Refactor MCP resource and prompt tests to use service classes and Zod schemas ([5ba4c78](https://github.com/dipseth/dataproc-mcp/commit/5ba4c7872050f9ad47f2d0440799704f432434e9))
+* remove outdated cluster profiles and add new setup scripts ([b46e542](https://github.com/dipseth/dataproc-mcp/commit/b46e542163bb8db273b13d195ddc781b9c4beee8))
+
+
+### 🐛 Bug Fixes
+
+* Update impersonateServiceAccount in server configuration for correct service account usage ([2be7a68](https://github.com/dipseth/dataproc-mcp/commit/2be7a68867ff278bf7619984a2e0f0e033a5b7c9))
+
+
+### 📚 Documentation
+
+* Enhance README and guides with default parameter management details and user experience improvements ([38146c5](https://github.com/dipseth/dataproc-mcp/commit/38146c58a03cff36f47e2103be68bdf2dc78cd6a))
+
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
 ## [1.0.0] - 2025-05-29
 
 ### Added
