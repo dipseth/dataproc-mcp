@@ -61,7 +61,7 @@
     "docs:generate": "node scripts/generate-docs.js",
     "docs:test-links": "node scripts/test-doc-links.js",
     "inspector": "npx @modelcontextprotocol/inspector build/index.js",
-    "test": "NODE_OPTIONS='--loader ts-node/esm' mocha 'tests/unit/**/*.ts' 'tests/integration/**/*.ts'",
+    "test": "NODE_OPTIONS='--loader ts-node/esm' mocha 'tests/unit/**/*.ts' 'tests/integration/**/*.ts' --exit",
     "test:unit": "NODE_OPTIONS='--loader ts-node/esm' mocha 'tests/unit/**/*.ts'",
     "test:unit:fast": "mocha 'tests/unit/**/*.js' --exit",
     "test:manual": "NODE_OPTIONS='--loader ts-node/esm' mocha 'tests/manual/**/*.ts' --timeout 60000",

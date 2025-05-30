@@ -104,7 +104,7 @@ describe('Profile Parameter Integration', () => {
       expect(() => {
         (profileManager as any).profiles.set(invalidProfile.id, invalidProfile);
         (profileManager as any).validateProfileParameters(invalidProfile);
-      }).to.throw('greater than maximum');
+      }).to.throw('Value 20 for parameter numWorkers is greater than maximum 10');
     });
 
     it('should use environment-specific defaults when no profile override', async () => {
