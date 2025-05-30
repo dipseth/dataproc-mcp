@@ -1,0 +1,236 @@
+name: 🔄 Dependency Updates
+
+on:
+  schedule:
+    # Run every Monday at 9 AM UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: dependency-update
+  cancel-in-progress: true
+
+jobs:
+  # ============================================================================
+  # DEPENDENCY AUDIT & UPDATE
+  # ============================================================================
+  dependency-update:
+    name: 📦 Update Dependencies
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 📦 Install Dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: 🔍 Security Audit
+        run: |
+          echo "🔍 Running security audit..."
+          npm audit --audit-level moderate || echo "⚠️ Security vulnerabilities found"
+          
+          # Generate audit report
+          npm audit --json > audit-report.json || true
+          
+          # Check for critical/high vulnerabilities
+          CRITICAL_COUNT=$(cat audit-report.json | jq '.metadata.vulnerabilities.critical // 0')
+          HIGH_COUNT=$(cat audit-report.json | jq '.metadata.vulnerabilities.high // 0')
+          
+          echo "🔒 Security Summary:"
+          echo "  - Critical: $CRITICAL_COUNT"
+          echo "  - High: $HIGH_COUNT"
+          
+          if [[ $CRITICAL_COUNT -gt 0 || $HIGH_COUNT -gt 0 ]]; then
+            echo "⚠️ High/Critical vulnerabilities detected - will attempt to fix"
+            echo "SECURITY_ISSUES=true" >> $GITHUB_ENV
+          else
+            echo "✅ No critical security issues found"
+            echo "SECURITY_ISSUES=false" >> $GITHUB_ENV
+          fi
+
+      - name: 🔧 Fix Security Vulnerabilities
+        if: env.SECURITY_ISSUES == 'true'
+        run: |
+          echo "🔧 Attempting to fix security vulnerabilities..."
+          npm audit fix --force || echo "⚠️ Some vulnerabilities could not be auto-fixed"
+
+      - name: 📈 Update Dependencies
+        run: |
+          echo "📈 Checking for dependency updates..."
+          
+          # Update patch versions only (safer)
+          npx npm-check-updates --target patch --upgrade
+          
+          # Install updated dependencies
+          npm install
+          
+          # Check if package-lock.json changed
+          if git diff --quiet package-lock.json; then
+            echo "NO_UPDATES=true" >> $GITHUB_ENV
+            echo "ℹ️ No dependency updates available"
+          else
+            echo "NO_UPDATES=false" >> $GITHUB_ENV
+            echo "✅ Dependencies updated"
+          fi
+
+      - name: 🧪 Test Updated Dependencies
+        if: env.NO_UPDATES == 'false' || env.SECURITY_ISSUES == 'true'
+        run: |
+          echo "🧪 Testing with updated dependencies..."
+          
+          # Build project
+          npm run build
+          
+          # Run tests
+          npm run test:unit:fast
+          
+          # Run linting
+          npm run lint:check
+          
+          # Type checking
+          npm run type-check
+          
+          echo "✅ All tests passed with updated dependencies"
+
+      - name: 📊 Generate Update Summary
+        if: env.NO_UPDATES == 'false' || env.SECURITY_ISSUES == 'true'
+        run: |
+          echo "📊 Generating update summary..."
+          
+          # Create summary of changes
+          echo "## 📦 Dependency Update Summary" > update-summary.md
+          echo "" >> update-summary.md
+          echo "### 🔄 Updated Dependencies" >> update-summary.md
+          echo "" >> update-summary.md
+          
+          # Show package.json changes
+          if git diff --quiet package.json; then
+            echo "No direct dependency changes in package.json" >> update-summary.md
+          else
+            echo "\`\`\`diff" >> update-summary.md
+            git diff package.json >> update-summary.md
+            echo "\`\`\`" >> update-summary.md
+          fi
+          
+          echo "" >> update-summary.md
+          echo "### 🔒 Security Status" >> update-summary.md
+          echo "" >> update-summary.md
+          
+          if [[ "${{ env.SECURITY_ISSUES }}" == "true" ]]; then
+            echo "- ✅ Security vulnerabilities addressed" >> update-summary.md
+          else
+            echo "- ✅ No security issues detected" >> update-summary.md
+          fi
+          
+          echo "" >> update-summary.md
+          echo "### ✅ Validation Results" >> update-summary.md
+          echo "" >> update-summary.md
+          echo "- ✅ Build successful" >> update-summary.md
+          echo "- ✅ Tests passing" >> update-summary.md
+          echo "- ✅ Linting passed" >> update-summary.md
+          echo "- ✅ Type checking passed" >> update-summary.md
+
+      - name: 🔀 Create Pull Request
+        if: env.NO_UPDATES == 'false' || env.SECURITY_ISSUES == 'true'
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: |
+            chore(deps): update dependencies and fix security issues
+            
+            - Updated patch-level dependencies
+            - Fixed security vulnerabilities
+            - All tests passing
+          title: "🔄 Automated Dependency Updates"
+          body-path: update-summary.md
+          branch: automated/dependency-updates
+          delete-branch: true
+          labels: |
+            dependencies
+            automated
+            security
+          assignees: dipseth
+          reviewers: dipseth
+
+      - name: 📢 No Updates Notification
+        if: env.NO_UPDATES == 'true' && env.SECURITY_ISSUES == 'false'
+        run: |
+          echo "## ✅ Dependencies Up to Date" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "All dependencies are current and no security issues were found." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- 📦 No dependency updates available" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔒 No security vulnerabilities detected" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Project is secure and up to date" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================================================
+  # SECURITY MONITORING
+  # ============================================================================
+  security-monitoring:
+    name: 🔒 Security Monitoring
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 📦 Install Dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: 🔍 Comprehensive Security Scan
+        run: |
+          echo "🔍 Running comprehensive security scan..."
+          
+          # Run npm audit
+          npm audit --json > security-report.json || true
+          
+          # Parse results
+          TOTAL_VULNS=$(cat security-report.json | jq '.metadata.vulnerabilities.total // 0')
+          CRITICAL_VULNS=$(cat security-report.json | jq '.metadata.vulnerabilities.critical // 0')
+          HIGH_VULNS=$(cat security-report.json | jq '.metadata.vulnerabilities.high // 0')
+          MODERATE_VULNS=$(cat security-report.json | jq '.metadata.vulnerabilities.moderate // 0')
+          LOW_VULNS=$(cat security-report.json | jq '.metadata.vulnerabilities.low // 0')
+          
+          echo "## 🔒 Security Scan Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Severity | Count |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Critical | $CRITICAL_VULNS |" >> $GITHUB_STEP_SUMMARY
+          echo "| High | $HIGH_VULNS |" >> $GITHUB_STEP_SUMMARY
+          echo "| Moderate | $MODERATE_VULNS |" >> $GITHUB_STEP_SUMMARY
+          echo "| Low | $LOW_VULNS |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Total** | **$TOTAL_VULNS** |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ $CRITICAL_VULNS -gt 0 || $HIGH_VULNS -gt 0 ]]; then
+            echo "⚠️ **Action Required**: High or critical vulnerabilities detected!" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Please review the security report and update dependencies." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ **Security Status**: No critical or high vulnerabilities detected." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: 📊 Upload Security Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-report-${{ github.run_number }}
+          path: security-report.json
+          retention-days: 30

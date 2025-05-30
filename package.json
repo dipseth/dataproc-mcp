@@ -1,6 +1,6 @@
 {
   "name": "@dataproc/mcp-server",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "A production-ready Model Context Protocol server for Google Cloud Dataproc operations with intelligent defaults and comprehensive tooling",
   "type": "module",
   "keywords": [

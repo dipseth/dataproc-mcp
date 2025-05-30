@@ -22,7 +22,7 @@ function shouldLog(level: string): boolean {
 }
 
 // Log to a file instead of stdout/stderr to avoid interfering with MCP protocol
-function logToFile(level: string, message: string, data?: any): void {
+function logToFile(level: string, message: string, data?: unknown): void {
   // In a real implementation, this would write to a file
   // For now, we'll just use console.log directly for visibility during debugging
 
