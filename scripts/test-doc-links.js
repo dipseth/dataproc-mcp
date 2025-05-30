@@ -228,11 +228,35 @@ class LinkTester {
             
             if (entry.isDirectory()) {
                 // Skip node_modules, .git, and build directories
-                if (!['node_modules', '.git', 'build', '.github'].includes(entry.name)) {
+                if (!['node_modules', '.git', 'build'].includes(entry.name)) {
                     this.findMarkdownFiles(fullPath, files);
                 }
             } else if (entry.isFile() && entry.name.endsWith('.md')) {
-                files.push(fullPath);
+                // Skip files that are not being tracked
+                const excludedFiles = [
+                    'REFLECTION_POEM.md',
+                    'RESTART_MCP_SERVER_INSTRUCTIONS.md'
+                ];
+                
+                const excludedDirs = [
+                    'old-tests',
+                    'old-configs'
+                ];
+                
+                // Check if file should be excluded
+                if (excludedFiles.includes(entry.name)) {
+                    return files; // Skip this file
+                }
+                
+                // Check if file is in excluded directory
+                const relativePath = path.relative(ROOT_DIR, fullPath);
+                const isInExcludedDir = excludedDirs.some(excludedDir =>
+                    relativePath.startsWith(excludedDir + path.sep)
+                );
+                
+                if (!isInExcludedDir) {
+                    files.push(fullPath);
+                }
             }
         }
         

@@ -1,6 +1,6 @@
 import { expect } from 'chai';
-import { ProfileManager } from '../../src/services/profile.js';
-import { DefaultParameterManager } from '../../src/services/default-params.js';
+import { ProfileManager } from '../../build/services/profile.js';
+import { DefaultParameterManager } from '../../build/services/default-params.js';
 describe('Profile Parameter Integration', () => {
     let profileManager;
     let parameterManager;

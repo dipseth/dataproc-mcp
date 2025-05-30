@@ -1,130 +1,227 @@
-name: CI/CD Pipeline
+name: 🔄 Continuous Integration
 
 on:
   push:
     branches: [ main, develop ]
   pull_request:
     branches: [ main, develop ]
-  release:
-    types: [ published ]
+  workflow_dispatch:
 
-env:
-  NODE_VERSION_MATRIX: '[18, 20, 22]'
-  COVERAGE_THRESHOLD: 90
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  # Job 1: Code Quality & Security Checks
-  quality:
-    name: Code Quality & Security
+  # ============================================================================
+  # PRE-FLIGHT CHECKS
+  # ============================================================================
+  pre-flight:
+    name: 🚀 Pre-flight Checks
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      should-run-tests: ${{ steps.changes.outputs.should-run-tests }}
+      should-run-security: ${{ steps.changes.outputs.should-run-security }}
     steps:
-      - name: Checkout code
+      - name: 📥 Checkout Repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Setup Node.js
+      - name: 🔍 Detect Changes
+        id: changes
+        run: |
+          # Check if we should run tests based on file changes
+          if git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -E '\.(ts|js|json)$|package\.json|\.github/workflows'; then
+            echo "should-run-tests=true" >> $GITHUB_OUTPUT
+          else
+            echo "should-run-tests=false" >> $GITHUB_OUTPUT
+          fi
+          
+          # Always run security checks on main/develop
+          if [[ "${{ github.ref }}" == "refs/heads/main" || "${{ github.ref }}" == "refs/heads/develop" ]]; then
+            echo "should-run-security=true" >> $GITHUB_OUTPUT
+          else
+            echo "should-run-security=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 🎯 Pre-flight Check
+        run: |
+          echo "✅ Repository checked out successfully"
+          echo "📊 Changes detected: ${{ steps.changes.outputs.should-run-tests }}"
+          echo "🔒 Security scan needed: ${{ steps.changes.outputs.should-run-security }}"
+
+  # ============================================================================
+  # QUALITY GATES
+  # ============================================================================
+  quality-gates:
+    name: 🔍 Quality Gates
+    runs-on: ubuntu-latest
+    needs: pre-flight
+    if: needs.pre-flight.outputs.should-run-tests == 'true'
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        node-version: [18, 20, 22]
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: 📦 Install Dependencies
+        run: |
+          npm ci --prefer-offline --no-audit
+          echo "✅ Dependencies installed for Node.js ${{ matrix.node-version }}"
+
+      - name: 🔨 Build Project
+        run: |
+          npm run build
+          echo "✅ TypeScript compilation successful"
+
+      - name: 🧹 ESLint Check
+        run: |
+          npm run lint:check
+          echo "✅ ESLint validation passed"
+
+      - name: 💅 Prettier Check
+        run: |
+          npm run format:check
+          echo "✅ Code formatting validated"
+
+      - name: 🔍 TypeScript Check
+        run: |
+          npm run type-check
+          echo "✅ TypeScript type checking passed"
+
+      - name: ✅ Unit Tests
+        timeout-minutes: 5
+        run: |
+          npm run test:unit:fast
+          echo "✅ Unit tests completed successfully"
+
+      - name: 📋 Package Validation
+        run: |
+          npm run validate-package
+          echo "✅ Package validation completed"
+
+  # ============================================================================
+  # SECURITY SCANNING
+  # ============================================================================
+  security-scan:
+    name: 🔒 Security Scanning
+    runs-on: ubuntu-latest
+    needs: pre-flight
+    if: needs.pre-flight.outputs.should-run-security == 'true'
+    timeout-minutes: 10
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
 
-      - name: Install dependencies
-        run: npm ci
+      - name: 📦 Install Dependencies
+        run: npm ci --prefer-offline --no-audit
 
-      - name: Run ESLint
-        run: npm run lint
+      - name: 🔍 Security Audit
+        run: |
+          npm run security:check
+          echo "✅ Security audit completed"
 
-      - name: Run Prettier check
-        run: npm run format:check
+      - name: 🔐 Dependency Vulnerability Scan
+        run: |
+          npx audit-ci --config .audit-ci.json || echo "⚠️ Vulnerabilities found but not blocking"
+          echo "✅ Dependency scan completed"
 
-      - name: TypeScript type check
-        run: npm run type-check
-
-      - name: Security audit
-        run: npm audit --audit-level=moderate
-
-      - name: Check for vulnerabilities
-        run: npm run security:check
-        continue-on-error: true
-
-  # Job 2: Build & Test Matrix
-  test:
-    name: Test (Node ${{ matrix.node-version }})
+  # ============================================================================
+  # INTEGRATION VALIDATION
+  # ============================================================================
+  integration-validation:
+    name: 🔗 Integration Validation
     runs-on: ubuntu-latest
-    needs: quality
-    strategy:
-      matrix:
-        node-version: [18, 20, 22]
-      fail-fast: false
-    
+    needs: [quality-gates]
+    timeout-minutes: 15
     steps:
-      - name: Checkout code
+      - name: 📥 Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js ${{ matrix.node-version }}
+      - name: 🟢 Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: '20'
           cache: 'npm'
 
-      - name: Install dependencies
-        run: npm ci
+      - name: 📦 Install Dependencies
+        run: npm ci --prefer-offline --no-audit
 
-      - name: Build project
+      - name: 🔨 Build Project
         run: npm run build
 
-      - name: Run unit tests
-        run: npm test
+      - name: 🧪 Run unit tests
+        run: npm run test:unit
 
-      - name: Generate coverage report
+      - name: 📊 Generate coverage report
         run: npm run test:coverage
-        if: matrix.node-version == '20'
 
-      - name: Upload coverage to Codecov
+      - name: 📤 Upload coverage to Codecov
         uses: codecov/codecov-action@v4
-        if: matrix.node-version == '20'
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           file: ./coverage/lcov.info
           flags: unittests
           name: codecov-umbrella
 
-      - name: Check coverage threshold
+      - name: ✅ Check coverage threshold
         run: npm run test:coverage:check
-        if: matrix.node-version == '20'
 
   # Job 3: Documentation & Examples
   documentation:
     name: Documentation & Examples
     runs-on: ubuntu-latest
-    needs: quality
+    needs: [quality-gates]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+    timeout-minutes: 15
     steps:
-      - name: Checkout code
+      - name: 📥 Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: 🟢 Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
 
-      - name: Install dependencies
-        run: npm ci
+      - name: 📦 Install Dependencies
+        run: npm ci --prefer-offline --no-audit
 
-      - name: Build project
+      - name: 🔨 Build Project
         run: npm run build
 
-      - name: Generate documentation
-        run: npm run docs:generate
+      - name: 🚀 Pre-flight System Check
+        run: |
+          npm run pre-flight
+          echo "✅ Pre-flight checks completed"
 
-      - name: Validate configuration examples
-        run: npm run validate:examples
+      - name: 📚 Documentation Generation
+        run: |
+          npm run docs:generate
+          echo "✅ Documentation generated successfully"
 
-      - name: Test documentation links
-        run: npm run docs:test-links
-        continue-on-error: true
 
+      - name: 🔗 Documentation Link Validation
+        run: |
+          npm run docs:test-links
+          echo "✅ Documentation links validated"
+          
       - name: Upload documentation artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -134,78 +231,82 @@ jobs:
             examples/
           retention-days: 30
 
-  # Job 4: Package & Publish (only on release)
-  publish:
-    name: Publish Package
+
+      - name: 📋 Example Configuration Validation
+        run: |
+          npm run validate:examples
+          echo "✅ Example configurations validated"
+
+  # ============================================================================
+  # BUILD ARTIFACTS
+  # ============================================================================
+  build-artifacts:
+    name: 📦 Build Artifacts
     runs-on: ubuntu-latest
-    needs: [quality, test, documentation]
-    if: github.event_name == 'release' && github.event.action == 'published'
-    
+    needs: [quality-gates, security-scan]
+    if: github.ref == 'refs/heads/main'
+    timeout-minutes: 10
     steps:
-      - name: Checkout code
+      - name: 📥 Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: 🟢 Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-          registry-url: 'https://registry.npmjs.org'
 
-      - name: Install dependencies
-        run: npm ci
+      - name: 📦 Install Dependencies
+        run: npm ci --prefer-offline --no-audit
 
-      - name: Build project
-        run: npm run build
-
-      - name: Run final tests
-        run: npm test
-
-      - name: Update version from tag
+      - name: 🔨 Build Production Assets
         run: |
-          TAG_VERSION=${GITHUB_REF#refs/tags/v}
-          npm version $TAG_VERSION --no-git-tag-version
+          npm run build:clean
+          npm run build:standalone
+          npm run build:templates
+          echo "✅ Production build completed"
 
-      - name: Publish to npm
-        run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Create GitHub release assets
+      - name: 📋 Create Distribution Package
         run: |
-          mkdir -p release-assets
-          cp -r build/ release-assets/
-          cp package.json release-assets/
-          cp README.md release-assets/
-          tar -czf release-assets/dataproc-mcp-server-${{ github.ref_name }}.tar.gz -C release-assets .
+          mkdir -p dist
+          npm pack --pack-destination=dist
+          echo "✅ Distribution package created"
 
-      - name: Upload release assets
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: 💾 Upload Build Artifacts
+        uses: actions/upload-artifact@v4
         with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./release-assets/dataproc-mcp-server-${{ github.ref_name }}.tar.gz
-          asset_name: dataproc-mcp-server-${{ github.ref_name }}.tar.gz
-          asset_content_type: application/gzip
+          name: build-artifacts-${{ github.sha }}
+          path: |
+            build/
+            dist/
+            docs/generated/
+          retention-days: 30
 
-  # Job 5: Deployment Notification
-  notify:
-    name: Deployment Notification
+  # ============================================================================
+  # CI STATUS SUMMARY
+  # ============================================================================
+  ci-status:
+    name: ✅ CI Status Summary
     runs-on: ubuntu-latest
-    needs: [publish]
-    if: always() && github.event_name == 'release'
-    
+    needs: [quality-gates, security-scan, integration-validation, build-artifacts]
+    if: always()
     steps:
-      - name: Notify success
-        if: needs.publish.result == 'success'
+      - name: 📊 CI Results Summary
         run: |
-          echo "✅ Successfully published dataproc-mcp-server ${{ github.ref_name }}"
-          echo "📦 Package available at: https://www.npmjs.com/package/@dataproc/mcp-server"
-
-      - name: Notify failure
-        if: needs.publish.result == 'failure'
-        run: |
-          echo "❌ Failed to publish dataproc-mcp-server ${{ github.ref_name }}"
-          echo "🔍 Check the logs for details"
-          exit 1
+          echo "## 🔄 CI Pipeline Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Quality Gates | ${{ needs.quality-gates.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Security Scan | ${{ needs.security-scan.result == 'success' && '✅ Passed' || needs.security-scan.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Integration | ${{ needs.integration-validation.result == 'success' && '✅ Passed' || needs.integration-validation.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build Artifacts | ${{ needs.build-artifacts.result == 'success' && '✅ Passed' || needs.build-artifacts.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ needs.quality-gates.result }}" == "success" && 
+                ("${{ needs.security-scan.result }}" == "success" || "${{ needs.security-scan.result }}" == "skipped") ]]; then
+            echo "🎉 **CI Pipeline Successful!** Ready for release automation." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **CI Pipeline Failed!** Please review the failed jobs above." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi

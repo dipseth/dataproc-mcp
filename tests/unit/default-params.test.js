@@ -1,4 +1,4 @@
-import { DefaultParameterManager } from '../../src/services/default-params.js';
+import { DefaultParameterManager } from '../../build/services/default-params.js';
 import { expect } from 'chai';
 describe('DefaultParameterManager', () => {
     let manager;

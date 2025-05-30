@@ -9,7 +9,7 @@ Before seeking help, please check our comprehensive documentation:
 - **[Quick Start Guide](QUICK_START.md)** - Get started in 5 minutes
 - **[API Reference](API_REFERENCE.md)** - Complete tool documentation
 - **[Configuration Examples](CONFIGURATION_EXAMPLES.md)** - Real-world configurations
-- **[Troubleshooting Guide](TROUBLESHOOTING.md)** - Common issues and solutions
+- **[Testing Guide](TESTING_GUIDE.md)** - Testing and debugging information
 
 ### 2. Search Existing Issues
 Check if your question has already been answered:

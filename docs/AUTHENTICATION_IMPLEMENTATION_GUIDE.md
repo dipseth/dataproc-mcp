@@ -394,7 +394,6 @@ The consolidation and enhancement project achieved:
 
 ## References
 
-- [Service Account Authentication Guide](../SERVICE_ACCOUNT_AUTHENTICATION_GUIDE.md) - Detailed service account comparison and testing results
 - [Configuration Guide](./CONFIGURATION_GUIDE.md) - General configuration setup
 - [Google Cloud Authentication Documentation](https://cloud.google.com/docs/authentication)
 
