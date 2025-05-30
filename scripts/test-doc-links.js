@@ -228,18 +228,19 @@ class LinkTester {
             
             if (entry.isDirectory()) {
                 // Skip node_modules, .git, and build directories
-                if (!['node_modules', '.git', 'build', '.github'].includes(entry.name)) {
+                if (!['node_modules', '.git', 'build'].includes(entry.name)) {
                     this.findMarkdownFiles(fullPath, files);
                 }
             } else if (entry.isFile() && entry.name.endsWith('.md')) {
                 // Skip files that are not being tracked
                 const excludedFiles = [
-                    'COMPREHENSIVE_MCP_TESTING_CHECKLIST.md',
-                    'SERVICE_ACCOUNT_AUTHENTICATION_GUIDE.md'
+                    'REFLECTION_POEM.md',
+                    'RESTART_MCP_SERVER_INSTRUCTIONS.md'
                 ];
                 
                 const excludedDirs = [
-                    'old-tests'
+                    'old-tests',
+                    'old-configs'
                 ];
                 
                 // Check if file should be excluded
