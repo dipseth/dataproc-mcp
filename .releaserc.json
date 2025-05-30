@@ -163,12 +163,12 @@
             "label": "Distribution Package"
           },
           {
-            "path": "docs/generated/*.html",
-            "label": "Generated Documentation"
+            "path": "build/index.js",
+            "label": "Main Entry Point"
           },
           {
-            "path": "build/**/*",
-            "label": "Compiled Source"
+            "path": "build/index.d.ts",
+            "label": "TypeScript Definitions"
           }
         ],
         "successComment": "🎉 This ${issue.pull_request ? 'PR is included' : 'issue has been resolved'} in version ${nextRelease.version} :tada:\n\nThe release is available on:\n- [npm package (@latest dist-tag)](https://www.npmjs.com/package/@dataproc/mcp-server/v/${nextRelease.version})\n- [GitHub release](${releases.filter(release => release.name === 'GitHub')[0].url})\n\nYour **[semantic-release](https://github.com/semantic-release/semantic-release)** bot :package::rocket:",
