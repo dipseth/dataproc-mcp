@@ -7,15 +7,14 @@ import { createHash } from 'crypto';
 import {
   GCSDownloadOptions,
   GCSError,
-  GCSErrorType,
+  GCSErrorTypes,
   GCSFileMetadata,
   GCSRawMetadata,
   GCSUri,
   DEFAULT_DOWNLOAD_OPTIONS,
-  OutputFormat
+  OutputFormat,
 } from '../types/gcs-types.js';
-import { getGcloudAccessToken, getGcloudAccessTokenWithConfig } from '../config/credentials.js';
-
+import { getGcloudAccessTokenWithConfig } from '../config/credentials.js';
 export class GCSService {
   private storage: Storage;
 
@@ -32,10 +31,7 @@ export class GCSService {
   parseUri(uri: string): GCSUri {
     const match = uri.match(/^gs:\/\/([^/]+)\/(.+)$/);
     if (!match) {
-      throw new GCSError(
-        GCSErrorType.INVALID_URI,
-        `Invalid GCS URI format: ${uri}`
-      );
+      throw new GCSError(GCSErrorTypes.INVALID_URI, `Invalid GCS URI format: ${uri}`);
     }
 
     const [, bucket, path] = match;
@@ -47,22 +43,18 @@ export class GCSService {
    */
   private convertMetadata(rawMetadata: GCSRawMetadata): GCSFileMetadata {
     if (!rawMetadata.name || !rawMetadata.size || !rawMetadata.updated) {
-      throw new GCSError(
-        GCSErrorType.INVALID_METADATA,
-        'Missing required metadata fields'
-      );
+      throw new GCSError(GCSErrorTypes.INVALID_METADATA, 'Missing required metadata fields');
     }
 
-    const size = typeof rawMetadata.size === 'string' 
-      ? parseInt(rawMetadata.size, 10)
-      : rawMetadata.size;
+    const size =
+      typeof rawMetadata.size === 'string' ? parseInt(rawMetadata.size, 10) : rawMetadata.size;
 
     return {
       name: rawMetadata.name,
       size,
       contentType: rawMetadata.contentType,
       updated: new Date(rawMetadata.updated),
-      md5Hash: rawMetadata.md5Hash
+      md5Hash: rawMetadata.md5Hash,
     };
   }
 
@@ -71,30 +63,23 @@ export class GCSService {
    */
   async getFileMetadata(uri: string): Promise<GCSFileMetadata> {
     const { bucket, path } = this.parseUri(uri);
-    
+
     // Use the service account from the server configuration
     await getGcloudAccessTokenWithConfig();
 
     try {
-      const [metadata] = await this.storage
-        .bucket(bucket)
-        .file(path)
-        .getMetadata();
+      const [metadata] = await this.storage.bucket(bucket).file(path).getMetadata();
 
       return this.convertMetadata(metadata);
     } catch (error: any) {
       if (error.code === 404) {
-        throw new GCSError(
-          GCSErrorType.NOT_FOUND,
-          `File not found: ${uri}`,
-          error
-        );
+        throw new GCSError(GCSErrorTypes.NOT_FOUND, `File not found: ${uri}`, error);
       }
       if (error instanceof GCSError) {
         throw error;
       }
       throw new GCSError(
-        GCSErrorType.PERMISSION_DENIED,
+        GCSErrorTypes.PERMISSION_DENIED,
         `Failed to get metadata for ${uri}`,
         error
       );
@@ -108,58 +93,70 @@ export class GCSService {
    */
   async listObjectsWithPrefix(uri: string): Promise<string[]> {
     const { bucket, path } = this.parseUri(uri);
-    
+
     console.log(`[DEBUG] GCSService.listObjectsWithPrefix: Listing objects with prefix ${uri}`);
-    
+
     // Get token for the service account from the server configuration
     let token: string;
     try {
       token = await getGcloudAccessTokenWithConfig();
-      console.log(`[DEBUG] GCSService.listObjectsWithPrefix: Successfully obtained token for ${uri}`);
+      console.log(
+        `[DEBUG] GCSService.listObjectsWithPrefix: Successfully obtained token for ${uri}`
+      );
     } catch (error) {
-      console.error(`[DEBUG] GCSService.listObjectsWithPrefix: Failed to get token for ${uri}:`, error);
+      console.error(
+        `[DEBUG] GCSService.listObjectsWithPrefix: Failed to get token for ${uri}:`,
+        error
+      );
       throw error;
     }
-    
+
     // Use fetch API directly with the token
     const fetch = (await import('node-fetch')).default;
-    
+
     // Format: https://storage.googleapis.com/storage/v1/b/bucket/o?prefix=path
     const encodedPrefix = encodeURIComponent(path);
     const url = `https://storage.googleapis.com/storage/v1/b/${bucket}/o?prefix=${encodedPrefix}`;
-    
+
     console.log(`[DEBUG] GCSService.listObjectsWithPrefix: Fetching from URL: ${url}`);
-    
+
     try {
       const response = await fetch(url, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json'
-        }
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
       });
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`HTTP error ${response.status}: ${errorText}`);
       }
-      
-      const data = await response.json() as { items?: Array<{ name: string }> };
-      
+
+      const data = (await response.json()) as { items?: Array<{ name: string }> };
+
       if (!data.items || data.items.length === 0) {
-        console.log(`[DEBUG] GCSService.listObjectsWithPrefix: No objects found with prefix ${uri}`);
+        console.log(
+          `[DEBUG] GCSService.listObjectsWithPrefix: No objects found with prefix ${uri}`
+        );
         return [];
       }
-      
+
       // Convert object names back to GCS URIs
-      const uris = data.items.map(item => `gs://${bucket}/${item.name}`);
-      console.log(`[DEBUG] GCSService.listObjectsWithPrefix: Found ${uris.length} objects with prefix ${uri}`);
-      
+      const uris = data.items.map((item) => `gs://${bucket}/${item.name}`);
+      console.log(
+        `[DEBUG] GCSService.listObjectsWithPrefix: Found ${uris.length} objects with prefix ${uri}`
+      );
+
       return uris;
     } catch (error) {
-      console.error(`[DEBUG] GCSService.listObjectsWithPrefix: Error listing objects with prefix ${uri}:`, error);
+      console.error(
+        `[DEBUG] GCSService.listObjectsWithPrefix: Error listing objects with prefix ${uri}:`,
+        error
+      );
       throw new GCSError(
-        GCSErrorType.LIST_FAILED,
+        GCSErrorTypes.LIST_FAILED,
         `Failed to list objects with prefix ${uri}`,
         error as Error
       );
@@ -173,9 +170,9 @@ export class GCSService {
   async downloadFile(uri: string, options: GCSDownloadOptions = {}): Promise<Buffer> {
     const { bucket, path } = this.parseUri(uri);
     const opts = { ...DEFAULT_DOWNLOAD_OPTIONS, ...options };
-    
+
     console.log(`[DEBUG] GCSService.downloadFile: Attempting to download ${uri}`);
-    
+
     // Get token for the service account from the server configuration
     let token: string;
     try {
@@ -185,17 +182,17 @@ export class GCSService {
       console.error(`[DEBUG] GCSService.downloadFile: Failed to get token for ${uri}:`, error);
       throw error;
     }
-    
+
     // Use fetch API directly with the token
     const fetch = (await import('node-fetch')).default;
-    
+
     // Convert GCS URI to HTTP URL
     // Format: gs://bucket/path -> https://storage.googleapis.com/storage/v1/b/bucket/o/path?alt=media
     const encodedPath = encodeURIComponent(path);
     const url = `https://storage.googleapis.com/storage/v1/b/${bucket}/o/${encodedPath}?alt=media`;
-    
+
     console.log(`[DEBUG] GCSService.downloadFile: Fetching from URL: ${url}`);
-    
+
     let attempt = 0;
     let lastError: Error | undefined;
 
@@ -206,71 +203,75 @@ export class GCSService {
         const fetchPromise = fetch(url, {
           method: 'GET',
           headers: {
-            'Authorization': `Bearer ${token}`,
-            'Accept': 'application/octet-stream'
-          }
+            Authorization: `Bearer ${token}`,
+            Accept: 'application/octet-stream',
+          },
         });
 
         const timeoutPromise = new Promise((_, reject) => {
           setTimeout(() => {
-            reject(new GCSError(
-              GCSErrorType.TIMEOUT,
-              `Download timed out after ${opts.timeout}ms`
-            ));
+            reject(
+              new GCSError(GCSErrorTypes.TIMEOUT, `Download timed out after ${opts.timeout}ms`)
+            );
           }, opts.timeout);
         });
 
         // Race the fetch against the timeout
-        const response = await Promise.race([
-          fetchPromise,
-          timeoutPromise
-        ]) as Response;
-        
+        const response = (await Promise.race([fetchPromise, timeoutPromise])) as Response;
+
         if (!response.ok) {
           const errorText = await response.text();
-          
+
           // If we get a 404 Not Found, it might be a prefix for multiple files
           if (response.status === 404) {
-            console.log(`[DEBUG] GCSService.downloadFile: File not found at ${uri}, checking if it's a prefix...`);
-            
+            console.log(
+              `[DEBUG] GCSService.downloadFile: File not found at ${uri}, checking if it's a prefix...`
+            );
+
             // Try to list objects with this prefix
             const objectUris = await this.listObjectsWithPrefix(uri);
-            
+
             if (objectUris.length > 0) {
-              console.log(`[DEBUG] GCSService.downloadFile: Found ${objectUris.length} objects with prefix ${uri}`);
-              
+              console.log(
+                `[DEBUG] GCSService.downloadFile: Found ${objectUris.length} objects with prefix ${uri}`
+              );
+
               // Download each file and concatenate the buffers
               const buffers: Buffer[] = [];
-              
+
               for (const objectUri of objectUris) {
                 console.log(`[DEBUG] GCSService.downloadFile: Downloading object ${objectUri}`);
-                
+
                 // Create a new URL for this specific object
                 const { bucket: objBucket, path: objPath } = this.parseUri(objectUri);
                 const encodedObjPath = encodeURIComponent(objPath);
                 const objUrl = `https://storage.googleapis.com/storage/v1/b/${objBucket}/o/${encodedObjPath}?alt=media`;
-                
+
                 const objResponse = await fetch(objUrl, {
                   method: 'GET',
                   headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Accept': 'application/octet-stream'
-                  }
+                    Authorization: `Bearer ${token}`,
+                    Accept: 'application/octet-stream',
+                  },
                 });
-                
+
                 if (!objResponse.ok) {
                   const objErrorText = await objResponse.text();
-                  throw new Error(`HTTP error ${objResponse.status} downloading ${objectUri}: ${objErrorText}`);
+                  throw new Error(
+                    `HTTP error ${objResponse.status} downloading ${objectUri}: ${objErrorText}`
+                  );
                 }
-                
+
                 const objArrayBuffer = await objResponse.arrayBuffer();
                 buffers.push(Buffer.from(objArrayBuffer));
               }
-              
+
               // Concatenate all buffers
               buffer = Buffer.concat(buffers);
-              console.log(`[DEBUG] GCSService.downloadFile: Successfully downloaded and concatenated ${buffers.length} files with total size ${buffer.length}`);
-              
+              console.log(
+                `[DEBUG] GCSService.downloadFile: Successfully downloaded and concatenated ${buffers.length} files with total size ${buffer.length}`
+              );
+
               // Skip validation for concatenated files
               return buffer;
             } else {
@@ -282,7 +283,7 @@ export class GCSService {
             throw new Error(`HTTP error ${response.status}: ${errorText}`);
           }
         }
-        
+
         // Get the response as a buffer
         const arrayBuffer = await response.arrayBuffer();
         buffer = Buffer.from(arrayBuffer); // Assign to the declared buffer
@@ -293,26 +294,23 @@ export class GCSService {
           const metadataResponse = await fetch(metadataUrl, {
             method: 'GET',
             headers: {
-              'Authorization': `Bearer ${token}`
-            }
+              Authorization: `Bearer ${token}`,
+            },
           });
-          
+
           if (metadataResponse.ok) {
-            const metadata = await metadataResponse.json() as { md5Hash?: string };
+            const metadata = (await metadataResponse.json()) as { md5Hash?: string };
             if (metadata.md5Hash) {
-              const hash = createHash('md5')
-                .update(buffer)
-                .digest('base64');
-              
+              const hash = createHash('md5').update(buffer).digest('base64');
+
               if (hash !== metadata.md5Hash) {
-                throw new GCSError(
-                  GCSErrorType.VALIDATION_FAILED,
-                  'MD5 hash validation failed'
-                );
+                throw new GCSError(GCSErrorTypes.VALIDATION_FAILED, 'MD5 hash validation failed');
               }
             }
           } else {
-            console.error(`[DEBUG] GCSService.downloadFile: Failed to get metadata for hash validation: HTTP error ${metadataResponse.status}`);
+            console.error(
+              `[DEBUG] GCSService.downloadFile: Failed to get metadata for hash validation: HTTP error ${metadataResponse.status}`
+            );
           }
         }
         return buffer;
@@ -320,22 +318,22 @@ export class GCSService {
         console.error(`[DEBUG] GCSService.downloadFile: Error downloading ${uri}:`, error);
         console.error(`[DEBUG] GCSService.downloadFile: Error type: ${error.constructor?.name}`);
         if (error.code) console.error(`[DEBUG] GCSService.downloadFile: Error code: ${error.code}`);
-        
+
         lastError = error;
         attempt++;
-        
+
         if (attempt < opts.retries!) {
           // Exponential backoff before retry
-          console.log(`[DEBUG] GCSService.downloadFile: Retrying download (attempt ${attempt}/${opts.retries})`);
-          await new Promise(resolve =>
-            setTimeout(resolve, Math.pow(2, attempt) * 1000)
+          console.log(
+            `[DEBUG] GCSService.downloadFile: Retrying download (attempt ${attempt}/${opts.retries})`
           );
+          await new Promise((resolve) => setTimeout(resolve, Math.pow(2, attempt) * 1000));
         }
       }
     }
 
     throw new GCSError(
-      GCSErrorType.DOWNLOAD_FAILED,
+      GCSErrorTypes.DOWNLOAD_FAILED,
       `Failed to download after ${opts.retries} attempts`,
       lastError
     );
@@ -347,9 +345,9 @@ export class GCSService {
   async detectOutputFormat(uri: string): Promise<OutputFormat> {
     // Use the service account from the server configuration
     await getGcloudAccessTokenWithConfig();
-    
+
     const metadata = await this.getFileMetadata(uri);
-    
+
     // Check content type first
     if (metadata.contentType) {
       if (metadata.contentType.includes('csv')) return 'csv';

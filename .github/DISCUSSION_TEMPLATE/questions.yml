@@ -1,0 +1,116 @@
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ❓ **Ask a Question**
+        
+        Get help from the Dataproc MCP Server community! Before asking, please:
+        
+        1. 📚 Check our [documentation](../docs/)
+        2. 🔍 Search existing discussions and issues
+        3. 📋 Follow our [troubleshooting guide](../docs/TROUBLESHOOTING.md)
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Your Question
+      description: What do you need help with?
+      placeholder: Clearly describe your question or problem...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Question Category
+      description: What category does your question fall into?
+      options:
+        - Installation & Setup
+        - Configuration
+        - Authentication
+        - Cluster Management
+        - Job Execution
+        - Performance
+        - Security
+        - Troubleshooting
+        - Integration
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment Information
+      description: Please provide details about your environment
+      placeholder: |
+        - OS: (e.g., macOS, Windows, Linux)
+        - Node.js version: (e.g., 18.17.0)
+        - Package version: (e.g., 1.0.0)
+        - MCP Client: (e.g., Claude Desktop, Cline)
+        - Google Cloud Project: (if relevant)
+        - Authentication method: (e.g., Service Account, ADC)
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-tried
+    attributes:
+      label: What Have You Tried?
+      description: What steps have you already taken to solve this?
+      placeholder: |
+        - Checked documentation: Yes/No
+        - Searched existing issues: Yes/No
+        - Tried troubleshooting steps: (describe)
+        - Other attempts: (describe)
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+      placeholder: Describe what you expected to happen...
+    validations:
+      required: false
+
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: Actual Behavior
+      description: What actually happened?
+      placeholder: Describe what actually happened, including any error messages...
+    validations:
+      required: false
+
+  - type: textarea
+    id: configuration
+    attributes:
+      label: Configuration (if relevant)
+      description: Share relevant configuration (remove sensitive data)
+      placeholder: |
+        ```json
+        {
+          "authentication": {
+            // Your config (remove sensitive data)
+          }
+        }
+        ```
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      description: Please confirm you have done the following
+      options:
+        - label: I have searched existing discussions and issues
+          required: true
+        - label: I have checked the documentation
+          required: true
+        - label: I have provided environment information
+          required: true
+        - label: I have removed any sensitive information
+          required: true

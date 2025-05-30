@@ -1,9 +1,9 @@
 /**
  * Manual test for MCP resource and prompt handlers
- * 
+ *
  * This script tests the resource and prompt handlers by simulating MCP requests
  * and printing the responses. It doesn't require any testing framework.
- * 
+ *
  * Run with: npx ts-node tests/manual/test-mcp-resources.ts
  */
 
@@ -19,22 +19,22 @@ import { getJobStatus } from '../../src/services/query.js';
 
 // Define the schemas
 const ListResourcesRequestSchema = z.object({
-  method: z.literal("list_resources"),
+  method: z.literal('list_resources'),
 });
 
 const ReadResourceRequestSchema = z.object({
-  method: z.literal("read_resource"),
+  method: z.literal('read_resource'),
   params: z.object({
     uri: z.string(),
   }),
 });
 
 const ListPromptsRequestSchema = z.object({
-  method: z.literal("list_prompts"),
+  method: z.literal('list_prompts'),
 });
 
 const ReadPromptRequestSchema = z.object({
-  method: z.literal("read_prompt"),
+  method: z.literal('read_prompt'),
   params: z.object({
     id: z.string(),
   }),
@@ -47,21 +47,18 @@ type ReadPromptRequest = z.infer<typeof ReadPromptRequestSchema>;
 /**
  * Test the resource list handler
  */
-async function testListResources(
-  clusterManager: ClusterManager,
-  jobTracker: JobTracker
-) {
+async function testListResources(clusterManager: ClusterManager, jobTracker: JobTracker) {
   console.log('\n=== Testing List Resources ===\n');
-  
+
   try {
     // Get tracked clusters
     const trackedClusters = clusterManager.listTrackedClusters();
     console.log(`Found ${trackedClusters.length} tracked clusters`);
-    
+
     // Get tracked jobs
     const trackedJobs = jobTracker.listJobs();
     console.log(`Found ${trackedJobs.length} tracked jobs`);
-    
+
     // Build resource list
     const resources = [
       // Cluster resources
@@ -70,14 +67,14 @@ async function testListResources(
         const projectId = cluster.metadata?.projectId || 'unknown';
         const region = cluster.metadata?.region || 'unknown';
         const status = cluster.metadata?.status || 'Unknown status';
-        
+
         return {
           uri: `dataproc://clusters/${projectId}/${region}/${cluster.clusterName}`,
           name: `Cluster: ${cluster.clusterName}`,
           description: `Dataproc cluster in ${region} (${status})`,
         };
       }),
-      
+
       // Job resources
       ...trackedJobs.map((job) => ({
         uri: `dataproc://jobs/${job.projectId}/${job.region}/${job.jobId}`,
@@ -85,10 +82,10 @@ async function testListResources(
         description: `Dataproc job (${job.toolName}) - ${job.status}`,
       })),
     ];
-    
+
     console.log('Resources:');
     console.log(JSON.stringify(resources, null, 2));
-    
+
     return { resources };
   } catch (error) {
     console.error('Error listing resources:', error);
@@ -99,16 +96,13 @@ async function testListResources(
 /**
  * Test the resource read handler
  */
-async function testReadResource(
-  request: ReadResourceRequest,
-  jobOutputHandler: JobOutputHandler
-) {
+async function testReadResource(request: ReadResourceRequest, jobOutputHandler: JobOutputHandler) {
   console.log('\n=== Testing Read Resource ===\n');
   console.log('Request:', JSON.stringify(request, null, 2));
-  
+
   try {
     const uri = request.params.uri;
-    
+
     // Parse the URI to determine resource type
     if (uri.startsWith('dataproc://clusters/')) {
       // Handle cluster resource
@@ -116,25 +110,25 @@ async function testReadResource(
       if (parts.length !== 3) {
         throw new Error(`Invalid cluster URI format: ${uri}`);
       }
-      
+
       const [projectId, region, clusterName] = parts;
       console.log(`Getting cluster: ${projectId}/${region}/${clusterName}`);
-      
+
       try {
         const cluster = await getCluster(projectId, region, clusterName);
-        
+
         const result = {
           content: [
             {
-              type: "text",
+              type: 'text',
               text: JSON.stringify(cluster, null, 2),
             },
           ],
         };
-        
+
         console.log('Result:');
         console.log(JSON.stringify(result, null, 2));
-        
+
         return result;
       } catch (error) {
         console.error(`Error getting cluster ${clusterName}:`, error);
@@ -146,14 +140,14 @@ async function testReadResource(
       if (parts.length !== 3) {
         throw new Error(`Invalid job URI format: ${uri}`);
       }
-      
+
       const [projectId, region, jobId] = parts;
       console.log(`Getting job: ${projectId}/${region}/${jobId}`);
-      
+
       try {
         // Get job status
         const status = await getJobStatus(projectId, region, jobId);
-        
+
         // Get job results if available
         let results = null;
         if (status && status.status?.state === JobState.DONE) {
@@ -163,19 +157,19 @@ async function testReadResource(
             console.error(`Error getting cached output for job ${jobId}:`, error);
           }
         }
-        
+
         const result = {
           content: [
             {
-              type: "text",
+              type: 'text',
               text: JSON.stringify({ status, results }, null, 2),
             },
           ],
         };
-        
+
         console.log('Result:');
         console.log(JSON.stringify(result, null, 2));
-        
+
         return result;
       } catch (error) {
         console.error(`Error getting job ${jobId}:`, error);
@@ -195,25 +189,25 @@ async function testReadResource(
  */
 async function testListPrompts() {
   console.log('\n=== Testing List Prompts ===\n');
-  
+
   try {
     // Define available prompts
     const prompts = [
       {
-        id: "dataproc-cluster-creation",
-        name: "Dataproc Cluster Creation",
-        description: "Guidelines for creating Dataproc clusters",
+        id: 'dataproc-cluster-creation',
+        name: 'Dataproc Cluster Creation',
+        description: 'Guidelines for creating Dataproc clusters',
       },
       {
-        id: "dataproc-job-submission",
-        name: "Dataproc Job Submission",
-        description: "Guidelines for submitting jobs to Dataproc clusters",
+        id: 'dataproc-job-submission',
+        name: 'Dataproc Job Submission',
+        description: 'Guidelines for submitting jobs to Dataproc clusters',
       },
     ];
-    
+
     console.log('Prompts:');
     console.log(JSON.stringify(prompts, null, 2));
-    
+
     return { prompts };
   } catch (error) {
     console.error('Error listing prompts:', error);
@@ -227,15 +221,15 @@ async function testListPrompts() {
 async function testReadPrompt(request: ReadPromptRequest) {
   console.log('\n=== Testing Read Prompt ===\n');
   console.log('Request:', JSON.stringify(request, null, 2));
-  
+
   try {
     const id = request.params.id;
-    
-    if (id === "dataproc-cluster-creation") {
+
+    if (id === 'dataproc-cluster-creation') {
       const result = {
         content: [
           {
-            type: "text",
+            type: 'text',
             text: `# Dataproc Cluster Creation Guidelines
 
 When creating a Dataproc cluster, consider the following:
@@ -255,16 +249,16 @@ For production workloads, consider using a predefined profile with the \`create_
           },
         ],
       };
-      
+
       console.log('Result:');
       console.log(JSON.stringify(result, null, 2));
-      
+
       return result;
-    } else if (id === "dataproc-job-submission") {
+    } else if (id === 'dataproc-job-submission') {
       const result = {
         content: [
           {
-            type: "text",
+            type: 'text',
             text: `# Dataproc Job Submission Guidelines
 
 When submitting jobs to Dataproc, follow these best practices:
@@ -297,10 +291,10 @@ When submitting jobs to Dataproc, follow these best practices:
           },
         ],
       };
-      
+
       console.log('Result:');
       console.log(JSON.stringify(result, null, 2));
-      
+
       return result;
     } else {
       throw new Error(`Unknown prompt ID: ${id}`);
@@ -317,53 +311,59 @@ When submitting jobs to Dataproc, follow these best practices:
 async function main() {
   try {
     console.log('=== MCP Resource and Prompt Handler Tests ===');
-    
+
     // Initialize services
     console.log('\nInitializing services...');
     const profileManager = new ProfileManager({ rootConfigPath: './profiles' });
     await profileManager.initialize();
-    
+
     const clusterTracker = new ClusterTracker();
     await clusterTracker.initialize();
-    
+
     const jobOutputHandler = new JobOutputHandler();
     const jobTracker = new JobTracker();
     const clusterManager = new ClusterManager(profileManager, clusterTracker);
-    
+
     // Test resource handlers
     await testListResources(clusterManager, jobTracker);
-    
-    await testReadResource({
-      method: 'read_resource',
-      params: {
-        uri: 'dataproc://clusters/test-project/us-central1/test-cluster'
-      }
-    }, jobOutputHandler);
-    
-    await testReadResource({
-      method: 'read_resource',
-      params: {
-        uri: 'dataproc://jobs/test-project/us-central1/test-job'
-      }
-    }, jobOutputHandler);
-    
+
+    await testReadResource(
+      {
+        method: 'read_resource',
+        params: {
+          uri: 'dataproc://clusters/test-project/us-central1/test-cluster',
+        },
+      },
+      jobOutputHandler
+    );
+
+    await testReadResource(
+      {
+        method: 'read_resource',
+        params: {
+          uri: 'dataproc://jobs/test-project/us-central1/test-job',
+        },
+      },
+      jobOutputHandler
+    );
+
     // Test prompt handlers
     await testListPrompts();
-    
+
     await testReadPrompt({
       method: 'read_prompt',
       params: {
-        id: 'dataproc-cluster-creation'
-      }
+        id: 'dataproc-cluster-creation',
+      },
     });
-    
+
     await testReadPrompt({
       method: 'read_prompt',
       params: {
-        id: 'dataproc-job-submission'
-      }
+        id: 'dataproc-job-submission',
+      },
     });
-    
+
     console.log('\n=== All tests completed ===');
   } catch (error) {
     console.error('Test failed:', error);
@@ -372,7 +372,7 @@ async function main() {
 }
 
 // Run the tests
-main().catch(error => {
+main().catch((error) => {
   console.error('Fatal error:', error);
   process.exit(1);
 });

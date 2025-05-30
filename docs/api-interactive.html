@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dataproc MCP Server - Interactive API Documentation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f8f9fa;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+            margin-bottom: 30px;
+            border-radius: 10px;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .nav {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .nav h3 {
+            margin-bottom: 15px;
+            color: #495057;
+        }
+        
+        .nav-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .nav-link {
+            padding: 8px 16px;
+            background: #e9ecef;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            color: #495057;
+        }
+        
+        .nav-link:hover, .nav-link.active {
+            background: #007bff;
+            color: white;
+        }
+        
+        .category {
+            background: white;
+            margin-bottom: 30px;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .category-header {
+            background: #495057;
+            color: white;
+            padding: 20px;
+            font-size: 1.3em;
+            font-weight: 600;
+        }
+        
+        .tool {
+            border-bottom: 1px solid #e9ecef;
+            padding: 0;
+        }
+        
+        .tool:last-child {
+            border-bottom: none;
+        }
+        
+        .tool-header {
+            padding: 20px;
+            cursor: pointer;
+            background: #f8f9fa;
+            border: none;
+            width: 100%;
+            text-align: left;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.3s;
+        }
+        
+        .tool-header:hover {
+            background: #e9ecef;
+        }
+        
+        .tool-name {
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #007bff;
+        }
+        
+        .tool-description {
+            color: #6c757d;
+            margin-top: 5px;
+        }
+        
+        .tool-content {
+            display: none;
+            padding: 20px;
+            background: white;
+        }
+        
+        .tool-content.active {
+            display: block;
+        }
+        
+        .example-section {
+            margin-top: 20px;
+        }
+        
+        .example-section h4 {
+            margin-bottom: 10px;
+            color: #495057;
+        }
+        
+        .code-block {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 5px;
+            padding: 15px;
+            overflow-x: auto;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.9em;
+        }
+        
+        .try-it {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 15px;
+            transition: background 0.3s;
+        }
+        
+        .try-it:hover {
+            background: #218838;
+        }
+        
+        .response-section {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            display: none;
+        }
+        
+        .response-section.active {
+            display: block;
+        }
+        
+        .expand-icon {
+            transition: transform 0.3s;
+        }
+        
+        .expand-icon.rotated {
+            transform: rotate(180deg);
+        }
+        
+        .search-box {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .nav-links {
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Dataproc MCP Server</h1>
+            <p>Interactive API Documentation</p>
+        </div>
+        
+        <div class="nav">
+            <h3>Quick Navigation</h3>
+            <input type="text" class="search-box" placeholder="Search tools..." id="searchBox">
+            <div class="nav-links">
+                <a href="#cluster-management" class="nav-link">Cluster Management</a>
+                <a href="#job-execution" class="nav-link">Job Execution</a>
+                <a href="#profile-management" class="nav-link">Profile Management</a>
+                <a href="#monitoring-utilities" class="nav-link">Monitoring & Utilities</a>
+            </div>
+        </div>
+        
+        
+        <div class="category" id="cluster-management">
+            <div class="category-header">
+                Cluster Management (6 tools)
+            </div>
+            
+            <div class="tool">
+                <button class="tool-header" onclick="toggleTool('start_dataproc_cluster')">
+                    <div>
+                        <div class="tool-name">start_dataproc_cluster</div>
+                        <div class="tool-description">Start a Google Cloud Dataproc cluster</div>
+                    </div>
+                    <span class="expand-icon" id="start_dataproc_cluster-icon">▼</span>
+                </button>
+                <div class="tool-content" id="start_dataproc_cluster-content">
+                    <div class="example-section">
+                        <h4>Example Usage:</h4>
+                        <div class="code-block">
+{
+  "tool": "start_dataproc_cluster",
+  "arguments": {
+  "clusterName": "my-analysis-cluster",
+  "clusterConfig": {
+    "masterConfig": {
+      "numInstances": 1,
+      "machineTypeUri": "n1-standard-4"
+    },
+    "workerConfig": {
+      "numInstances": 3,
+      "machineTypeUri": "n1-standard-2"
+    }
+  }
+}
+}
+                        </div>
+                        <button class="try-it" onclick="tryTool('start_dataproc_cluster', {&quot;clusterName&quot;:&quot;my-analysis-cluster&quot;,&quot;clusterConfig&quot;:{&quot;masterConfig&quot;:{&quot;numInstances&quot;:1,&quot;machineTypeUri&quot;:&quot;n1-standard-4&quot;},&quot;workerConfig&quot;:{&quot;numInstances&quot;:3,&quot;machineTypeUri&quot;:&quot;n1-standard-2&quot;}}})">
+                            Try This Example
+                        </button>
+                    </div>
+                    <div class="response-section" id="start_dataproc_cluster-response">
+                    </div>
+                </div>
+            </div>
+  
+            <div class="tool">
+                <button class="tool-header" onclick="toggleTool('create_cluster_from_yaml')">
+                    <div>
+                        <div class="tool-name">create_cluster_from_yaml</div>
+                        <div class="tool-description">Create a Dataproc cluster using a YAML configuration file</div>
+                    </div>
+                    <span class="expand-icon" id="create_cluster_from_yaml-icon">▼</span>
+                </button>
+                <div class="tool-content" id="create_cluster_from_yaml-content">
+                    <div class="example-section">
+                        <h4>Example Usage:</h4>
+                        <div class="code-block">
+{
+  "tool": "create_cluster_from_yaml",
+  "arguments": {
+  "projectId": "my-project-123",
+  "region": "us-central1",
+  "yamlPath": "./configs/production-cluster.yaml",
+  "overrides": {
+    "clusterName": "prod-cluster-001"
+  }
+}
+}
+                        </div>
+                        <button class="try-it" onclick="tryTool('create_cluster_from_yaml', {&quot;projectId&quot;:&quot;my-project-123&quot;,&quot;region&quot;:&quot;us-central1&quot;,&quot;yamlPath&quot;:&quot;./configs/production-cluster.yaml&quot;,&quot;overrides&quot;:{&quot;clusterName&quot;:&quot;prod-cluster-001&quot;}})">
+                            Try This Example
+                        </button>
+                    </div>
+                    <div class="response-section" id="create_cluster_from_yaml-response">
+                    </div>
+                </div>
+            </div>
+  
+            <div class="tool">
+                <button class="tool-header" onclick="toggleTool('create_cluster_from_profile')">
+                    <div>
+                        <div class="tool-name">create_cluster_from_profile</div>
+                        <div class="tool-description">Create a Dataproc cluster using a predefined profile</div>
+                    </div>
+                    <span class="expand-icon" id="create_cluster_from_profile-icon">▼</span>
+                </button>
+                <div class="tool-content" id="create_cluster_from_profile-content">
+                    <div class="example-section">
+                        <h4>Example Usage:</h4>
+                        <div class="code-block">
+{
+  "tool": "create_cluster_from_profile",
+  "arguments": {
+  "projectId": "my-project-123",
+  "region": "us-central1",
+  "profileName": "production/high-memory/analysis",
+  "clusterName": "analytics-cluster-prod"
+}
+}
+                        </div>
+                        <button class="try-it" onclick="tryTool('create_cluster_from_profile', {&quot;projectId&quot;:&quot;my-project-123&quot;,&quot;region&quot;:&quot;us-central1&quot;,&quot;profileName&quot;:&quot;production/high-memory/analysis&quot;,&quot;clusterName&quot;:&quot;analytics-cluster-prod&quot;})">
+                            Try This Example
+                        </button>
+                    </div>
+                    <div class="response-section" id="create_cluster_from_profile-response">
+                    </div>
+                </div>
+            </div>
+  
+            <div class="tool">
+                <button class="tool-header" onclick="toggleTool('list_clusters')">
+                    <div>
+                        <div class="tool-name">list_clusters</div>
+                        <div class="tool-description">List Dataproc clusters in a project and region</div>
+                    </div>
+                    <span class="expand-icon" id="list_clusters-icon">▼</span>
+                </button>
+                <div class="tool-content" id="list_clusters-content">
+                    <div class="example-section">
+                        <h4>Example Usage:</h4>
+                        <div class="code-block">
+{
+  "tool": "list_clusters",
+  "arguments": {
+  "filter": "status.state=RUNNING",
+  "pageSize": 10
+}
+}
+                        </div>
+                        <button class="try-it" onclick="tryTool('list_clusters', {&quot;filter&quot;:&quot;status.state=RUNNING&quot;,&quot;pageSize&quot;:10})">
+                            Try This Example
+                        </button>
+                    </div>
+                    <div class="response-section" id="list_clusters-response">
+                    </div>
+                </div>
+            </div>
+  
+            <div class="tool">
+                <button class="tool-header" onclick="toggleTool('get_cluster')">
+                    <div>
+                        <div class="tool-name">get_cluster</div>
+                        <div class="tool-description">Get details for a specific Dataproc cluster</div>
+                    </div>
+                    <span class="expand-icon" id="get_cluster-icon">▼</span>
+                </button>
+                <div class="tool-content" id="get_cluster-content">
+                    <div class="example-section">
+                        <h4>Example Usage:</h4>
+                        <div class="code-block">
+{
+  "tool": "get_cluster",
+  "arguments": {
+  "projectId": "my-project-123",
+  "region": "us-central1",
+  "clusterName": "my-analysis-cluster"
+}
+}
+                        </div>
+                        <button class="try-it" onclick="tryTool('get_cluster', {&quot;projectId&quot;:&quot;my-project-123&quot;,&quot;region&quot;:&quot;us-central1&quot;,&quot;clusterName&quot;:&quot;my-analysis-cluster&quot;})">
+                            Try This Example
+                        </button>
+                    </div>
+                    <div class="response-section" id="get_cluster-response">
+                    </div>
+                </div>
+            </div>
+  
+            <div class="tool">
+                <button class="tool-header" onclick="toggleTool('delete_cluster')">
+                    <div>
+                        <div class="tool-name">delete_cluster</div>
+                        <div class="tool-description">Delete a Dataproc cluster</div>
+                    </div>
+                    <span class="expand-icon" id="delete_cluster-icon">▼</span>
+                </button>
+                <div class="tool-content" id="delete_cluster-content">
+                    <div class="example-section">
+                        <h4>Example Usage:</h4>
+                        <div class="code-block">
+{
+  "tool": "delete_cluster",
+  "arguments": {
+  "projectId": "my-project-123",
+  "region": "us-central1",
+  "clusterName": "temporary-cluster"
+}
+}
+                        </div>
+                        <button class="try-it" onclick="tryTool('delete_cluster', {&quot;projectId&quot;:&quot;my-project-123&quot;,&quot;region&quot;:&quot;us-central1&quot;,&quot;clusterName&quot;:&quot;temporary-cluster&quot;})">
+                            Try This Example
+                        </button>
+                    </div>
+                    <div class="response-section" id="delete_cluster-response">
+                    </div>
+                </div>
+            </div>
+  
+        </div>
+    
+        <div class="category" id="job-execution">
+            <div class="category-header">
+                Job Execution (5 tools)
+            </div>
+            
+            <div class="tool">
+                <button class="tool-header" onclick="toggleTool('submit_hive_query')">
+                    <div>
+                        <div class="tool-name">submit_hive_query</div>
+                        <div class="tool-description">Submit a Hive query to a Dataproc cluster</div>
+                    </div>
+                    <span class="expand-icon" id="submit_hive_query-icon">▼</span>
+                </button>
+                <div class="tool-content" id="submit_hive_query-content">
+                    <div class="example-section">
+                        <h4>Example Usage:</h4>
+                        <div class="code-block">
+{
+  "tool": "submit_hive_query",
+  "arguments": {
+  "projectId": "my-project-123",
+  "region": "us-central1",
+  "clusterName": "analytics-cluster",
+  "query": "SELECT COUNT(*) FROM my_table WHERE date >= \"2024-01-01\"",
+  "async": false
+}
+}
+                        </div>
+                        <button class="try-it" onclick="tryTool('submit_hive_query', {&quot;projectId&quot;:&quot;my-project-123&quot;,&quot;region&quot;:&quot;us-central1&quot;,&quot;clusterName&quot;:&quot;analytics-cluster&quot;,&quot;query&quot;:&quot;SELECT COUNT(*) FROM my_table WHERE date >= \&quot;2024-01-01\&quot;&quot;,&quot;async&quot;:false})">
+                            Try This Example
+                        </button>
+                    </div>
+                    <div class="response-section" id="submit_hive_query-response">
+                    </div>
+                </div>
+            </div>
+  
+            <div class="tool">
+                <button class="tool-header" onclick="toggleTool('submit_dataproc_job')">
+                    <div>
+                        <div class="tool-name">submit_dataproc_job</div>
+                        <div class="tool-description">Submit a Dataproc job (Hive, Spark, PySpark, Presto, etc.)</div>
+                    </div>
+                    <span class="expand-icon" id="submit_dataproc_job-icon">▼</span>
+                </button>
+                <div class="tool-content" id="submit_dataproc_job-content">
+                    <div class="example-section">
+                        <h4>Example Usage:</h4>
+                        <div class="code-block">
+{
+  "tool": "submit_dataproc_job",
+  "arguments": {
+  "projectId": "my-project-123",
+  "region": "us-central1",
+  "clusterName": "spark-cluster",
+  "jobType": "spark",
+  "jobConfig": {
+    "mainClass": "com.example.SparkApp",
+    "jarFileUris": [
+      "gs://my-bucket/spark-app.jar"
+    ]
+  }
+}
+}
+                        </div>
+                        <button class="try-it" onclick="tryTool('submit_dataproc_job', {&quot;projectId&quot;:&quot;my-project-123&quot;,&quot;region&quot;:&quot;us-central1&quot;,&quot;clusterName&quot;:&quot;spark-cluster&quot;,&quot;jobType&quot;:&quot;spark&quot;,&quot;jobConfig&quot;:{&quot;mainClass&quot;:&quot;com.example.SparkApp&quot;,&quot;jarFileUris&quot;:[&quot;gs://my-bucket/spark-app.jar&quot;]}})">
+                            Try This Example
+                        </button>
+                    </div>
+                    <div class="response-section" id="submit_dataproc_job-response">
+                    </div>
+                </div>
+            </div>
+  
+            <div class="tool">
+                <button class="tool-header" onclick="toggleTool('get_job_status')">
+                    <div>
+                        <div class="tool-name">get_job_status</div>
+                        <div class="tool-description">Get the status of a Dataproc job by job ID</div>
+                    </div>
+                    <span class="expand-icon" id="get_job_status-icon">▼</span>
+                </button>
+                <div class="tool-content" id="get_job_status-content">
+                    <div class="example-section">
+                        <h4>Example Usage:</h4>
+                        <div class="code-block">
+{
+  "tool": "get_job_status",
+  "arguments": {
+  "jobId": "job-12345-abcdef"
+}
+}
+                        </div>
+                        <button class="try-it" onclick="tryTool('get_job_status', {&quot;jobId&quot;:&quot;job-12345-abcdef&quot;})">
+                            Try This Example
+                        </button>
+                    </div>
+                    <div class="response-section" id="get_job_status-response">
+                    </div>
+                </div>
+            </div>
+  
+            <div class="tool">
+                <button class="tool-header" onclick="toggleTool('get_query_results')">
+                    <div>
+                        <div class="tool-name">get_query_results</div>
+                        <div class="tool-description">Get the results of a completed Hive query</div>
+                    </div>
+                    <span class="expand-icon" id="get_query_results-icon">▼</span>
+                </button>
+                <div class="tool-content" id="get_query_results-content">
+                    <div class="example-section">
+                        <h4>Example Usage:</h4>
+                        <div class="code-block">
+{
+  "tool": "get_query_results",
+  "arguments": {
+  "projectId": "my-project-123",
+  "region": "us-central1",
+  "jobId": "hive-job-12345",
+  "maxResults": 50
+}
+}
+                        </div>
+                        <button class="try-it" onclick="tryTool('get_query_results', {&quot;projectId&quot;:&quot;my-project-123&quot;,&quot;region&quot;:&quot;us-central1&quot;,&quot;jobId&quot;:&quot;hive-job-12345&quot;,&quot;maxResults&quot;:50})">
+                            Try This Example
+                        </button>
+                    </div>
+                    <div class="response-section" id="get_query_results-response">
+                    </div>
+                </div>
+            </div>
+  
+            <div class="tool">
+                <button class="tool-header" onclick="toggleTool('get_job_results')">
+                    <div>
+                        <div class="tool-name">get_job_results</div>
+                        <div class="tool-description">Get the results of a completed Dataproc job</div>
+                    </div>
+                    <span class="expand-icon" id="get_job_results-icon">▼</span>
+                </button>
+                <div class="tool-content" id="get_job_results-content">
+                    <div class="example-section">
+                        <h4>Example Usage:</h4>
+                        <div class="code-block">
+{
+  "tool": "get_job_results",
+  "arguments": {
+  "projectId": "my-project-123",
+  "region": "us-central1",
+  "jobId": "spark-job-67890",
+  "maxResults": 100
+}
+}
+                        </div>
+                        <button class="try-it" onclick="tryTool('get_job_results', {&quot;projectId&quot;:&quot;my-project-123&quot;,&quot;region&quot;:&quot;us-central1&quot;,&quot;jobId&quot;:&quot;spark-job-67890&quot;,&quot;maxResults&quot;:100})">
+                            Try This Example
+                        </button>
+                    </div>
+                    <div class="response-section" id="get_job_results-response">
+                    </div>
+                </div>
+            </div>
+  
+        </div>
+    
+        <div class="category" id="profile-management">
+            <div class="category-header">
+                Profile Management (3 tools)
+            </div>
+            
+            <div class="tool">
+                <button class="tool-header" onclick="toggleTool('list_profiles')">
+                    <div>
+                        <div class="tool-name">list_profiles</div>
+                        <div class="tool-description">List available cluster configuration profiles</div>
+                    </div>
+                    <span class="expand-icon" id="list_profiles-icon">▼</span>
+                </button>
+                <div class="tool-content" id="list_profiles-content">
+                    <div class="example-section">
+                        <h4>Example Usage:</h4>
+                        <div class="code-block">
+{
+  "tool": "list_profiles",
+  "arguments": {
+  "category": "production"
+}
+}
+                        </div>
+                        <button class="try-it" onclick="tryTool('list_profiles', {&quot;category&quot;:&quot;production&quot;})">
+                            Try This Example
+                        </button>
+                    </div>
+                    <div class="response-section" id="list_profiles-response">
+                    </div>
+                </div>
+            </div>
+  
+            <div class="tool">
+                <button class="tool-header" onclick="toggleTool('get_profile')">
+                    <div>
+                        <div class="tool-name">get_profile</div>
+                        <div class="tool-description">Get details for a specific cluster configuration profile</div>
+                    </div>
+                    <span class="expand-icon" id="get_profile-icon">▼</span>
+                </button>
+                <div class="tool-content" id="get_profile-content">
+                    <div class="example-section">
+                        <h4>Example Usage:</h4>
+                        <div class="code-block">
+{
+  "tool": "get_profile",
+  "arguments": {
+  "profileId": "development/small"
+}
+}
+                        </div>
+                        <button class="try-it" onclick="tryTool('get_profile', {&quot;profileId&quot;:&quot;development/small&quot;})">
+                            Try This Example
+                        </button>
+                    </div>
+                    <div class="response-section" id="get_profile-response">
+                    </div>
+                </div>
+            </div>
+  
+            <div class="tool">
+                <button class="tool-header" onclick="toggleTool('list_tracked_clusters')">
+                    <div>
+                        <div class="tool-name">list_tracked_clusters</div>
+                        <div class="tool-description">List clusters that were created and tracked by this MCP server</div>
+                    </div>
+                    <span class="expand-icon" id="list_tracked_clusters-icon">▼</span>
+                </button>
+                <div class="tool-content" id="list_tracked_clusters-content">
+                    <div class="example-section">
+                        <h4>Example Usage:</h4>
+                        <div class="code-block">
+{
+  "tool": "list_tracked_clusters",
+  "arguments": {
+  "profileId": "production/high-memory/analysis"
+}
+}
+                        </div>
+                        <button class="try-it" onclick="tryTool('list_tracked_clusters', {&quot;profileId&quot;:&quot;production/high-memory/analysis&quot;})">
+                            Try This Example
+                        </button>
+                    </div>
+                    <div class="response-section" id="list_tracked_clusters-response">
+                    </div>
+                </div>
+            </div>
+  
+        </div>
+    
+        <div class="category" id="monitoring--utilities">
+            <div class="category-header">
+                Monitoring & Utilities (1 tools)
+            </div>
+            
+            <div class="tool">
+                <button class="tool-header" onclick="toggleTool('get_zeppelin_url')">
+                    <div>
+                        <div class="tool-name">get_zeppelin_url</div>
+                        <div class="tool-description">Get the Zeppelin notebook URL for a Dataproc cluster</div>
+                    </div>
+                    <span class="expand-icon" id="get_zeppelin_url-icon">▼</span>
+                </button>
+                <div class="tool-content" id="get_zeppelin_url-content">
+                    <div class="example-section">
+                        <h4>Example Usage:</h4>
+                        <div class="code-block">
+{
+  "tool": "get_zeppelin_url",
+  "arguments": {
+  "projectId": "my-project-123",
+  "region": "us-central1",
+  "clusterName": "jupyter-cluster"
+}
+}
+                        </div>
+                        <button class="try-it" onclick="tryTool('get_zeppelin_url', {&quot;projectId&quot;:&quot;my-project-123&quot;,&quot;region&quot;:&quot;us-central1&quot;,&quot;clusterName&quot;:&quot;jupyter-cluster&quot;})">
+                            Try This Example
+                        </button>
+                    </div>
+                    <div class="response-section" id="get_zeppelin_url-response">
+                    </div>
+                </div>
+            </div>
+  
+        </div>
+    
+    </div>
+    
+    <script>
+        // Tool interaction functionality
+        function toggleTool(toolName) {
+            const content = document.getElementById(toolName + '-content');
+            const icon = document.getElementById(toolName + '-icon');
+            
+            if (content.classList.contains('active')) {
+                content.classList.remove('active');
+                icon.classList.remove('rotated');
+            } else {
+                content.classList.add('active');
+                icon.classList.add('rotated');
+            }
+        }
+        
+        function tryTool(toolName, example) {
+            const responseSection = document.getElementById(toolName + '-response');
+            responseSection.classList.add('active');
+            responseSection.innerHTML = `
+                <h4>Example Request:</h4>
+                <div class="code-block">
+{
+  "tool": "${toolName}",
+  "arguments": ${JSON.stringify(example, null, 2)}
+}
+                </div>
+                <h4>Response:</h4>
+                <div class="code-block">
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Tool executed successfully. See actual response in your MCP client."
+    }
+  ]
+}
+                </div>
+            `;
+        }
+        
+        // Search functionality
+        document.getElementById('searchBox').addEventListener('input', function(e) {
+            const searchTerm = e.target.value.toLowerCase();
+            const tools = document.querySelectorAll('.tool');
+            
+            tools.forEach(tool => {
+                const toolName = tool.querySelector('.tool-name').textContent.toLowerCase();
+                const toolDescription = tool.querySelector('.tool-description').textContent.toLowerCase();
+                
+                if (toolName.includes(searchTerm) || toolDescription.includes(searchTerm)) {
+                    tool.classList.remove('hidden');
+                } else {
+                    tool.classList.add('hidden');
+                }
+            });
+        });
+        
+        // Smooth scrolling for navigation links
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                const targetId = this.getAttribute('href').substring(1);
+                const targetElement = document.getElementById(targetId);
+                if (targetElement) {
+                    targetElement.scrollIntoView({ behavior: 'smooth' });
+                }
+            });
+        });
+    </script>
+</body>
+</html>

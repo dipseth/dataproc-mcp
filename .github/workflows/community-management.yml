@@ -1,0 +1,294 @@
+name: Community Management
+
+on:
+  issues:
+    types: [opened, edited, labeled, unlabeled]
+  issue_comment:
+    types: [created]
+  pull_request:
+    types: [opened, edited, labeled, unlabeled]
+  schedule:
+    # Run daily at 9 AM UTC for stale issue management
+    - cron: '0 9 * * *'
+
+jobs:
+  # Auto-label new issues based on content
+  auto-label-issues:
+    if: github.event_name == 'issues' && github.event.action == 'opened'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Auto-label bug reports
+        if: contains(github.event.issue.title, '[BUG]') || contains(github.event.issue.body, 'Bug Description')
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels: ['bug', 'needs-triage']
+            });
+
+      - name: Auto-label feature requests
+        if: contains(github.event.issue.title, '[FEATURE]') || contains(github.event.issue.body, 'Feature Summary')
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels: ['enhancement', 'needs-triage']
+            });
+
+      - name: Auto-label documentation issues
+        if: contains(github.event.issue.title, '[DOCS]') || contains(github.event.issue.body, 'documentation')
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels: ['documentation', 'needs-triage']
+            });
+
+      - name: Auto-label security issues
+        if: contains(github.event.issue.title, '[SECURITY]') || contains(github.event.issue.body, 'security')
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels: ['security', 'high-priority', 'needs-triage']
+            });
+
+  # Welcome new contributors
+  welcome-new-contributors:
+    if: github.event_name == 'issues' && github.event.action == 'opened'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Check if first-time contributor
+        uses: actions/github-script@v7
+        id: check-contributor
+        with:
+          script: |
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              creator: context.payload.issue.user.login,
+              state: 'all'
+            });
+            
+            const { data: prs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'all'
+            });
+            
+            const userPrs = prs.filter(pr => pr.user.login === context.payload.issue.user.login);
+            const isFirstTime = issues.length === 1 && userPrs.length === 0;
+            
+            return isFirstTime;
+
+      - name: Welcome first-time contributor
+        if: steps.check-contributor.outputs.result == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const welcomeMessage = `
+            👋 Welcome to the Dataproc MCP Server community, @${context.payload.issue.user.login}!
+
+            Thank you for opening your first issue. Here are some helpful resources:
+
+            📚 **Documentation**
+            - [Quick Start Guide](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/docs/QUICK_START.md)
+            - [API Reference](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/docs/API_REFERENCE.md)
+            - [Troubleshooting Guide](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/docs/TROUBLESHOOTING.md)
+
+            🤝 **Community**
+            - [Community Support Guide](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/docs/COMMUNITY_SUPPORT.md)
+            - [Contributing Guidelines](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/CONTRIBUTING.md)
+            - [Code of Conduct](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/CODE_OF_CONDUCT.md)
+
+            A maintainer will review your issue soon. In the meantime, please ensure you've provided all the requested information in the issue template.
+
+            Happy coding! 🚀
+            `;
+
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: welcomeMessage
+            });
+
+  # Manage stale issues
+  stale-issues:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Mark stale issues
+        uses: actions/stale@v9
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          stale-issue-message: |
+            This issue has been automatically marked as stale because it has not had recent activity. 
+            
+            **Next Steps:**
+            - If this issue is still relevant, please comment to keep it open
+            - If you've found a solution, please share it with the community
+            - If this is no longer needed, it will be closed in 7 days
+            
+            Thank you for your contribution! 🙏
+          stale-pr-message: |
+            This pull request has been automatically marked as stale because it has not had recent activity.
+            
+            **Next Steps:**
+            - If you're still working on this, please comment to keep it open
+            - If you need help, please ask in the comments
+            - If this is no longer needed, it will be closed in 7 days
+            
+            Thank you for your contribution! 🙏
+          close-issue-message: |
+            This issue has been automatically closed due to inactivity. 
+            
+            If you believe this issue is still relevant, please reopen it with updated information.
+          close-pr-message: |
+            This pull request has been automatically closed due to inactivity.
+            
+            If you'd like to continue working on this, please reopen it or create a new PR.
+          days-before-stale: 30
+          days-before-close: 7
+          stale-issue-label: 'stale'
+          stale-pr-label: 'stale'
+          exempt-issue-labels: 'pinned,security,critical'
+          exempt-pr-labels: 'pinned,security,critical'
+
+  # Auto-assign reviewers for PRs
+  auto-assign-reviewers:
+    if: github.event_name == 'pull_request' && github.event.action == 'opened'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Auto-assign reviewers
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const reviewers = ['dipseth']; // Add more maintainers as needed
+            
+            // Don't assign if PR is from a maintainer
+            if (!reviewers.includes(context.payload.pull_request.user.login)) {
+              github.rest.pulls.requestReviewers({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.payload.pull_request.number,
+                reviewers: reviewers
+              });
+            }
+
+  # Add labels based on PR content
+  auto-label-prs:
+    if: github.event_name == 'pull_request' && github.event.action == 'opened'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Label breaking changes
+        if: contains(github.event.pull_request.title, 'BREAKING') || contains(github.event.pull_request.body, 'breaking change')
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              labels: ['breaking-change', 'needs-review']
+            });
+
+      - name: Label documentation PRs
+        if: contains(github.event.pull_request.title, 'docs') || contains(github.event.pull_request.body, 'documentation')
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              labels: ['documentation']
+            });
+
+      - name: Label security PRs
+        if: contains(github.event.pull_request.title, 'security') || contains(github.event.pull_request.body, 'security')
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              labels: ['security', 'high-priority']
+            });
+
+  # Community metrics collection
+  collect-metrics:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: read
+      pull-requests: read
+    steps:
+      - name: Collect community metrics
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const now = new Date();
+            const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+            
+            // Get issues from last 30 days
+            const { data: recentIssues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'all',
+              since: thirtyDaysAgo.toISOString()
+            });
+            
+            // Get PRs from last 30 days
+            const { data: recentPRs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'all'
+            });
+            
+            const recentPRsFiltered = recentPRs.filter(pr => 
+              new Date(pr.created_at) > thirtyDaysAgo
+            );
+            
+            // Calculate metrics
+            const metrics = {
+              issues_opened: recentIssues.filter(issue => !issue.pull_request).length,
+              prs_opened: recentPRsFiltered.length,
+              issues_closed: recentIssues.filter(issue => 
+                !issue.pull_request && issue.state === 'closed'
+              ).length,
+              prs_merged: recentPRsFiltered.filter(pr => pr.merged_at).length,
+              unique_contributors: new Set([
+                ...recentIssues.map(issue => issue.user.login),
+                ...recentPRsFiltered.map(pr => pr.user.login)
+              ]).size
+            };
+            
+            console.log('Community Metrics (Last 30 days):', JSON.stringify(metrics, null, 2));
+            
+            // Store metrics as artifact or send to analytics service
+            // This is a placeholder for actual metrics collection

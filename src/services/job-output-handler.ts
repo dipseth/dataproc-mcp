@@ -5,7 +5,7 @@
 import { GCSService } from './gcs.js';
 import { CacheManager } from './cache-manager.js';
 import { OutputParser, ParseOptions } from './output-parser.js';
-import { GCSError, GCSErrorType, OutputFormat } from '../types/gcs-types.js';
+import { GCSError, GCSErrorTypes, OutputFormat } from '../types/gcs-types.js';
 import { CacheConfig } from '../types/cache-types.js';
 import { logger } from '../utils/logger.js';
 
@@ -48,7 +48,7 @@ export class JobOutputHandler {
     const opts = {
       useCache: true,
       validateHash: true,
-      ...options
+      ...options,
     };
 
     // Try cache first if enabled
@@ -63,27 +63,30 @@ export class JobOutputHandler {
       // Check file size before downloading
       logger.debug(`JobOutputHandler: Attempting to get metadata for ${uri}`);
       const metadata = await this.gcsService.getFileMetadata(uri);
-      logger.debug(`JobOutputHandler: Successfully got metadata for ${uri}. Size: ${metadata.size}`);
+      logger.debug(
+        `JobOutputHandler: Successfully got metadata for ${uri}. Size: ${metadata.size}`
+      );
       const eligibleForCache = this.cacheManager.isEligibleForCache(metadata.size);
 
       // Download and parse content
       logger.debug(`JobOutputHandler: Attempting to download file from ${uri}`);
       const content = await this.gcsService.downloadFile(uri, {
-        validateHash: opts.validateHash
+        validateHash: opts.validateHash,
       });
-      logger.debug(`JobOutputHandler: Successfully downloaded file from ${uri}. Content length: ${content.length}`);
+      logger.debug(
+        `JobOutputHandler: Successfully downloaded file from ${uri}. Content length: ${content.length}`
+      );
 
       // Auto-detect format if needed
-      const detectedFormat = format === 'unknown' 
-        ? await this.gcsService.detectOutputFormat(uri)
-        : format;
+      const detectedFormat =
+        format === 'unknown' ? await this.gcsService.detectOutputFormat(uri) : format;
 
       // Parse the content
       const parseOpts: ParseOptions = {
         trim: opts.trim,
         delimiter: opts.delimiter,
         parseNumbers: opts.parseNumbers,
-        skipEmpty: opts.skipEmpty
+        skipEmpty: opts.skipEmpty,
       };
 
       const result = await this.outputParser.parse(content, detectedFormat, parseOpts);
@@ -99,7 +102,7 @@ export class JobOutputHandler {
         throw error;
       }
       throw new GCSError(
-        GCSErrorType.DOWNLOAD_FAILED,
+        GCSErrorTypes.DOWNLOAD_FAILED,
         `Failed to get job output from ${uri}`,
         error as Error
       );
@@ -115,7 +118,7 @@ export class JobOutputHandler {
     options: JobOutputOptions = {}
   ): Promise<T> {
     const results: T[] = [];
-    
+
     for (const uri of uris) {
       const result = await this.getJobOutput<T>(uri, format, options);
       results.push(result);
@@ -124,30 +127,34 @@ export class JobOutputHandler {
     // Combine results for common formats
     if (format === 'text') {
       // Concatenate all text outputs
-      return results.map(r => (typeof r === 'string' ? r : JSON.stringify(r))).join('\n') as unknown as T;
+      return results
+        .map((r) => (typeof r === 'string' ? r : JSON.stringify(r)))
+        .join('\n') as unknown as T;
     }
     if (format === 'json') {
       // Merge arrays or objects
-      if (results.every(r => Array.isArray(r))) {
+      if (results.every((r) => Array.isArray(r))) {
         return ([] as any[]).concat(...(results as any[][])) as unknown as T;
       }
-      if (results.every(r => typeof r === 'object')) {
+      if (results.every((r) => typeof r === 'object')) {
         return Object.assign({}, ...results) as T;
       }
     }
     if (format === 'csv') {
       // Concatenate CSV text
-      return results.map(r => (typeof r === 'string' ? r : JSON.stringify(r))).join('\n') as unknown as T;
+      return results
+        .map((r) => (typeof r === 'string' ? r : JSON.stringify(r)))
+        .join('\n') as unknown as T;
     }
     // Special case: if all results have a 'tables' property, merge tables
-    if (results.every(r => r && typeof r === 'object' && 'tables' in r)) {
+    if (results.every((r) => r && typeof r === 'object' && 'tables' in r)) {
       // Add diagnostic log to check if results contain rawOutput
       logger.debug('JobOutputHandler.getJobOutputs: Merging tables from multiple results', {
         resultCount: results.length,
         resultsWithRawOutput: results.filter((r: any) => 'rawOutput' in r).length,
-        sampleResultKeys: results.length > 0 ? Object.keys(results[0] as object) : []
+        sampleResultKeys: results.length > 0 ? Object.keys(results[0] as object) : [],
       });
-      
+
       const allTables = results.flatMap((r: any) => r.tables || []);
       return { tables: allTables } as unknown as T;
     }
@@ -179,12 +186,12 @@ export class JobOutputHandler {
     // Iterate through all cached items using the public get method
     // We need to check all cache keys since we don't have direct access to the cache
     const cacheStats = this.cacheManager.getStats();
-    
+
     // If cache is empty, return undefined immediately
     if (cacheStats.size === 0) {
       return undefined;
     }
-    
+
     // Try to find a cached result that contains the jobId in its key
     // This is a simple approach that might need refinement in production
     for (const uri of this.getRecentJobUris()) {
@@ -192,10 +199,10 @@ export class JobOutputHandler {
         return this.cacheManager.get(uri);
       }
     }
-    
+
     return undefined;
   }
-  
+
   /**
    * Helper method to get recent job URIs from recent job submissions
    * In a real implementation, this would track URIs when jobs are submitted

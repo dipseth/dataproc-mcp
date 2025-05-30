@@ -29,7 +29,9 @@ export class JobTracker {
       clusterName: jobInfo.clusterName || existingJob?.clusterName || 'UNKNOWN',
     };
     this.jobs.set(jobInfo.jobId, updatedJob);
-    logger.debug(`JobTracker: Job ${jobInfo.jobId} ${existingJob ? 'updated' : 'added'}. Status: ${updatedJob.status}`);
+    logger.debug(
+      `JobTracker: Job ${jobInfo.jobId} ${existingJob ? 'updated' : 'added'}. Status: ${updatedJob.status}`
+    );
   }
 
   /**

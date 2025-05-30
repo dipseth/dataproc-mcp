@@ -11,7 +11,7 @@ const LOG_LEVELS: Record<string, number> = {
   debug: 0,
   info: 1,
   warn: 2,
-  error: 3
+  error: 3,
 };
 
 // Check if the current log level allows the specified level
@@ -25,7 +25,7 @@ function shouldLog(level: string): boolean {
 function logToFile(level: string, message: string, data?: any): void {
   // In a real implementation, this would write to a file
   // For now, we'll just use console.log directly for visibility during debugging
-  
+
   const logData = data ? ` ${JSON.stringify(data)}` : '';
   console.log(`[${level}] ${message}${logData}`);
 }
@@ -37,22 +37,22 @@ export const logger = {
       logToFile('DEBUG', message, data);
     }
   },
-  
+
   info: (message: string, data?: any) => {
     if (shouldLog('info')) {
       logToFile('INFO', message, data);
     }
   },
-  
+
   warn: (message: string, data?: any) => {
     if (shouldLog('warn')) {
       logToFile('WARN', message, data);
     }
   },
-  
+
   error: (message: string, data?: any) => {
     if (shouldLog('error')) {
       logToFile('ERROR', message, data);
     }
-  }
+  },
 };

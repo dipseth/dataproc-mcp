@@ -35,7 +35,7 @@ export interface DataprocClientOptions {
  */
 export enum AuthStrategy {
   KEY_FILE = 'key_file',
-  APPLICATION_DEFAULT = 'application_default'
+  APPLICATION_DEFAULT = 'application_default',
 }
 
 /**
@@ -56,7 +56,7 @@ export interface AuthResult {
 export function getGcloudAccessToken(): string {
   const startTime = Date.now();
   console.error(`[TIMING] getGcloudAccessToken: Starting gcloud token acquisition`);
-  
+
   try {
     // Use the key file from environment variable (GOOGLE_APPLICATION_CREDENTIALS)
     // This is the proven working approach from the MWAA service account guide
@@ -65,17 +65,24 @@ export function getGcloudAccessToken(): string {
     const token = execSync('gcloud auth print-access-token', { encoding: 'utf8' }).trim();
     const execDuration = Date.now() - execStartTime;
     const totalDuration = Date.now() - startTime;
-    
-    console.error(`[TIMING] getGcloudAccessToken: SUCCESS - gcloud exec: ${execDuration}ms, total: ${totalDuration}ms, token length: ${token.length}`);
+
+    console.error(
+      `[TIMING] getGcloudAccessToken: SUCCESS - gcloud exec: ${execDuration}ms, total: ${totalDuration}ms, token length: ${token.length}`
+    );
     if (process.env.LOG_LEVEL === 'debug') {
-      console.error('[DEBUG] getGcloudAccessToken: Successfully obtained token using configured key file');
+      console.error(
+        '[DEBUG] getGcloudAccessToken: Successfully obtained token using configured key file'
+      );
     }
-    
+
     return token;
   } catch (err) {
     const totalDuration = Date.now() - startTime;
     console.error(`[TIMING] getGcloudAccessToken: FAILED after ${totalDuration}ms`);
-    console.error('[ERROR] getGcloudAccessToken: Failed to get token using configured key file:', err);
+    console.error(
+      '[ERROR] getGcloudAccessToken: Failed to get token using configured key file:',
+      err
+    );
     throw new Error(`Failed to get access token using configured key file: ${err}`);
   }
 }
@@ -87,7 +94,7 @@ export function getGcloudAccessToken(): string {
 export async function getGcloudAccessTokenWithConfig(): Promise<string> {
   const startTime = Date.now();
   console.error(`[TIMING] getGcloudAccessTokenWithConfig: Starting with caching`);
-  
+
   // Check cache first
   if (authCache && authCache.expiresAt > Date.now()) {
     const cacheDuration = Date.now() - startTime;
@@ -97,23 +104,23 @@ export async function getGcloudAccessTokenWithConfig(): Promise<string> {
     }
     return authCache.token;
   }
-  
+
   // Cache miss or expired, get new token
   console.error(`[TIMING] getGcloudAccessTokenWithConfig: Cache miss, getting new token`);
   const token = getGcloudAccessToken();
-  
+
   // Cache the token
   authCache = {
     token,
-    expiresAt: Date.now() + CACHE_DURATION_MS
+    expiresAt: Date.now() + CACHE_DURATION_MS,
   };
-  
+
   const totalDuration = Date.now() - startTime;
   console.error(`[TIMING] getGcloudAccessTokenWithConfig: NEW TOKEN CACHED - ${totalDuration}ms`);
   if (process.env.LOG_LEVEL === 'debug') {
     console.error('[DEBUG] getGcloudAccessTokenWithConfig: Token cached for 5 minutes');
   }
-  
+
   return token;
 }
 
@@ -128,18 +135,22 @@ export async function createImpersonatedAuth(
   sourceCredentials?: GoogleAuth
 ): Promise<Impersonated> {
   const startTime = Date.now();
-  console.error(`[TIMING] createImpersonatedAuth: Starting impersonation for ${targetServiceAccount}`);
-  
+  console.error(
+    `[TIMING] createImpersonatedAuth: Starting impersonation for ${targetServiceAccount}`
+  );
+
   try {
     // Use provided source credentials or fail if none provided
     if (!sourceCredentials) {
-      throw new Error('Source credentials are required for impersonation. No fallback to ADC to avoid environment dependencies.');
+      throw new Error(
+        'Source credentials are required for impersonation. No fallback to ADC to avoid environment dependencies.'
+      );
     }
     const sourceAuth = sourceCredentials;
-    
+
     // Get source credentials
     const sourceAuthClient = await sourceAuth.getClient();
-    
+
     // Create impersonated credentials
     const impersonatedClient = new Impersonated({
       sourceClient: sourceAuthClient as OAuth2Client,
@@ -147,22 +158,31 @@ export async function createImpersonatedAuth(
       targetScopes: ['https://www.googleapis.com/auth/cloud-platform'],
       delegates: [],
     });
-    
+
     // Test the impersonated credentials
     const testStartTime = Date.now();
     await impersonatedClient.getAccessToken();
     const testDuration = Date.now() - testStartTime;
     const totalDuration = Date.now() - startTime;
-    
-    console.error(`[TIMING] createImpersonatedAuth: SUCCESS - test: ${testDuration}ms, total: ${totalDuration}ms`);
-    console.error(`[DEBUG] createImpersonatedAuth: Successfully created impersonated credentials for ${targetServiceAccount}`);
-    
+
+    console.error(
+      `[TIMING] createImpersonatedAuth: SUCCESS - test: ${testDuration}ms, total: ${totalDuration}ms`
+    );
+    console.error(
+      `[DEBUG] createImpersonatedAuth: Successfully created impersonated credentials for ${targetServiceAccount}`
+    );
+
     return impersonatedClient;
   } catch (error) {
     const totalDuration = Date.now() - startTime;
     console.error(`[TIMING] createImpersonatedAuth: FAILED after ${totalDuration}ms`);
-    console.error(`[ERROR] createImpersonatedAuth: Failed to create impersonated credentials for ${targetServiceAccount}:`, error);
-    throw new Error(`Failed to create impersonated credentials for ${targetServiceAccount}: ${error}`);
+    console.error(
+      `[ERROR] createImpersonatedAuth: Failed to create impersonated credentials for ${targetServiceAccount}:`,
+      error
+    );
+    throw new Error(
+      `Failed to create impersonated credentials for ${targetServiceAccount}: ${error}`
+    );
   }
 }
 
@@ -175,7 +195,7 @@ export async function createAuth(options: DataprocClientOptions = {}): Promise<A
   const startTime = Date.now();
   console.error(`[TIMING] createAuth: Starting authentication process`);
   const { keyFilename, useApplicationDefault } = options;
-  
+
   // Get server configuration to check for impersonation settings
   let serverConfig;
   try {
@@ -183,7 +203,7 @@ export async function createAuth(options: DataprocClientOptions = {}): Promise<A
   } catch (error) {
     console.warn(`[WARN] createAuth: Failed to load server config: ${error}`);
   }
-  
+
   // Log environment configuration for debugging
   console.error(`[DEBUG] createAuth: Environment configuration:`, {
     GOOGLE_APPLICATION_CREDENTIALS: process.env.GOOGLE_APPLICATION_CREDENTIALS ? 'SET' : 'NOT SET',
@@ -193,39 +213,53 @@ export async function createAuth(options: DataprocClientOptions = {}): Promise<A
     useApplicationDefault: useApplicationDefault,
     impersonateServiceAccount: serverConfig?.authentication?.impersonateServiceAccount || 'NOT SET',
     fallbackKeyPath: serverConfig?.authentication?.fallbackKeyPath || 'NOT SET',
-    preferImpersonation: serverConfig?.authentication?.preferImpersonation ?? 'NOT SET'
+    preferImpersonation: serverConfig?.authentication?.preferImpersonation ?? 'NOT SET',
   });
-  
+
   // Strategy 0: Service Account Impersonation (highest priority if preferred)
-  if (serverConfig?.authentication?.impersonateServiceAccount &&
-      (serverConfig?.authentication?.preferImpersonation !== false)) {
+  if (
+    serverConfig?.authentication?.impersonateServiceAccount &&
+    serverConfig?.authentication?.preferImpersonation !== false
+  ) {
     try {
       const impersonationStartTime = Date.now();
       const targetServiceAccount = serverConfig.authentication.impersonateServiceAccount;
-      console.error(`[TIMING] createAuth: Attempting service account impersonation: ${targetServiceAccount}`);
-      
+      console.error(
+        `[TIMING] createAuth: Attempting service account impersonation: ${targetServiceAccount}`
+      );
+
       // Create source credentials for impersonation - REQUIRE fallback key path
       if (!serverConfig.authentication.fallbackKeyPath) {
-        throw new Error(`Service account impersonation requires fallbackKeyPath in server configuration. No environment fallback to ensure independence.`);
+        throw new Error(
+          `Service account impersonation requires fallbackKeyPath in server configuration. No environment fallback to ensure independence.`
+        );
       }
-      
-      console.error(`[DEBUG] createAuth: Using fallback key path for impersonation source: ${serverConfig.authentication.fallbackKeyPath}`);
+
+      console.error(
+        `[DEBUG] createAuth: Using fallback key path for impersonation source: ${serverConfig.authentication.fallbackKeyPath}`
+      );
       const sourceAuth = new GoogleAuth({
         keyFilename: serverConfig.authentication.fallbackKeyPath,
         scopes: ['https://www.googleapis.com/auth/cloud-platform'],
       });
-      
+
       // Test the source auth
       await sourceAuth.getAccessToken();
-      console.error(`[DEBUG] createAuth: Fallback key path authentication successful for impersonation`);
-      
+      console.error(
+        `[DEBUG] createAuth: Fallback key path authentication successful for impersonation`
+      );
+
       const impersonatedClient = await createImpersonatedAuth(targetServiceAccount, sourceAuth);
       const impersonationDuration = Date.now() - impersonationStartTime;
       const totalDuration = Date.now() - startTime;
-      
-      console.error(`[TIMING] createAuth: Impersonation SUCCESS - impersonation: ${impersonationDuration}ms, total: ${totalDuration}ms`);
-      console.error(`[DEBUG] createAuth: Service account impersonation successful for ${targetServiceAccount}`);
-      
+
+      console.error(
+        `[TIMING] createAuth: Impersonation SUCCESS - impersonation: ${impersonationDuration}ms, total: ${totalDuration}ms`
+      );
+      console.error(
+        `[DEBUG] createAuth: Service account impersonation successful for ${targetServiceAccount}`
+      );
+
       // Return the impersonated client directly wrapped in GoogleAuth interface
       // The Impersonated client can be used directly with Google Cloud client libraries
       const auth = {
@@ -233,23 +267,29 @@ export async function createAuth(options: DataprocClientOptions = {}): Promise<A
         getAccessToken: () => impersonatedClient.getAccessToken(),
         getProjectId: async () => {
           // Try to get project ID from server config or environment
-          return serverConfig?.authentication?.projectId || process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT;
-        }
+          return (
+            serverConfig?.authentication?.projectId ||
+            process.env.GOOGLE_CLOUD_PROJECT ||
+            process.env.GCLOUD_PROJECT
+          );
+        },
       };
-      
+
       return {
         strategy: AuthStrategy.KEY_FILE, // Use KEY_FILE as closest match for impersonation
         success: true,
-        auth: auth as any // Cast to match expected interface
+        auth: auth as any, // Cast to match expected interface
       };
     } catch (error) {
       const impersonationFailDuration = Date.now() - startTime;
-      console.error(`[TIMING] createAuth: Impersonation strategy FAILED after ${impersonationFailDuration}ms`);
+      console.error(
+        `[TIMING] createAuth: Impersonation strategy FAILED after ${impersonationFailDuration}ms`
+      );
       console.warn(`[WARN] createAuth: Service account impersonation failed: ${error}`);
       // Continue to fallback strategies
     }
   }
-  
+
   // Strategy 1: Use configured key file (explicit configuration only - no environment fallback)
   const keyPath = keyFilename || serverConfig?.authentication?.fallbackKeyPath;
   if (keyPath && !useApplicationDefault) {
@@ -259,7 +299,7 @@ export async function createAuth(options: DataprocClientOptions = {}): Promise<A
       if (process.env.LOG_LEVEL === 'debug') {
         console.error(`[DEBUG] createAuth: Using key file authentication: ${keyPath}`);
       }
-      
+
       const authCreateStartTime = Date.now();
       const auth = new GoogleAuth({
         keyFilename: keyPath,
@@ -267,23 +307,25 @@ export async function createAuth(options: DataprocClientOptions = {}): Promise<A
       });
       const authCreateDuration = Date.now() - authCreateStartTime;
       console.error(`[TIMING] createAuth: GoogleAuth instance created in ${authCreateDuration}ms`);
-      
+
       // Test the auth by getting a token
       const tokenTestStartTime = Date.now();
       console.error(`[TIMING] createAuth: Testing token acquisition...`);
       await auth.getAccessToken();
       const tokenTestDuration = Date.now() - tokenTestStartTime;
       const keyFileTotal = Date.now() - keyFileStartTime;
-      
-      console.error(`[TIMING] createAuth: Key file auth SUCCESS - token test: ${tokenTestDuration}ms, total: ${keyFileTotal}ms`);
+
+      console.error(
+        `[TIMING] createAuth: Key file auth SUCCESS - token test: ${tokenTestDuration}ms, total: ${keyFileTotal}ms`
+      );
       if (process.env.LOG_LEVEL === 'debug') {
         console.error('[DEBUG] createAuth: Key file authentication successful');
       }
-      
+
       return {
         strategy: AuthStrategy.KEY_FILE,
         success: true,
-        auth
+        auth,
       };
     } catch (error) {
       const keyFileFailDuration = Date.now() - startTime;
@@ -291,23 +333,27 @@ export async function createAuth(options: DataprocClientOptions = {}): Promise<A
       console.warn(`[WARN] createAuth: Key file strategy failed: ${error}`);
     }
   }
-  
+
   // Strategy 2: Application Default Credentials (only if explicitly enabled)
   if (serverConfig?.authentication?.useApplicationDefaultFallback) {
     try {
       const adcStartTime = Date.now();
-      console.error(`[TIMING] createAuth: Attempting application default credentials (explicitly enabled)`);
+      console.error(
+        `[TIMING] createAuth: Attempting application default credentials (explicitly enabled)`
+      );
       if (process.env.LOG_LEVEL === 'debug') {
         console.error('[DEBUG] createAuth: Using application default credentials');
       }
-      
+
       const authCreateStartTime = Date.now();
       const auth = new GoogleAuth({
         scopes: ['https://www.googleapis.com/auth/cloud-platform'],
       });
       const authCreateDuration = Date.now() - authCreateStartTime;
-      console.error(`[TIMING] createAuth: ADC GoogleAuth instance created in ${authCreateDuration}ms`);
-      
+      console.error(
+        `[TIMING] createAuth: ADC GoogleAuth instance created in ${authCreateDuration}ms`
+      );
+
       // Test the auth by getting a token
       const tokenTestStartTime = Date.now();
       console.error(`[TIMING] createAuth: Testing ADC token acquisition...`);
@@ -315,16 +361,18 @@ export async function createAuth(options: DataprocClientOptions = {}): Promise<A
       const tokenTestDuration = Date.now() - tokenTestStartTime;
       const adcTotal = Date.now() - adcStartTime;
       const totalDuration = Date.now() - startTime;
-      
-      console.error(`[TIMING] createAuth: ADC auth SUCCESS - token test: ${tokenTestDuration}ms, adc total: ${adcTotal}ms, overall total: ${totalDuration}ms`);
+
+      console.error(
+        `[TIMING] createAuth: ADC auth SUCCESS - token test: ${tokenTestDuration}ms, adc total: ${adcTotal}ms, overall total: ${totalDuration}ms`
+      );
       if (process.env.LOG_LEVEL === 'debug') {
         console.error('[DEBUG] createAuth: Application default credentials successful');
       }
-      
+
       return {
         strategy: AuthStrategy.APPLICATION_DEFAULT,
         success: true,
-        auth
+        auth,
       };
     } catch (error) {
       const totalFailDuration = Date.now() - startTime;
@@ -334,13 +382,13 @@ export async function createAuth(options: DataprocClientOptions = {}): Promise<A
   } else {
     console.error(`[DEBUG] createAuth: Application Default Credentials disabled in configuration`);
   }
-  
+
   const totalDuration = Date.now() - startTime;
   console.error(`[TIMING] createAuth: ALL STRATEGIES FAILED after ${totalDuration}ms`);
   return {
     strategy: AuthStrategy.APPLICATION_DEFAULT,
     success: false,
-    error: 'All authentication strategies failed'
+    error: 'All authentication strategies failed',
   };
 }
 
@@ -349,7 +397,9 @@ export async function createAuth(options: DataprocClientOptions = {}): Promise<A
  * @param options Client configuration options
  * @returns Configured ClusterControllerClient
  */
-export async function createDataprocClient(options: DataprocClientOptions = {}): Promise<ClusterControllerClient> {
+export async function createDataprocClient(
+  options: DataprocClientOptions = {}
+): Promise<ClusterControllerClient> {
   const { region } = options;
 
   // Set up client options
@@ -365,15 +415,17 @@ export async function createDataprocClient(options: DataprocClientOptions = {}):
 
   // Get authentication using the simplified approach
   const authResult = await createAuth(options);
-  
+
   if (!authResult.success) {
     throw new Error(`Failed to create authentication: ${authResult.error}`);
   }
-  
+
   clientOptions.auth = authResult.auth;
-  
+
   if (process.env.LOG_LEVEL === 'debug') {
-    console.error(`[DEBUG] createDataprocClient: Using authentication strategy: ${authResult.strategy}`);
+    console.error(
+      `[DEBUG] createDataprocClient: Using authentication strategy: ${authResult.strategy}`
+    );
   }
 
   return new ClusterControllerClient(clientOptions);
@@ -384,23 +436,25 @@ export async function createDataprocClient(options: DataprocClientOptions = {}):
  * @param options Client configuration options
  * @returns Configured JobControllerClient
  */
-export async function createJobClient(options: DataprocClientOptions = {}): Promise<JobControllerClient> {
+export async function createJobClient(
+  options: DataprocClientOptions = {}
+): Promise<JobControllerClient> {
   const startTime = Date.now();
   console.error(`[TIMING] createJobClient: Starting job client creation`);
   const { region } = options;
-  
+
   if (process.env.LOG_LEVEL === 'debug') {
     console.error('[DEBUG] createJobClient: Starting with options:', {
       region,
       keyFilename: options.keyFilename ? 'provided' : 'not provided',
-      useApplicationDefault: options.useApplicationDefault
+      useApplicationDefault: options.useApplicationDefault,
     });
   }
-  
+
   // Set up client options
   const optionsStartTime = Date.now();
   const clientOptions: Record<string, any> = {};
-  
+
   // Configure region-specific endpoint if provided
   if (region) {
     clientOptions.apiEndpoint = `${region}-dataproc.googleapis.com:443`;
@@ -411,35 +465,37 @@ export async function createJobClient(options: DataprocClientOptions = {}): Prom
   }
   const optionsDuration = Date.now() - optionsStartTime;
   console.error(`[TIMING] createJobClient: Client options configured in ${optionsDuration}ms`);
-  
+
   // Get authentication using the simplified approach
   console.error(`[TIMING] createJobClient: Starting authentication...`);
   const authStartTime = Date.now();
   const authResult = await createAuth(options);
   const authDuration = Date.now() - authStartTime;
   console.error(`[TIMING] createJobClient: Authentication completed in ${authDuration}ms`);
-  
+
   if (!authResult.success) {
     const totalDuration = Date.now() - startTime;
     console.error(`[TIMING] createJobClient: FAILED during auth after ${totalDuration}ms`);
     throw new Error(`Failed to create authentication: ${authResult.error}`);
   }
-  
+
   clientOptions.auth = authResult.auth;
-  
+
   if (process.env.LOG_LEVEL === 'debug') {
     console.error(`[DEBUG] createJobClient: Using authentication strategy: ${authResult.strategy}`);
   }
-  
+
   // Create the JobControllerClient
   console.error(`[TIMING] createJobClient: Creating JobControllerClient instance...`);
   const clientCreateStartTime = Date.now();
   const client = new JobControllerClient(clientOptions);
   const clientCreateDuration = Date.now() - clientCreateStartTime;
   const totalDuration = Date.now() - startTime;
-  
-  console.error(`[TIMING] createJobClient: SUCCESS - auth: ${authDuration}ms, client creation: ${clientCreateDuration}ms, total: ${totalDuration}ms`);
-  
+
+  console.error(
+    `[TIMING] createJobClient: SUCCESS - auth: ${authDuration}ms, client creation: ${clientCreateDuration}ms, total: ${totalDuration}ms`
+  );
+
   return client;
 }
 
@@ -447,13 +503,13 @@ export async function createJobClient(options: DataprocClientOptions = {}): Prom
  * Gets the credentials configuration from environment variables
  * @returns Credentials configuration
  */
-export function getCredentialsConfig(): { 
-  keyFilename?: string; 
+export function getCredentialsConfig(): {
+  keyFilename?: string;
   useApplicationDefault: boolean;
 } {
   const keyFilename = process.env.GOOGLE_APPLICATION_CREDENTIALS;
   const useApplicationDefault = process.env.USE_APPLICATION_DEFAULT === 'true';
-  
+
   return {
     keyFilename,
     useApplicationDefault: useApplicationDefault || !keyFilename,
@@ -467,38 +523,44 @@ export function getCredentialsConfig(): {
  */
 export async function getFallbackAccessToken(): Promise<string> {
   const startTime = Date.now();
-  console.error(`[TIMING] getFallbackAccessToken: Starting fallback service account token acquisition`);
-  
+  console.error(
+    `[TIMING] getFallbackAccessToken: Starting fallback service account token acquisition`
+  );
+
   try {
     // Get server configuration to get the fallback service account
     const serverConfig = await getServerConfig();
     const fallbackAccount = serverConfig?.authentication?.fallbackServiceAccount;
-    
+
     if (!fallbackAccount) {
       throw new Error('No fallback service account configured in server configuration');
     }
-    
+
     // Store current account
     const currentAccount = execSync('gcloud config get-value account', { encoding: 'utf8' }).trim();
     console.error(`[DEBUG] getFallbackAccessToken: Current account: ${currentAccount}`);
-    
+
     // Switch to fallback service account
-    console.error(`[DEBUG] getFallbackAccessToken: Switching to fallback account: ${fallbackAccount}`);
+    console.error(
+      `[DEBUG] getFallbackAccessToken: Switching to fallback account: ${fallbackAccount}`
+    );
     execSync(`gcloud config set account ${fallbackAccount}`, { encoding: 'utf8' });
-    
+
     // Get token with fallback account
     console.error(`[TIMING] getFallbackAccessToken: Getting token with fallback account...`);
     const execStartTime = Date.now();
     const token = execSync('gcloud auth print-access-token', { encoding: 'utf8' }).trim();
     const execDuration = Date.now() - execStartTime;
-    
+
     // Restore original account
     console.error(`[DEBUG] getFallbackAccessToken: Restoring original account: ${currentAccount}`);
     execSync(`gcloud config set account ${currentAccount}`, { encoding: 'utf8' });
-    
+
     const totalDuration = Date.now() - startTime;
-    console.error(`[TIMING] getFallbackAccessToken: SUCCESS - token acquisition: ${execDuration}ms, total: ${totalDuration}ms`);
-    
+    console.error(
+      `[TIMING] getFallbackAccessToken: SUCCESS - token acquisition: ${execDuration}ms, total: ${totalDuration}ms`
+    );
+
     return token;
   } catch (err) {
     const totalDuration = Date.now() - startTime;
@@ -507,4 +569,3 @@ export async function getFallbackAccessToken(): Promise<string> {
     throw new Error(`Failed to get fallback access token: ${err}`);
   }
 }
-

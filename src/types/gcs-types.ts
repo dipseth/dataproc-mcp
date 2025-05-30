@@ -38,7 +38,7 @@ export type OutputFormat = 'csv' | 'json' | 'text' | 'unknown';
 /**
  * GCS operation error types (plain object, not enum)
  */
-export const GCSErrorType = {
+export const GCSErrorTypes = {
   NOT_FOUND: 'NOT_FOUND',
   PERMISSION_DENIED: 'PERMISSION_DENIED',
   INVALID_URI: 'INVALID_URI',
@@ -46,9 +46,9 @@ export const GCSErrorType = {
   VALIDATION_FAILED: 'VALIDATION_FAILED',
   TIMEOUT: 'TIMEOUT',
   INVALID_METADATA: 'INVALID_METADATA',
-  LIST_FAILED: 'LIST_FAILED'
+  LIST_FAILED: 'LIST_FAILED',
 } as const;
-export type GCSErrorType = typeof GCSErrorType[keyof typeof GCSErrorType];
+export type GCSErrorType = (typeof GCSErrorTypes)[keyof typeof GCSErrorTypes];
 
 /**
  * GCS operation error

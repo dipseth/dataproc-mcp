@@ -17,7 +17,7 @@ describe('Profile Parameter Integration', () => {
           description: 'GCP machine type',
           type: 'string',
           required: true,
-          defaultValue: 'n1-standard-4'
+          defaultValue: 'n1-standard-4',
         },
         {
           name: 'numWorkers',
@@ -27,38 +27,41 @@ describe('Profile Parameter Integration', () => {
           defaultValue: 2,
           validation: {
             min: 2,
-            max: 10
-          }
-        }
+            max: 10,
+          },
+        },
       ],
       environments: [
         {
           environment: 'production',
           parameters: {
             machineType: 'n1-standard-8',
-            numWorkers: 4
-          }
+            numWorkers: 4,
+          },
         },
         {
           environment: 'stable',
           parameters: {
             machineType: 'n1-standard-4',
-            numWorkers: 2
-          }
-        }
-      ]
+            numWorkers: 2,
+          },
+        },
+      ],
     };
 
     parameterManager = new DefaultParameterManager(paramConfig);
 
     // Set up ProfileManager with test config and parameter manager
-    profileManager = new ProfileManager({
-      rootConfigPath: './test/profiles',
-      defaultParameters: {
-        environment: 'production',
-        validateParameters: true
-      }
-    }, parameterManager);
+    profileManager = new ProfileManager(
+      {
+        rootConfigPath: './test/profiles',
+        defaultParameters: {
+          environment: 'production',
+          validateParameters: true,
+        },
+      },
+      parameterManager
+    );
   });
 
   describe('Parameter Resolution', () => {
@@ -71,8 +74,8 @@ describe('Profile Parameter Integration', () => {
         category: 'test',
         timesUsed: 0,
         parameters: {
-          numWorkers: 6
-        }
+          numWorkers: 6,
+        },
       };
 
       // Add profile manually since we're not reading from disk
@@ -81,7 +84,7 @@ describe('Profile Parameter Integration', () => {
       const params = profileManager.getProfileParameters('test/profile1');
       expect(params).to.deep.equal({
         machineType: 'n1-standard-8', // From production environment
-        numWorkers: 6 // From profile override
+        numWorkers: 6, // From profile override
       });
     });
 
@@ -93,8 +96,8 @@ describe('Profile Parameter Integration', () => {
         category: 'test',
         timesUsed: 0,
         parameters: {
-          numWorkers: 20 // Exceeds max value of 10
-        }
+          numWorkers: 20, // Exceeds max value of 10
+        },
       };
 
       // Add profile manually
@@ -111,7 +114,7 @@ describe('Profile Parameter Integration', () => {
         path: './test/profiles/test/profile2.yaml',
         category: 'test',
         timesUsed: 0,
-        parameters: {} // No overrides
+        parameters: {}, // No overrides
       };
 
       // Add profile manually
@@ -120,7 +123,7 @@ describe('Profile Parameter Integration', () => {
       const params = profileManager.getProfileParameters('test/profile2');
       expect(params).to.deep.equal({
         machineType: 'n1-standard-8',
-        numWorkers: 4
+        numWorkers: 4,
       });
     });
 
@@ -130,7 +133,7 @@ describe('Profile Parameter Integration', () => {
         name: 'test-cluster',
         path: './test/profiles/test/profile3.yaml',
         category: 'test',
-        timesUsed: 0
+        timesUsed: 0,
       };
 
       // Add profile manually
@@ -139,7 +142,7 @@ describe('Profile Parameter Integration', () => {
       const params = profileManager.getProfileParameters('test/profile3');
       expect(params).to.deep.equal({
         machineType: 'n1-standard-8',
-        numWorkers: 4
+        numWorkers: 4,
       });
     });
   });
@@ -147,13 +150,16 @@ describe('Profile Parameter Integration', () => {
   describe('Environment Switching', () => {
     it('should use correct environment parameters', async () => {
       // Set ProfileManager to use 'stable' environment
-      const stableProfileManager = new ProfileManager({
-        rootConfigPath: './test/profiles',
-        defaultParameters: {
-          environment: 'stable',
-          validateParameters: true
-        }
-      }, parameterManager);
+      const stableProfileManager = new ProfileManager(
+        {
+          rootConfigPath: './test/profiles',
+          defaultParameters: {
+            environment: 'stable',
+            validateParameters: true,
+          },
+        },
+        parameterManager
+      );
 
       const profileInfo = {
         id: 'test/profile4',
@@ -161,7 +167,7 @@ describe('Profile Parameter Integration', () => {
         path: './test/profiles/test/profile4.yaml',
         category: 'test',
         timesUsed: 0,
-        parameters: {}
+        parameters: {},
       };
 
       // Add profile manually
@@ -170,7 +176,7 @@ describe('Profile Parameter Integration', () => {
       const params = stableProfileManager.getProfileParameters('test/profile4');
       expect(params).to.deep.equal({
         machineType: 'n1-standard-4',
-        numWorkers: 2
+        numWorkers: 2,
       });
     });
   });

@@ -8,7 +8,13 @@ import { ClusterInfo, ClusterListResponse } from '../types/response.js';
 import { ProfileInfo } from '../types/profile.js';
 import { ProfileManager } from './profile.js';
 import { ClusterTracker } from './tracker.js';
-import { createCluster, createClusterFromYaml, deleteCluster, getCluster, listClusters } from './cluster.js';
+import {
+  createCluster,
+  createClusterFromYaml,
+  deleteCluster,
+  getCluster,
+  listClusters,
+} from './cluster.js';
 import { getDataprocConfigFromYaml } from '../config/yaml.js';
 
 /**
@@ -17,7 +23,7 @@ import { getDataprocConfigFromYaml } from '../config/yaml.js';
 export class ClusterManager {
   private profileManager: ProfileManager;
   private clusterTracker: ClusterTracker;
-  
+
   /**
    * Creates a new ClusterManager instance
    * @param profileManager Profile manager instance
@@ -27,7 +33,7 @@ export class ClusterManager {
     this.profileManager = profileManager;
     this.clusterTracker = clusterTracker;
   }
-  
+
   /**
    * Lists all available cluster profiles
    * @returns Array of profile information
@@ -35,7 +41,7 @@ export class ClusterManager {
   listProfiles(): ProfileInfo[] {
     return this.profileManager.getAllProfiles();
   }
-  
+
   /**
    * Gets a profile by ID
    * @param profileId Profile ID
@@ -44,7 +50,7 @@ export class ClusterManager {
   getProfile(profileId: string): ProfileInfo | undefined {
     return this.profileManager.getProfile(profileId);
   }
-  
+
   /**
    * Gets profiles by category
    * @param category Category to filter by
@@ -53,7 +59,7 @@ export class ClusterManager {
   getProfilesByCategory(category: string): ProfileInfo[] {
     return this.profileManager.getProfilesByCategory(category);
   }
-  
+
   /**
    * Creates a cluster from a profile
    * @param projectId GCP project ID
@@ -70,67 +76,58 @@ export class ClusterManager {
     clusterNameOverride?: string,
     configOverrides?: Partial<ClusterConfig>
   ): Promise<any> {
-    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] ClusterManager: Creating cluster from profile:', profileId);
-    
+    if (process.env.LOG_LEVEL === 'debug')
+      console.error('[DEBUG] ClusterManager: Creating cluster from profile:', profileId);
+
     // Get the profile
     const profile = this.profileManager.getProfile(profileId);
-    
+
     if (!profile) {
       throw new Error(`Profile not found: ${profileId}`);
     }
-    
+
     // Read the profile YAML
     const { clusterName, config, labels } = await getDataprocConfigFromYaml(profile.path);
-    
+
     if (process.env.LOG_LEVEL === 'debug') {
       console.error('[DEBUG] ClusterManager: Profile path:', profile.path);
       console.error('[DEBUG] ClusterManager: Loaded cluster name:', clusterName);
       console.error('[DEBUG] ClusterManager: Loaded config:', JSON.stringify(config, null, 2));
       console.error('[DEBUG] ClusterManager: Loaded labels:', JSON.stringify(labels, null, 2));
     }
-    
+
     // Apply overrides
     const finalClusterName = clusterNameOverride || clusterName;
     const finalConfig: any = configOverrides ? { ...config, ...configOverrides } : config;
-    
+
     // Add labels to the config so they get passed to the API
     if (labels) {
       finalConfig.labels = labels;
     }
-    
+
     if (process.env.LOG_LEVEL === 'debug') {
       console.error('[DEBUG] ClusterManager: Final cluster name:', finalClusterName);
       console.error('[DEBUG] ClusterManager: Final config:', JSON.stringify(finalConfig, null, 2));
     }
-    
+
     // Create the cluster
-    const response = await createCluster(
-      projectId,
-      region,
-      finalClusterName,
-      finalConfig
-    );
-    
+    const response = await createCluster(projectId, region, finalClusterName, finalConfig);
+
     // Update profile usage
     this.profileManager.updateProfileUsage(profileId);
-    
+
     // Track the cluster
     if (response && response.clusterUuid) {
-      this.clusterTracker.trackClusterFromProfile(
-        response.clusterUuid,
-        finalClusterName,
-        profile,
-        {
-          projectId,
-          region,
-          createdAt: new Date().toISOString(),
-        }
-      );
+      this.clusterTracker.trackClusterFromProfile(response.clusterUuid, finalClusterName, profile, {
+        projectId,
+        region,
+        createdAt: new Date().toISOString(),
+      });
     }
-    
+
     return response;
   }
-  
+
   /**
    * Creates a cluster from a YAML file and tracks it
    * @param projectId GCP project ID
@@ -145,26 +142,22 @@ export class ClusterManager {
     yamlPath: string,
     overrides?: Partial<ClusterConfig>
   ): Promise<any> {
-    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] ClusterManager: Creating cluster from YAML:', yamlPath);
-    
+    if (process.env.LOG_LEVEL === 'debug')
+      console.error('[DEBUG] ClusterManager: Creating cluster from YAML:', yamlPath);
+
     // Read the YAML configuration
     const { clusterName } = await getDataprocConfigFromYaml(yamlPath);
-    
+
     // Create the cluster
-    const response = await createClusterFromYaml(
-      projectId,
-      region,
-      yamlPath,
-      overrides
-    );
-    
+    const response = await createClusterFromYaml(projectId, region, yamlPath, overrides);
+
     // Track the cluster
     if (response && response.clusterUuid) {
       this.clusterTracker.trackCluster(
         response.clusterUuid,
         clusterName,
         undefined, // No profile ID
-        yamlPath,  // But we do have the YAML path
+        yamlPath, // But we do have the YAML path
         {
           projectId,
           region,
@@ -172,10 +165,10 @@ export class ClusterManager {
         }
       );
     }
-    
+
     return response;
   }
-  
+
   /**
    * Lists clusters with tracking information
    * @param projectId GCP project ID
@@ -192,24 +185,19 @@ export class ClusterManager {
     pageSize?: number,
     pageToken?: string
   ): Promise<ClusterListResponse> {
-    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] ClusterManager: Listing clusters with tracking info');
-    
+    if (process.env.LOG_LEVEL === 'debug')
+      console.error('[DEBUG] ClusterManager: Listing clusters with tracking info');
+
     // Get clusters from Dataproc
-    const response = await listClusters(
-      projectId,
-      region,
-      filter,
-      pageSize,
-      pageToken
-    );
-    
+    const response = await listClusters(projectId, region, filter, pageSize, pageToken);
+
     // Get all tracked clusters
     const trackedClusters = this.clusterTracker.getAllTrackedClusters();
-    
+
     // Add tracking information to the clusters
     const enhancedClusters: ClusterInfo[] = response.clusters.map((cluster: ClusterInfo) => {
-      const trackedCluster = trackedClusters.find(tc => tc.clusterId === cluster.clusterUuid);
-      
+      const trackedCluster = trackedClusters.find((tc) => tc.clusterId === cluster.clusterUuid);
+
       if (trackedCluster) {
         // Add tracking information to the cluster
         return {
@@ -229,16 +217,16 @@ export class ClusterManager {
           },
         };
       }
-      
+
       return cluster;
     });
-    
+
     return {
       clusters: enhancedClusters,
       nextPageToken: response.nextPageToken,
     };
   }
-  
+
   /**
    * Gets cluster details with tracking information
    * @param projectId GCP project ID
@@ -251,18 +239,19 @@ export class ClusterManager {
     region: string,
     clusterName: string
   ): Promise<any> {
-    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] ClusterManager: Getting cluster with tracking info:', clusterName);
-    
+    if (process.env.LOG_LEVEL === 'debug')
+      console.error('[DEBUG] ClusterManager: Getting cluster with tracking info:', clusterName);
+
     // Get cluster details from Dataproc
     const cluster = await getCluster(projectId, region, clusterName);
-    
+
     if (!cluster || !cluster.clusterUuid) {
       return cluster;
     }
-    
+
     // Get tracked cluster
     const trackedCluster = this.clusterTracker.getTrackedCluster(cluster.clusterUuid);
-    
+
     if (trackedCluster) {
       // Add tracking information to the cluster
       return {
@@ -282,10 +271,10 @@ export class ClusterManager {
         },
       };
     }
-    
+
     return cluster;
   }
-  
+
   /**
    * Lists all tracked clusters
    * @returns Array of tracked clusters
@@ -293,7 +282,7 @@ export class ClusterManager {
   listTrackedClusters() {
     return this.clusterTracker.getAllTrackedClusters();
   }
-  
+
   /**
    * Gets tracked clusters by profile
    * @param profileId Profile ID
@@ -302,7 +291,7 @@ export class ClusterManager {
   getTrackedClustersByProfile(profileId: string) {
     return this.clusterTracker.getTrackedClustersByProfile(profileId);
   }
-  
+
   /**
    * Deletes a cluster and removes it from tracking
    * @param projectId GCP project ID
@@ -310,30 +299,30 @@ export class ClusterManager {
    * @param clusterName Cluster name
    * @returns Operation details
    */
-  async deleteCluster(
-    projectId: string,
-    region: string,
-    clusterName: string
-  ): Promise<any> {
-    if (process.env.LOG_LEVEL === 'debug') console.error('[DEBUG] ClusterManager: Deleting cluster:', clusterName);
-    
+  async deleteCluster(projectId: string, region: string, clusterName: string): Promise<any> {
+    if (process.env.LOG_LEVEL === 'debug')
+      console.error('[DEBUG] ClusterManager: Deleting cluster:', clusterName);
+
     try {
       // Get cluster details first to get the UUID
       const cluster = await getCluster(projectId, region, clusterName);
-      
+
       // Delete the cluster
       const response = await deleteCluster(projectId, region, clusterName);
-      
+
       // If the cluster has a UUID and is tracked, untrack it
       if (cluster && cluster.clusterUuid) {
         const trackedCluster = this.clusterTracker.getTrackedCluster(cluster.clusterUuid);
-        
+
         if (trackedCluster) {
           this.clusterTracker.untrackCluster(cluster.clusterUuid);
-          if (process.env.LOG_LEVEL === 'debug') console.error(`[DEBUG] ClusterManager: Untracked cluster ${clusterName} (${cluster.clusterUuid})`);
+          if (process.env.LOG_LEVEL === 'debug')
+            console.error(
+              `[DEBUG] ClusterManager: Untracked cluster ${clusterName} (${cluster.clusterUuid})`
+            );
         }
       }
-      
+
       return response;
     } catch (error) {
       console.error('[DEBUG] ClusterManager: Error deleting cluster:', error);

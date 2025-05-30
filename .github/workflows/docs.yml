@@ -1,0 +1,245 @@
+name: Documentation
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'docs/**'
+      - 'src/**/*.ts'
+      - 'scripts/generate-docs.js'
+      - 'README.md'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'docs/**'
+      - 'src/**/*.ts'
+      - 'scripts/generate-docs.js'
+      - 'README.md'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  # Job 1: Generate and validate documentation
+  generate-docs:
+    name: Generate Documentation
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Generate documentation
+        run: npm run docs:generate
+
+      - name: Validate examples
+        run: npm run validate:examples
+
+      - name: Test documentation links
+        run: npm run docs:test-links
+        continue-on-error: true
+
+      - name: Upload documentation artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: generated-docs
+          path: docs/generated/
+          retention-days: 30
+
+      - name: Commit updated documentation
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add docs/generated/ || true
+          if git diff --staged --quiet; then
+            echo "No documentation changes to commit"
+          else
+            git commit -m "docs: update generated documentation [skip ci]"
+            git push
+          fi
+
+  # Job 2: Deploy to GitHub Pages (only on main branch)
+  deploy-pages:
+    name: Deploy to GitHub Pages
+    runs-on: ubuntu-latest
+    needs: generate-docs
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Generate documentation
+        run: npm run docs:generate
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v3
+
+      - name: Create Pages directory structure
+        run: |
+          mkdir -p _site
+          cp -r docs/generated/* _site/ 2>/dev/null || true
+          cp README.md _site/index.md 2>/dev/null || true
+          
+          # Create a simple index.html if none exists
+          if [ ! -f _site/index.html ]; then
+            cat > _site/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>Dataproc MCP Server Documentation</title>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <style>
+              body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 40px; }
+              .container { max-width: 800px; margin: 0 auto; }
+              h1 { color: #1a73e8; }
+              .nav { margin: 20px 0; }
+              .nav a { margin-right: 20px; text-decoration: none; color: #1a73e8; }
+              .nav a:hover { text-decoration: underline; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <h1>🔧 Dataproc MCP Server Documentation</h1>
+              <p>Production-ready Model Context Protocol server for Google Cloud Dataproc operations.</p>
+              
+              <div class="nav">
+                <a href="api-reference.html">📚 API Reference</a>
+                <a href="quick-start.html">🚀 Quick Start</a>
+                <a href="configuration-examples.html">⚙️ Configuration</a>
+                <a href="security-guide.html">🔐 Security Guide</a>
+              </div>
+              
+              <h2>Features</h2>
+              <ul>
+                <li>🎯 <strong>Intelligent Defaults</strong> - 60-80% fewer parameters required</li>
+                <li>🔐 <strong>Enterprise Security</strong> - Comprehensive validation and audit logging</li>
+                <li>📊 <strong>Rich Documentation</strong> - Interactive examples and guides</li>
+                <li>🚀 <strong>Production Ready</strong> - CI/CD, testing, and monitoring</li>
+              </ul>
+              
+              <h2>Quick Links</h2>
+              <ul>
+                <li><a href="https://github.com/dipseth/dataproc-mcp">GitHub Repository</a></li>
+                <li><a href="https://www.npmjs.com/package/@dataproc/mcp-server">NPM Package</a></li>
+                <li><a href="https://github.com/dipseth/dataproc-mcp/issues">Report Issues</a></li>
+              </ul>
+            </div>
+          </body>
+          </html>
+          EOF
+          fi
+
+      - name: Upload to GitHub Pages
+        uses: actions/upload-pages-artifact@v2
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v2
+
+  # Job 3: Documentation quality check
+  quality-check:
+    name: Documentation Quality Check
+    runs-on: ubuntu-latest
+    needs: generate-docs
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download generated docs
+        uses: actions/download-artifact@v3
+        with:
+          name: generated-docs
+          path: docs/generated/
+
+      - name: Check documentation completeness
+        run: |
+          echo "📋 Checking documentation completeness..."
+          
+          # Check for required documentation files
+          required_files=(
+            "docs/API_REFERENCE.md"
+            "docs/QUICK_START.md"
+            "docs/CONFIGURATION_EXAMPLES.md"
+            "docs/SECURITY_GUIDE.md"
+            "README.md"
+          )
+          
+          missing_files=()
+          for file in "${required_files[@]}"; do
+            if [ ! -f "$file" ]; then
+              missing_files+=("$file")
+            fi
+          done
+          
+          if [ ${#missing_files[@]} -gt 0 ]; then
+            echo "❌ Missing required documentation files:"
+            printf '%s\n' "${missing_files[@]}"
+            exit 1
+          else
+            echo "✅ All required documentation files present"
+          fi
+
+      - name: Check for broken internal links
+        run: npm run docs:test-links
+
+      - name: Validate documentation examples
+        run: npm run validate:examples
+
+      - name: Check documentation freshness
+        run: |
+          echo "📅 Checking documentation freshness..."
+          
+          # Check if generated docs are up to date
+          npm run docs:generate
+          
+          if git diff --quiet docs/generated/; then
+            echo "✅ Generated documentation is up to date"
+          else
+            echo "⚠️ Generated documentation may be outdated"
+            echo "Consider running 'npm run docs:generate' and committing changes"
+          fi

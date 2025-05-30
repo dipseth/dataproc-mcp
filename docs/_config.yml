@@ -1,0 +1,142 @@
+# Jekyll configuration for GitHub Pages
+title: Dataproc MCP Server
+description: Google Cloud Dataproc MCP Server with intelligent parameter injection and enterprise-grade features
+url: https://dipseth.github.io
+baseurl: /dataproc-mcp
+
+# Theme
+theme: minima
+remote_theme: pages-themes/minimal@v0.2.0
+
+# Plugins
+plugins:
+  - jekyll-feed
+  - jekyll-sitemap
+  - jekyll-seo-tag
+  - jekyll-optional-front-matter
+  - jekyll-readme-index
+  - jekyll-default-layout
+  - jekyll-titles-from-headings
+
+# Markdown processing
+markdown: kramdown
+highlighter: rouge
+kramdown:
+  input: GFM
+  syntax_highlighter: rouge
+
+# Collections
+collections:
+  guides:
+    output: true
+    permalink: /:collection/:name/
+  examples:
+    output: true
+    permalink: /:collection/:name/
+
+# Navigation
+header_pages:
+  - quick-start.md
+  - api-reference.md
+  - configuration-examples.md
+  - guides/index.md
+  - changelog.md
+
+# Social links
+github_username: dipseth
+twitter_username: dataproc_mcp
+
+# Google Analytics (optional)
+# google_analytics: UA-XXXXXXXX-X
+
+# SEO settings
+author:
+  name: dipseth
+  email: your-email@example.com
+
+social:
+  name: Dataproc MCP Server
+  links:
+    - https://github.com/dipseth/dataproc-mcp
+    - https://www.npmjs.com/package/@dataproc/mcp-server
+
+# Build settings
+safe: true
+incremental: false
+gist:
+  noscript: false
+
+# Exclude from processing
+exclude:
+  - .sass-cache/
+  - .jekyll-cache/
+  - gemfiles/
+  - Gemfile
+  - Gemfile.lock
+  - node_modules/
+  - vendor/bundle/
+  - vendor/cache/
+  - vendor/gems/
+  - vendor/ruby/
+  - _site/
+  - "*.gemspec"
+  - "*.gem"
+
+# Include files
+include:
+  - _pages
+
+# Defaults
+defaults:
+  - scope:
+      path: ""
+      type: "posts"
+    values:
+      layout: "post"
+      author: "dipseth"
+  - scope:
+      path: ""
+      type: "pages"
+    values:
+      layout: "page"
+  - scope:
+      path: ""
+      type: "guides"
+    values:
+      layout: "guide"
+  - scope:
+      path: ""
+      type: "examples"
+    values:
+      layout: "example"
+
+# Custom variables
+project:
+  name: Dataproc MCP Server
+  version: 1.0.0
+  npm_package: "@dataproc/mcp-server"
+  github_repo: "dipseth/dataproc-mcp"
+  license: MIT
+  node_version: ">=18.0.0"
+
+# Footer links
+footer_links:
+  - title: GitHub
+    url: https://github.com/dipseth/dataproc-mcp
+    icon: github
+  - title: NPM
+    url: https://www.npmjs.com/package/@dataproc/mcp-server
+    icon: npm
+  - title: Issues
+    url: https://github.com/dipseth/dataproc-mcp/issues
+    icon: bug
+  - title: Documentation
+    url: https://dipseth.github.io/dataproc-mcp
+    icon: book
+
+# Custom CSS
+sass:
+  style: compressed
+
+# Timezone
+timezone: America/Chicago
