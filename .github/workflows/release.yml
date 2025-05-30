@@ -189,9 +189,9 @@ jobs:
             echo "🎉 **Successfully released version ${{ steps.release.outputs.version }}!**" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "### 📦 Package Information" >> $GITHUB_STEP_SUMMARY
-            echo "- **NPM Package**: [@dataproc/mcp-server@${{ steps.release.outputs.version }}](https://www.npmjs.com/package/@dataproc/mcp-server/v/${{ steps.release.outputs.version }})" >> $GITHUB_STEP_SUMMARY
+            echo "- **NPM Package**: [@dipseth/dataproc-mcp-server@${{ steps.release.outputs.version }}](https://www.npmjs.com/package/@dipseth/dataproc-mcp-server/v/${{ steps.release.outputs.version }})" >> $GITHUB_STEP_SUMMARY
             echo "- **GitHub Release**: [v${{ steps.release.outputs.version }}](https://github.com/${{ github.repository }}/releases/tag/v${{ steps.release.outputs.version }})" >> $GITHUB_STEP_SUMMARY
-            echo "- **Installation**: \`npm install @dataproc/mcp-server@${{ steps.release.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+            echo "- **Installation**: \`npm install @dipseth/dataproc-mcp-server@${{ steps.release.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
           else
             echo "ℹ️ **No release created** - No releasable changes detected." >> $GITHUB_STEP_SUMMARY
           fi
@@ -224,8 +224,8 @@ jobs:
           
           # Check if package is available
           PACKAGE_VERSION="${{ needs.semantic-release.outputs.version }}"
-          if npm view @dataproc/mcp-server@$PACKAGE_VERSION version; then
-            echo "✅ Package @dataproc/mcp-server@$PACKAGE_VERSION is available on NPM"
+          if npm view @dipseth/dataproc-mcp-server@$PACKAGE_VERSION version; then
+            echo "✅ Package @dipseth/dataproc-mcp-server@$PACKAGE_VERSION is available on NPM"
           else
             echo "❌ Package not found on NPM registry"
             exit 1
@@ -239,12 +239,12 @@ jobs:
           mkdir -p /tmp/test-install
           cd /tmp/test-install
           npm init -y
-          npm install @dataproc/mcp-server@${{ needs.semantic-release.outputs.version }}
+          npm install @dipseth/dataproc-mcp-server@${{ needs.semantic-release.outputs.version }}
           
           # Verify installation
-          if [ -f "node_modules/@dataproc/mcp-server/package.json" ]; then
+          if [ -f "node_modules/@dipseth/dataproc-mcp-server/package.json" ]; then
             echo "✅ Package installation successful"
-            INSTALLED_VERSION=$(node -p "require('./node_modules/@dataproc/mcp-server/package.json').version")
+            INSTALLED_VERSION=$(node -p "require('./node_modules/@dipseth/dataproc-mcp-server/package.json').version")
             echo "📦 Installed version: $INSTALLED_VERSION"
           else
             echo "❌ Package installation failed"
@@ -280,9 +280,9 @@ jobs:
           echo "## 🎉 Release v${{ needs.semantic-release.outputs.version }} Successfully Published!" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 📦 Package Details" >> $GITHUB_STEP_SUMMARY
-          echo "- **NPM Package**: [@dataproc/mcp-server@${{ needs.semantic-release.outputs.version }}](https://www.npmjs.com/package/@dataproc/mcp-server)" >> $GITHUB_STEP_SUMMARY
+          echo "- **NPM Package**: [@dipseth/dataproc-mcp-server@${{ needs.semantic-release.outputs.version }}](https://www.npmjs.com/package/@dipseth/dataproc-mcp-server)" >> $GITHUB_STEP_SUMMARY
           echo "- **GitHub Release**: [v${{ needs.semantic-release.outputs.version }}](https://github.com/${{ github.repository }}/releases/tag/v${{ needs.semantic-release.outputs.version }})" >> $GITHUB_STEP_SUMMARY
-          echo "- **Installation**: \`npm install @dataproc/mcp-server@latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Installation**: \`npm install @dipseth/dataproc-mcp-server@latest\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 🚀 Next Steps" >> $GITHUB_STEP_SUMMARY
           echo "1. Update documentation if needed" >> $GITHUB_STEP_SUMMARY
