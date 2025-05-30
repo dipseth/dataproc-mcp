@@ -29,7 +29,6 @@
   ],
   "sort": ["source-order"],
   "kindSortOrder": [
-    "Document",
     "Project",
     "Module",
     "Namespace",
