@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- semantic-release-changelog -->
 
+## [1.0.1](https://github.com/dipseth/dataproc-mcp/compare/v1.0.0...v1.0.1) (2025-05-30)
+
+
+### 🐛 Bug Fixes
+
+* resolve ES module build script issue and enhance CI/CD mode ([387fe7c](https://github.com/dipseth/dataproc-mcp/commit/387fe7cc874c593077231eb91fc89199e3e4c3de))
+
 ## 1.0.0 (2025-05-30)
 
 
