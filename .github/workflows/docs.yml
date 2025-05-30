@@ -54,7 +54,7 @@ jobs:
         continue-on-error: true
 
       - name: Upload documentation artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: generated-docs
           path: docs/generated/
@@ -80,9 +80,9 @@ jobs:
     needs: generate-docs
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
     
     steps:
       - name: Checkout code
@@ -104,7 +104,7 @@ jobs:
         run: npm run docs:generate
 
       - name: Setup Pages
-        uses: actions/configure-pages@v3
+        uses: actions/configure-pages@v4
 
       - name: Create Pages directory structure
         run: |
@@ -191,7 +191,7 @@ jobs:
         run: npm ci
 
       - name: Download generated docs
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: generated-docs
           path: docs/generated/
