@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- semantic-release-changelog -->
 
+## [1.1.0](https://github.com/dipseth/dataproc-mcp/compare/v1.0.2...v1.1.0) (2025-05-30)
+
+
+### 🚀 Features
+
+* update MCP Client references to Roo and enhance documentation for better integration ([44f5e8e](https://github.com/dipseth/dataproc-mcp/commit/44f5e8ea0cfb537a1884c5b9d23cb4089bc29294))
+
 ## [1.0.2](https://github.com/dipseth/dataproc-mcp/compare/v1.0.1...v1.0.2) (2025-05-30)
 
 
