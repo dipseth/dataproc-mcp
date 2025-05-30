@@ -1,0 +1,51 @@
+{
+  "defaultEnvironment": "production",
+  "parameters": [
+    {
+      "name": "projectId",
+      "type": "string",
+      "required": true,
+      "description": "Google Cloud Project ID"
+    },
+    {
+      "name": "region",
+      "type": "string",
+      "required": true,
+      "defaultValue": "us-central1",
+      "description": "Google Cloud region for Dataproc operations"
+    },
+    {
+      "name": "zone",
+      "type": "string",
+      "required": false,
+      "defaultValue": "us-central1-a",
+      "description": "Google Cloud zone for Dataproc operations"
+    }
+  ],
+  "environments": [
+    {
+      "environment": "development",
+      "parameters": {
+        "projectId": "your-dev-project-id",
+        "region": "us-west1",
+        "zone": "us-west1-a"
+      }
+    },
+    {
+      "environment": "staging",
+      "parameters": {
+        "projectId": "your-staging-project-id",
+        "region": "us-central1",
+        "zone": "us-central1-b"
+      }
+    },
+    {
+      "environment": "production",
+      "parameters": {
+        "projectId": "your-production-project-id",
+        "region": "us-central1",
+        "zone": "us-central1-a"
+      }
+    }
+  ]
+}

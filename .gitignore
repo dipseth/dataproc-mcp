@@ -1,26 +1,105 @@
+# Dependencies
 node_modules/
+
+# Build output
 build/
+dist/
+
+# Logs
 *.log
+logs/
+
+# Environment files
 .env*
+
+# Output and temporary files
 *.csv
 output/*
-config/server.json
-test-formatted-output.js
-old-tests/AUTHENTICATION_ANALYSIS_RESULTS.md
-old-tests/AUTHENTICATION_CONSOLIDATION_SUMMARY.md
-old-tests/AUTHENTICATION_FIX_PLAN.md
-old-tests/AUTHENTICATION_SOLUTION.md
-old-tests/AUTHENTICATION_SUCCESS_REPORT.md
-old-tests/AUTHENTICATION_TESTING_PLAN.md
-old-tests/ENHANCED_AUTHENTICATION_CONFIG.md
-old-tests/fix-explanation.md
-old-tests/MCP_INSPECTOR_TESTING_RESULTS.md
-old-tests/mcp_settings_http.json
-old-tests/mcp_settings.json.example
-old-tests/test-results.json
-config/server.json
-.roo/mcp.json
-.rooignore
-config/server.json
-old-tests/*.md
+state/dataproc-state.json
 
+# Configuration files (contain sensitive data)
+config/server.json
+config/default-params.json
+
+# Test files and results
+test-formatted-output.js
+old-tests/
+.nyc_output/
+coverage/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Roo specific
+.roo/
+.rooignore
+
+# NPM
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# parcel-bundler cache (https://parceljs.org/)
+.cache
+.parcel-cache
+
+# next.js build output
+.next
+
+# nuxt.js build output
+.nuxt
+
+# vuepress build output
+.vuepress/dist
+
+# Serverless directories
+.serverless/
+
+# FuseBox cache
+.fusebox/
+
+# DynamoDB Local files
+.dynamodb/
+
+# TernJS port file
+.tern-port

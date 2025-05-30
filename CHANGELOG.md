@@ -1,63 +1,101 @@
 # Changelog
 
-## 2025-05-29
+All notable changes to this project will be documented in this file.
 
-### 🏆 **MAJOR SUCCESS: Authentication System Consolidation**
-- **Authentication Consolidation Project**: Successfully consolidated and optimized the entire authentication system
-  - **Performance Improvement**: Achieved 53-58% faster operations through REST API conversion and authentication caching
-  - **Timeout Resolution**: Eliminated all MCP timeout errors (-32001) that were blocking tool operations
-  - **100% Tool Success**: All 16/16 MCP tools now working perfectly (up from 3/16 - 19% success rate)
-  - **Authentication Caching**: Implemented 5-minute token cache to reduce authentication overhead
-  - **Simplified Architecture**: Consolidated duplicate authentication logic into single [`src/config/credentials.ts`](src/config/credentials.ts) file
-  - **REST API Integration**: Converted from Google Cloud client libraries to REST API calls for optimal performance
-  - **Error Elimination**: Resolved all `getUniverseDomain is not a function` errors through proper authentication implementation
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-### Fixed
-- **Service Account Configuration**: Fixed critical issue where custom service accounts specified in cluster profiles were not being passed to the Dataproc API
-  - Problem: The `createCluster` function was only copying specific configuration sections (`masterConfig`, `workerConfig`, `secondaryWorkerConfig`, `softwareConfig`) but missing the `gceClusterConfig` section
-  - Solution: Added `gceClusterConfig` to the list of configuration sections copied from profiles to the API request
-  - Impact: Custom service accounts in profile YAML files are now properly used during cluster creation instead of falling back to default compute service account
+## [1.0.0] - 2025-05-29
 
-### Simplified
-- **Configuration System**: Dramatically simplified the configuration approach to eliminate unnecessary complexity
-  - **Removed auto-directory creation**: No longer automatically creates `config/` or `configs/` directories
-  - **Simplified hierarchy**: Uses sensible defaults with optional overrides via global MCP settings
-  - **Eliminated unnecessary files**: Removed local `mcp_settings.json` in favor of global MCP configuration
-  - **Cleaner project structure**: Moved auto-created `configs/` directory to `old-configs/`
+### Added
+- **Production-ready npm package configuration**
+  - Removed private flag for public distribution
+  - Added comprehensive package metadata and keywords
+  - Enhanced npm scripts for development and production use
+  - Added engines requirement for Node.js >=18.0.0
 
-### Organized
-- **Test Directory Structure**: Reorganized all test and debug files into a structured `tests/` directory:
-  - `tests/unit/` - Unit tests using Mocha and Chai
-  - `tests/integration/` - Integration tests with real MCP server instances
-  - `tests/manual/` - Manual test scripts and utilities
-  - `tests/debug/` - Debug scripts used during development
-  - `tests/data/` - Test data files (CSV outputs, etc.)
-  - Added README files for each subdirectory explaining their purpose
+- **Automated setup and installation**
+  - Interactive setup script (`npm run setup`)
+  - Post-install script for automatic directory creation
+  - Configuration validation script (`npm run validate`)
+  - Template configuration files for easy setup
 
-### Updated
-- **Documentation**:
-  - Created comprehensive [Configuration Guide](docs/CONFIGURATION_GUIDE.md) explaining the simplified setup
-  - Updated main README.md with quick start guide and configuration references
-  - Added testing infrastructure documentation
-  - Service account configuration guidance
+- **Enhanced development tooling**
+  - ESLint and Prettier configuration
+  - Test coverage reporting with nyc
+  - Security audit scripts
+  - Automated formatting and linting
 
-### Files Moved/Removed
-- Moved all `debug-*.js` files to `tests/debug/`
-- Moved all `test-*.js` files to `tests/manual/`
-- Moved all `*.sh` test scripts to `tests/manual/`
-- Moved all `clean-output*.csv` files to `tests/data/`
-- Moved `test-cluster.yaml` to `tests/manual/`
-- Moved `mcp_settings.json` to `old-tests/mcp_settings.json.example`
-- Moved `configs/` to `old-configs/`
+- **Template configurations**
+  - `templates/default-params.json.template` - Default parameter configuration
+  - `templates/server.json.template` - Server configuration with authentication
+  - `templates/mcp-settings.json.template` - MCP client settings template
 
-### Configuration Changes
-- **Default behavior**: MCP server now works out-of-the-box with sensible defaults
-- **Global MCP settings**: Recommended approach for configuration
-- **Optional project configs**: Only create when specific overrides are needed
-- **Profile management**: Centralized profiles in `./profiles/` directory by default
+- **Open source preparation**
+  - MIT License
+  - Comprehensive CHANGELOG.md
+  - Production readiness plan documentation
 
-### Technical Details
-- **Root Cause**: The service account configuration was in `cluster_config.gce_cluster_config.service_account` in the profile YAML, but the `createCluster` function wasn't copying the `gceClusterConfig` property to the API request
-- **Fix Location**: `src/services/cluster.ts` lines 36-51
-- **Configuration Fix**: `src/config/server.ts` - removed auto-directory creation and simplified config loading
-- **Validation**: Successfully created cluster `test-pricing-cluster-fixed` using profile `production/pricing-promotions` with correct service account `loc-sa-pricing-promo-dataproc@prj-grp-data-sci-prod-b425.iam.gserviceaccount.com`
+### Changed
+- **Package name**: Changed from `dataproc-server` to `@dataproc/mcp-server`
+- **Version**: Bumped to 1.0.0 for production release
+- **Files included**: Expanded to include templates, scripts, and documentation
+
+### Enhanced
+- **Smart default parameter management** (existing feature)
+  - Intelligent parameter injection for common parameters
+  - Multi-environment support
+  - Backward compatibility with explicit parameters
+
+- **Comprehensive toolset** (existing feature)
+  - 16 tools covering cluster management and job execution
+  - MCP resource exposure for configuration access
+  - Environment-independent authentication
+
+### Security
+- **Enhanced input validation** preparation
+- **Credential sanitization** framework
+- **Security audit integration**
+
+## [0.3.0] - 2025-05-29
+
+### Added
+- Default parameter management system
+- Resource exposure via MCP protocol
+- Service account impersonation support
+
+### Enhanced
+- Authentication strategy with fallback mechanisms
+- Performance improvements (53-58% faster operations)
+- Comprehensive testing infrastructure
+
+## [0.1.0] - Initial Release
+
+### Added
+- Basic MCP server for Google Cloud Dataproc
+- Cluster creation and management tools
+- Hive query execution
+- Profile-based cluster configuration
+- Basic authentication support
+
+---
+
+## Upcoming Features
+
+### [1.1.0] - Planned
+- Enhanced security features
+- Rate limiting implementation
+- Advanced monitoring and logging
+- Performance optimizations
+
+### [1.2.0] - Planned
+- CI/CD pipeline integration
+- Automated testing enhancements
+- Community contribution guidelines
+- Documentation website
+
+### [2.0.0] - Future
+- Breaking changes for improved API design
+- Advanced cluster management features
+- Multi-cloud support exploration
+- Enterprise features

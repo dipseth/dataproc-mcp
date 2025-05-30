@@ -1,22 +1,66 @@
 {
-  "name": "dataproc-server",
-  "version": "0.1.0",
-  "description": "A Model Context Protocol server",
+  "name": "@dataproc/mcp-server",
+  "version": "1.0.0",
+  "description": "A production-ready Model Context Protocol server for Google Cloud Dataproc operations with intelligent defaults and comprehensive tooling",
   "private": true,
   "type": "module",
+  "keywords": [
+    "mcp",
+    "dataproc",
+    "google-cloud",
+    "bigdata",
+    "hive",
+    "spark",
+    "model-context-protocol",
+    "gcp",
+    "cluster-management"
+  ],
+  "author": "dipseth",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:dipseth/dataproc-mcp.git"
+  },
+  "homepage": "https://github.com/dipseth/dataproc-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/dipseth/dataproc-mcp/issues"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "bin": {
     "dataproc-server": "./build/index.js"
   },
   "files": [
-    "build"
+    "build",
+    "profiles",
+    "config",
+    "docs",
+    "templates",
+    "scripts",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
   ],
   "scripts": {
     "build": "tsc && node -e \"require('fs').chmodSync('build/index.js', '755')\"",
     "prepare": "npm run build",
     "watch": "tsc --watch",
+    "start": "node build/index.js",
+    "stop": "node scripts/stop-server.js",
+    "restart": "npm run stop && npm run start",
+    "setup": "node scripts/setup.js",
+    "validate": "node scripts/validate-config.js",
     "inspector": "npx @modelcontextprotocol/inspector build/index.js",
     "test": "mocha --require ts-node/register 'tests/**/*.ts'",
-    "test:integration": "mocha --require ts-node/register 'tests/integration/**/*.ts' --timeout 30000"
+    "test:integration": "mocha --require ts-node/register 'tests/integration/**/*.ts' --timeout 30000",
+    "test:coverage": "nyc npm test",
+    "lint": "eslint src/**/*.ts",
+    "lint:fix": "eslint src/**/*.ts --fix",
+    "format": "prettier --write src/**/*.ts",
+    "security:audit": "npm audit",
+    "security:check": "npm audit --audit-level moderate",
+    "postinstall": "node scripts/postinstall.js"
   },
   "dependencies": {
     "@google-cloud/dataproc": "^6.0.1",
@@ -34,8 +78,15 @@
     "@types/js-yaml": "^4.0.9",
     "@types/mocha": "^10.0.10",
     "@types/node": "^20.17.47",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
     "chai": "^5.2.0",
+    "eslint": "^8.0.0",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-prettier": "^5.0.0",
     "mocha": "^11.2.2",
+    "nyc": "^15.1.0",
+    "prettier": "^3.0.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3"
   }

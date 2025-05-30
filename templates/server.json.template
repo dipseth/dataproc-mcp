@@ -1,0 +1,30 @@
+{
+  "authentication": {
+    "impersonateServiceAccount": "your-service-account@your-project.iam.gserviceaccount.com",
+    "fallbackKeyPath": "/absolute/path/to/your/source-service-account-key.json",
+    "preferImpersonation": true,
+    "useApplicationDefaultFallback": false
+  },
+  "profileManager": {
+    "rootConfigPath": "./profiles",
+    "scanInterval": 300000,
+    "enableAutoReload": true
+  },
+  "clusterTracker": {
+    "stateFilePath": "./state/dataproc-state.json",
+    "saveInterval": 60000,
+    "enablePersistence": true
+  },
+  "logging": {
+    "level": "info",
+    "enableConsole": true,
+    "enableFile": false,
+    "filePath": "./logs/dataproc-server.log"
+  },
+  "security": {
+    "enableRateLimiting": true,
+    "maxRequestsPerMinute": 100,
+    "enableInputValidation": true,
+    "sanitizeCredentials": true
+  }
+}
