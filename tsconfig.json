@@ -11,10 +11,7 @@
     "forceConsistentCasingInFileNames": true,
     "allowJs": true,
     "resolveJsonModule": true,
-    "allowImportingTsExtensions": false,
-    "types": [
-      "node"
-    ]
+    "allowImportingTsExtensions": false
   },
   "include": [
     "src/**/*"

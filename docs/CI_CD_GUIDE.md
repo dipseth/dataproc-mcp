@@ -168,6 +168,36 @@ npm run ci-cd:validate
 - **Solution**: Updated dependencies and added compatibility warnings
 - **Note**: ESLint warnings are non-blocking but should be addressed
 
+#### ✅ TypeScript Configuration Issue (FINAL FIX)
+- **Problem**: `tsconfig.json` included explicit types that weren't available in fresh CI installs
+- **Root Cause**: CI environment differences - local had cached types, CI had fresh install
+- **Solution**: Removed explicit `types` array entirely, letting TypeScript use default behavior
+- **Why Local Missed It**: Local `node_modules` had cached type definitions that CI didn't have
+- **Prevention**: Test with fresh installs: `rm -rf node_modules package-lock.json && npm install && npm run build`
+- **Status**: ✅ RESOLVED - CI now matches local environment exactly
+
+### Environment Parity Testing
+
+**Critical for preventing CI failures that local testing misses:**
+
+```bash
+# Clean install (matches CI behavior exactly)
+rm -rf node_modules package-lock.json
+npm install
+
+# Or use npm ci (requires existing lock file)
+npm ci
+
+# Test in clean environment
+npm run pre-push
+```
+
+**Why Environment Differences Occur:**
+- Local `node_modules` may have cached/different versions
+- CI always starts with fresh installs
+- TypeScript type definitions can vary between installs
+- Development vs production dependency differences
+
 ### Common Issues & Solutions
 
 #### Build Failures
@@ -175,7 +205,7 @@ npm run ci-cd:validate
 # 1. Check dependency sync
 npm install --package-lock-only
 
-# 2. Clear cache and reinstall
+# 2. Clear cache and reinstall (matches CI environment)
 rm -rf node_modules package-lock.json
 npm install
 
