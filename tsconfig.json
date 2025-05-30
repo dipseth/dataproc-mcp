@@ -11,6 +11,7 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
+    "noImplicitAny": false,
     "forceConsistentCasingInFileNames": true,
     "allowJs": true,
     "resolveJsonModule": true,

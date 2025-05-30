@@ -130,7 +130,9 @@
     "@types/chai": "^5.2.2",
     "@types/jest": "^29.5.5",
     "@types/js-yaml": "^4.0.9",
+    "@types/long": "^5.0.0",
     "@types/mocha": "^10.0.10",
+    "@types/node": "^20.17.47",
     "@typescript-eslint/eslint-plugin": "^6.21.0",
     "@typescript-eslint/parser": "^6.21.0",
     "chai": "^5.2.0",
@@ -146,7 +148,6 @@
     "ts-jest": "^29.1.1",
     "ts-node": "^10.9.2",
     "typedoc": "^0.25.4",
-    "typescript": "^5.3.3",
-    "@types/node": "^20.17.47"
+    "typescript": "^5.3.3"
   }
 }
