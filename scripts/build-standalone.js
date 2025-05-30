@@ -5,8 +5,12 @@
  * Creates a self-contained distribution with all necessary files
  */
 
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 function createStandaloneDistribution() {
   console.log('🔨 Building standalone distribution...');
@@ -92,8 +96,12 @@ function createStartupScript(distDir) {
  * This script starts the Dataproc MCP Server with proper configuration
  */
 
-const path = require('path');
-const { spawn } = require('child_process');
+import path from 'path';
+import { spawn } from 'child_process';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const serverPath = path.join(__dirname, 'build', 'index.js');
 
@@ -184,8 +192,9 @@ function listDirectoryContents(dir, prefix = '') {
   });
 }
 
-if (require.main === module) {
+// Check if this script is being run directly
+if (import.meta.url === `file://${process.argv[1]}`) {
   createStandaloneDistribution();
 }
 
-module.exports = { createStandaloneDistribution };
+export { createStandaloneDistribution };
