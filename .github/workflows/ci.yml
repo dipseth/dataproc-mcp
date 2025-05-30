@@ -100,6 +100,7 @@ jobs:
           echo "✅ TypeScript type checking passed"
 
       - name: ✅ Unit Tests
+        timeout-minutes: 5
         run: |
           npm run test:unit:fast
           echo "✅ Unit tests completed successfully"
