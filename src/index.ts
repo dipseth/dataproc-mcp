@@ -45,6 +45,11 @@ import {
 } from './validation/schemas.js';
 import * as fs from 'fs';
 import * as path from 'path';
+import { createRequire } from 'module';
+
+// Import package.json for version info
+const require = createRequire(import.meta.url);
+const packageJson = require('../package.json');
 
 // Import our services
 import {
@@ -107,7 +112,7 @@ try {
 const server = new Server(
   {
     name: 'dataproc-server',
-    version: '0.3.0',
+    version: packageJson.version,
   },
   {
     capabilities: {

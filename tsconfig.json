@@ -5,6 +5,9 @@
     "moduleResolution": "Node",
     "outDir": "./build",
     "rootDir": "./src",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -12,6 +15,9 @@
     "allowJs": true,
     "resolveJsonModule": true,
     "allowImportingTsExtensions": false,
+    "typeRoots": [
+      "./node_modules/@types"
+    ],
     "types": [
       "node"
     ]
