@@ -11,10 +11,11 @@ Add this configuration to your Roo MCP settings:
   "mcpServers": {
     "dataproc": {
       "command": "npx",
-      "args": ["@dipseth/dataproc-mcp-server"],
+      "args": ["@dipseth/dataproc-mcp-server@latest"],
       "env": {
         "LOG_LEVEL": "info"
-      }
+      },
+      "alwaysAllow": []
     }
   }
 }
@@ -27,11 +28,12 @@ Add this configuration to your Roo MCP settings:
   "mcpServers": {
     "dataproc": {
       "command": "npx",
-      "args": ["@dipseth/dataproc-mcp-server"],
+      "args": ["@dipseth/dataproc-mcp-server@latest"],
       "env": {
         "LOG_LEVEL": "info",
-        "DATAPROC_CONFIG_PATH": "/path/to/your/config.json"
-      }
+        "DATAPROC_CONFIG_PATH": "/path/to/your/config/server.json"
+      },
+      "alwaysAllow": []
     }
   }
 }
@@ -44,12 +46,13 @@ Add this configuration to your Roo MCP settings:
   "mcpServers": {
     "dataproc": {
       "command": "npx",
-      "args": ["@dipseth/dataproc-mcp-server"],
+      "args": ["@dipseth/dataproc-mcp-server@latest"],
       "env": {
         "LOG_LEVEL": "debug",
         "DATAPROC_CONFIG_PATH": "/Users/yourname/.config/dataproc/server.json",
         "GOOGLE_APPLICATION_CREDENTIALS": "/path/to/service-account.json"
-      }
+      },
+      "alwaysAllow": []
     }
   }
 }

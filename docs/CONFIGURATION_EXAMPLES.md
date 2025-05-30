@@ -581,19 +581,19 @@ cluster_config:
 {
   "mcpServers": {
     "dataproc-dev": {
-      "command": "node",
-      "args": ["/path/to/dataproc-mcp/build/index.js"],
+      "command": "npx",
+      "args": ["@dipseth/dataproc-mcp-server@latest"],
       "env": {
         "LOG_LEVEL": "error",
-        "MCP_CONFIG": "{\"profileManager\":{\"rootConfigPath\":\"/path/to/dev-profiles\"}}"
+        "DATAPROC_CONFIG_PATH": "/path/to/dev-profiles/server.json"
       }
     },
     "dataproc-prod": {
-      "command": "node",
-      "args": ["/path/to/dataproc-mcp/build/index.js"],
+      "command": "npx",
+      "args": ["@dipseth/dataproc-mcp-server@latest"],
       "env": {
         "LOG_LEVEL": "warn",
-        "MCP_CONFIG": "{\"profileManager\":{\"rootConfigPath\":\"/path/to/prod-profiles\"}}"
+        "DATAPROC_CONFIG_PATH": "/path/to/prod-profiles/server.json"
       }
     }
   }
@@ -602,26 +602,18 @@ cluster_config:
 
 ### Roo Configuration
 
-**File: `.vscode/settings.json`**
+**File: `.roo/mcp.json`**
 ```json
 {
   "mcpServers": {
-    "dataproc-server": {
-      "command": "node",
-      "args": ["/path/to/dataproc-mcp/build/index.js"],
-      "disabled": false,
-      "timeout": 60,
-      "alwaysAllow": [
-        "list_clusters",
-        "get_cluster",
-        "list_profiles",
-        "get_profile",
-        "get_job_status",
-        "get_job_results"
-      ],
+    "dataproc": {
+      "command": "npx",
+      "args": ["@dipseth/dataproc-mcp-server@latest"],
       "env": {
-        "LOG_LEVEL": "info"
-      }
+        "LOG_LEVEL": "info",
+        "DATAPROC_CONFIG_PATH": "/path/to/your/config/server.json"
+      },
+      "alwaysAllow": []
     }
   }
 }
