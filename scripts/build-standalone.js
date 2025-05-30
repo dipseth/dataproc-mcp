@@ -43,6 +43,13 @@ function createStandaloneDistribution() {
     console.log('✅ Copied config templates');
   }
   
+  // Copy templates directory
+  const templatesDir = path.join(__dirname, '..', 'templates');
+  if (fs.existsSync(templatesDir)) {
+    copyDirectory(templatesDir, path.join(distDir, 'templates'));
+    console.log('✅ Copied configuration templates');
+  }
+  
   // Copy documentation
   const docsDir = path.join(__dirname, '..', 'docs');
   if (fs.existsSync(docsDir)) {
@@ -63,6 +70,9 @@ function createStandaloneDistribution() {
   
   // Create startup script
   createStartupScript(distDir);
+  
+  // Create distribution manifest
+  createDistributionManifest(distDir);
   
   console.log('🎉 Standalone distribution created in dist/');
   console.log('📦 Distribution contents:');
@@ -179,6 +189,42 @@ See the \`docs/\` directory for comprehensive documentation:
 
   fs.writeFileSync(path.join(distDir, 'README-STANDALONE.md'), distReadme);
   console.log('✅ Created standalone README');
+}
+
+function createDistributionManifest(distDir) {
+  const manifest = {
+    "name": "@dataproc/mcp-server",
+    "type": "standalone-distribution",
+    "version": "2.0.0",
+    "buildDate": new Date().toISOString(),
+    "contents": {
+      "build/": "Compiled TypeScript application",
+      "profiles/": "Cluster configuration profiles",
+      "config/": "Runtime configuration files",
+      "templates/": "Configuration templates for setup",
+      "docs/": "Complete documentation",
+      "start.js": "Standalone startup script",
+      "README-STANDALONE.md": "Distribution-specific documentation"
+    },
+    "requirements": {
+      "node": ">=18.0.0",
+      "npm": ">=8.0.0"
+    },
+    "quickStart": [
+      "node start.js",
+      "# or",
+      "node build/index.js"
+    ],
+    "configuration": {
+      "server": "config/server.json",
+      "defaults": "config/default-params.json",
+      "profiles": "profiles/*.yaml"
+    }
+  };
+  
+  const manifestPath = path.join(distDir, 'distribution-manifest.json');
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+  console.log('✅ Created distribution manifest');
 }
 
 function listDirectoryContents(dir, prefix = '') {
