@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- semantic-release-changelog -->
 
+## [1.0.2](https://github.com/dipseth/dataproc-mcp/compare/v1.0.1...v1.0.2) (2025-05-30)
+
+
+### 🐛 Bug Fixes
+
+* change package scope to [@dipseth](https://github.com/dipseth) for NPM publishing ([55bfe2d](https://github.com/dipseth/dataproc-mcp/commit/55bfe2deb7852bb04b3d9caf03f9ff8a6932c9f2))
+
 ## [1.0.1](https://github.com/dipseth/dataproc-mcp/compare/v1.0.0...v1.0.1) (2025-05-30)
 
 
