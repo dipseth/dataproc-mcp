@@ -195,6 +195,16 @@ jobs:
         with:
           name: generated-docs
           path: docs/generated/
+        continue-on-error: true
+        
+      - name: Generate docs if not downloaded
+        run: |
+          if [ ! -d "docs/generated" ] || [ -z "$(ls -A docs/generated 2>/dev/null)" ]; then
+            echo "📝 Generated docs not found, creating them..."
+            npm run docs:generate
+          else
+            echo "✅ Using downloaded generated docs"
+          fi
 
       - name: Check documentation completeness
         run: |

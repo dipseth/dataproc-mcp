@@ -310,7 +310,7 @@ The formatted output is generated using the `table` library with specific config
 - Column padding: Adds 1 space of padding on both sides of column content
 - Horizontal lines: Draws horizontal lines only at the top, after the header, and at the bottom
 
-For more detailed implementation information, see [Formatted Output Implementation](./formatted-output-implementation.md).
+For more detailed implementation information, see the source code in `src/services/output-parser.ts`.
 
 ## Error Handling
 

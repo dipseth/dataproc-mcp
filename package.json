@@ -1,6 +1,6 @@
 {
   "name": "@dataproc/mcp-server",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "A production-ready Model Context Protocol server for Google Cloud Dataproc operations with intelligent defaults and comprehensive tooling",
   "type": "module",
   "keywords": [
@@ -61,8 +61,8 @@
     "docs:generate": "node scripts/generate-docs.js",
     "docs:test-links": "node scripts/test-doc-links.js",
     "inspector": "npx @modelcontextprotocol/inspector build/index.js",
-    "test": "NODE_OPTIONS='--loader ts-node/esm' mocha 'tests/unit/**/*.ts' --exit",
-    "test:unit": "NODE_OPTIONS='--loader ts-node/esm' mocha 'tests/unit/**/*.ts'",
+    "test": "npm run test:unit:fast",
+    "test:unit": "npm run test:unit:fast",
     "test:unit:fast": "mocha 'tests/unit/**/*.js' --exit",
     "test:manual": "NODE_OPTIONS='--loader ts-node/esm' mocha 'tests/manual/**/*.ts' --timeout 60000 --exit",
     "test:integration": "NODE_OPTIONS='--loader ts-node/esm' mocha 'tests/manual/**/*.ts' --timeout 30000 --exit",
