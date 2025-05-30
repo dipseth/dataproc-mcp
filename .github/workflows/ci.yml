@@ -32,6 +32,7 @@ jobs:
         id: changes
         run: |
           # Check if we should run tests based on file changes
+
           # Handle cases where github.event.before might be null (new branch, force push, etc.)
           if [[ "${{ github.event.before }}" == "0000000000000000000000000000000000000000" ]] || [[ -z "${{ github.event.before }}" ]]; then
             echo "🔄 New branch or force push detected - running all tests"
@@ -68,6 +69,7 @@ jobs:
           echo "🔒 Security scan needed: ${{ steps.changes.outputs.should-run-security }}"
 
   # ============================================================================
+
   # DEPENDENCY SYNC CHECK
   # ============================================================================
   dependency-sync:
@@ -76,15 +78,29 @@ jobs:
     needs: pre-flight
     if: needs.pre-flight.outputs.should-run-tests == 'true'
     timeout-minutes: 5
+  # QUALITY GATES
+  # ============================================================================
+  quality-gates:
+    name: 🔍 Quality Gates
+    runs-on: ubuntu-latest
+    needs: pre-flight
+    if: needs.pre-flight.outputs.should-run-tests == 'true'
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        node-version: [18, 20, 22]
     steps:
       - name: 📥 Checkout Repository
         uses: actions/checkout@v4
 
+
       - name: 🟢 Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: ${{ matrix.node-version }}
           cache: 'npm'
+          registry-url: 'https://registry.npmjs.org'
+
 
       - name: 🔍 Check Package Lock Sync
         run: |
@@ -275,12 +291,14 @@ jobs:
           cache: 'npm'
 
       - name: 📦 Install Dependencies
+
         run: |
           # Use npm install if ci fails due to sync issues
           if ! npm ci --prefer-offline --no-audit --ignore-scripts; then
             echo "⚠️ npm ci failed, falling back to npm install..."
             npm install --prefer-offline --no-audit --ignore-scripts
           fi
+
 
       - name: 🔨 Build Project
         run: npm run build
@@ -289,6 +307,7 @@ jobs:
         run: |
           npm run pre-flight
           echo "✅ Pre-flight checks completed"
+
 
       - name: 📚 API Documentation Generation
         run: |
@@ -321,6 +340,13 @@ jobs:
             docs/examples/
           retention-days: 30
 
+
+      - name: 📋 Example Configuration Validation
+        run: |
+          npm run validate:examples
+          echo "✅ Example configurations validated"
+
+
   # ============================================================================
   # BUILD ARTIFACTS
   # ============================================================================
@@ -341,6 +367,7 @@ jobs:
           cache: 'npm'
 
       - name: 📦 Install Dependencies
+
         run: |
           # Use npm install if ci fails due to sync issues
           if ! npm ci --prefer-offline --no-audit --ignore-scripts; then
@@ -417,6 +444,7 @@ jobs:
             dist/README-STANDALONE.md
             build-report.md
           retention-days: 90
+
 
   # ============================================================================
   # CI STATUS SUMMARY
