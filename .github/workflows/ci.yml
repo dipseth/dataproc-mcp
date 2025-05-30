@@ -1,10 +1,11 @@
+---
 name: 🔄 Continuous Integration
 
-on:
+"on":
   push:
-    branches: [ main, develop, 'feat/**' ]
+    branches: [main, develop, "feat/**"]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
   workflow_dispatch:
 
 concurrency:
@@ -31,95 +32,91 @@ jobs:
       - name: 🔍 Detect Changes
         id: changes
         run: |
-          # Check if we should run tests based on file changes
+              # Check if we should run tests based on file changes
 
-          # Handle cases where github.event.before might be null (new branch, force push, etc.)
-          if [[ "${{ github.event.before }}" == "0000000000000000000000000000000000000000" ]] || [[ -z "${{ github.event.before }}" ]]; then
-            echo "🔄 New branch or force push detected - running all tests"
-            echo "should-run-tests=true" >> $GITHUB_OUTPUT
-          else
-            # Check for relevant file changes
-            if git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -E '\.(ts|js|json)$|package\.json|\.github/workflows|scripts/'; then
-              echo "📝 Code changes detected - running tests"
-              echo "should-run-tests=true" >> $GITHUB_OUTPUT
-            else
-              echo "📄 Only documentation changes detected - skipping tests"
-              echo "should-run-tests=false" >> $GITHUB_OUTPUT
-            fi
-          fi
-          
-          # Always run security checks on main/develop, or if package.json changed
-          if [[ "${{ github.ref }}" == "refs/heads/main" || "${{ github.ref }}" == "refs/heads/develop" ]]; then
-            echo "should-run-security=true" >> $GITHUB_OUTPUT
-          elif [[ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]] && [[ -n "${{ github.event.before }}" ]]; then
-            if git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -E 'package\.json|package-lock\.json'; then
-              echo "📦 Dependency changes detected - running security scan"
-              echo "should-run-security=true" >> $GITHUB_OUTPUT
-            else
-              echo "should-run-security=false" >> $GITHUB_OUTPUT
-            fi
-          else
-            echo "should-run-security=false" >> $GITHUB_OUTPUT
-          fi
+              # Handle cases where github.event.before might be null
+              # (new branch, force push, etc.)
+              BEFORE="${{ github.event.before }}"
+              if [[ "$BEFORE" == \
+                    "0000000000000000000000000000000000000000" ]] || \
+                [[ -z "$BEFORE" ]]; then
+                echo "🔄 New branch or force push detected - running all tests"
+                echo "should-run-tests=true" >> $GITHUB_OUTPUT
+              else
+                # Check for relevant file changes
+                PATTERN='\.(ts|js|json)$|package\.json|\.github/workflows|scripts/'
+                if git diff --name-only "$BEFORE" "${{ github.sha }}" | \
+                  grep -E "$PATTERN"; then
+                  echo "📝 Code changes detected - running tests"
+                  echo "should-run-tests=true" >> $GITHUB_OUTPUT
+                else
+                  echo "📄 Only documentation changes detected - skipping tests"
+                  echo "should-run-tests=false" >> $GITHUB_OUTPUT
+                fi
+              fi
+
+              # Always run security checks on main/develop, or if package.json
+              # changed
+              REF="${{ github.ref }}"
+              if [[ "$REF" == "refs/heads/main" || \
+                    "$REF" == "refs/heads/develop" ]]; then
+                echo "should-run-security=true" >> $GITHUB_OUTPUT
+              elif [[ "$BEFORE" != \
+                      "0000000000000000000000000000000000000000" ]] && \
+                  [[ -n "$BEFORE" ]]; then
+                PKG_PATTERN='package\.json|package-lock\.json'
+                if git diff --name-only "$BEFORE" "${{ github.sha }}" | \
+                  grep -E "$PKG_PATTERN"; then
+                  echo "📦 Pkg deps changed, run security"
+                  echo "should-run-security=true" >> $GITHUB_OUTPUT
+                else
+                  echo "should-run-security=false" >> $GITHUB_OUTPUT
+                fi
+              else
+                echo "should-run-security=false" >> $GITHUB_OUTPUT
+              fi
 
       - name: 🎯 Pre-flight Check
         run: |
           echo "✅ Repository checked out successfully"
-          echo "📊 Changes detected: ${{ steps.changes.outputs.should-run-tests }}"
-          echo "🔒 Security scan needed: ${{ steps.changes.outputs.should-run-security }}"
+          echo "📊${{ steps.changes.outputs.should-run-tests }}"
+          echo "🔒 ${{ steps.changes.outputs.should-run-security }}"
 
-  # ============================================================================
-
-  # DEPENDENCY SYNC CHECK
-  # ============================================================================
   dependency-sync:
     name: 🔄 Dependency Sync Check
     runs-on: ubuntu-latest
     needs: pre-flight
     if: needs.pre-flight.outputs.should-run-tests == 'true'
     timeout-minutes: 5
-  # QUALITY GATES
-  # ============================================================================
-  quality-gates:
-    name: 🔍 Quality Gates
-    runs-on: ubuntu-latest
-    needs: pre-flight
-    if: needs.pre-flight.outputs.should-run-tests == 'true'
-    timeout-minutes: 10
-    strategy:
-      matrix:
-        node-version: [18, 20, 22]
     steps:
       - name: 📥 Checkout Repository
         uses: actions/checkout@v4
 
-
       - name: 🟢 Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
-          cache: 'npm'
-          registry-url: 'https://registry.npmjs.org'
+          node-version: "20"
+          cache: "npm"
 
+      - name: 📦 Install Dependencies
+        run: npm ci --prefer-offline --no-audit
 
-      - name: 🔍 Check Package Lock Sync
+      - name: 🔄 Check Package Lock Sync
         run: |
           echo "🔍 Checking if package.json and package-lock.json are in sync..."
-          
-          # Try npm ci first to check sync
           if npm ci --dry-run --prefer-offline --no-audit --ignore-scripts; then
             echo "✅ Package files are in sync"
           else
             echo "⚠️ Package files are out of sync - attempting to fix..."
             echo "📦 Running npm install to update lock file..."
             npm install --package-lock-only --ignore-scripts
-            
             # Check if there are changes to commit
             if git diff --exit-code package-lock.json; then
               echo "✅ No changes needed to package-lock.json"
             else
               echo "❌ package-lock.json needs to be updated"
-              echo "Please run 'npm install' locally and commit the updated package-lock.json"
+              echo "Please run 'npm install' locally and commit the" \
+                   "updated package-lock.json"
               git diff package-lock.json
               exit 1
             fi
@@ -145,8 +142,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: 'npm'
-          registry-url: 'https://registry.npmjs.org'
+          cache: "npm"
+          registry-url: "https://registry.npmjs.org"
 
       - name: 📦 Install Dependencies
         run: |
@@ -204,8 +201,8 @@ jobs:
       - name: 🟢 Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
 
       - name: 📦 Install Dependencies
         run: |
@@ -222,7 +219,8 @@ jobs:
 
       - name: 🔐 Dependency Vulnerability Scan
         run: |
-          npx audit-ci --config .audit-ci.json || echo "⚠️ Vulnerabilities found but not blocking"
+          npx audit-ci --config .audit-ci.json || \
+            echo "⚠️ Vulnerabilities found but not blocking"
           echo "✅ Dependency scan completed"
 
   # ============================================================================
@@ -240,8 +238,8 @@ jobs:
       - name: 🟢 Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
 
       - name: 📦 Install Dependencies
         run: |
@@ -287,18 +285,16 @@ jobs:
       - name: 🟢 Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
 
       - name: 📦 Install Dependencies
-
         run: |
           # Use npm install if ci fails due to sync issues
           if ! npm ci --prefer-offline --no-audit --ignore-scripts; then
             echo "⚠️ npm ci failed, falling back to npm install..."
             npm install --prefer-offline --no-audit --ignore-scripts
           fi
-
 
       - name: 🔨 Build Project
         run: npm run build
@@ -307,7 +303,6 @@ jobs:
         run: |
           npm run pre-flight
           echo "✅ Pre-flight checks completed"
-
 
       - name: 📚 API Documentation Generation
         run: |
@@ -328,7 +323,7 @@ jobs:
         run: |
           npm run validate:examples
           echo "✅ Example configurations validated"
-          
+
       - name: 📤 Upload Documentation Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -339,13 +334,6 @@ jobs:
             docs/API_AUTO_GENERATED.md
             docs/examples/
           retention-days: 30
-
-
-      - name: 📋 Example Configuration Validation
-        run: |
-          npm run validate:examples
-          echo "✅ Example configurations validated"
-
 
   # ============================================================================
   # BUILD ARTIFACTS
@@ -363,11 +351,10 @@ jobs:
       - name: 🟢 Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
 
       - name: 📦 Install Dependencies
-
         run: |
           # Use npm install if ci fails due to sync issues
           if ! npm ci --prefer-offline --no-audit --ignore-scripts; then
@@ -414,7 +401,8 @@ jobs:
           echo "" >> build-report.md
           echo "## File Sizes" >> build-report.md
           if [ -d "dist" ]; then
-            du -sh dist/* >> build-report.md 2>/dev/null || echo "No dist files" >> build-report.md
+            du -sh dist/* >> build-report.md 2>/dev/null || \
+              echo "No dist files" >> build-report.md
           fi
           echo "✅ Build report generated"
 
@@ -445,14 +433,20 @@ jobs:
             build-report.md
           retention-days: 90
 
-
   # ============================================================================
   # CI STATUS SUMMARY
   # ============================================================================
   ci-status:
     name: ✅ CI Status Summary
     runs-on: ubuntu-latest
-    needs: [pre-flight, dependency-sync, quality-gates, security-scan, integration-validation, documentation, build-artifacts]
+    needs:
+      - pre-flight
+      - dependency-sync
+      - quality-gates
+      - security-scan
+      - integration-validation
+      - documentation
+      - build-artifacts
     if: always()
     steps:
       - name: 📊 CI Results Summary
@@ -461,40 +455,70 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Pre-flight | ${{ needs.pre-flight.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Dependency Sync | ${{ needs.dependency-sync.result == 'success' && '✅ Passed' || needs.dependency-sync.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Quality Gates | ${{ needs.quality-gates.result == 'success' && '✅ Passed' || needs.quality-gates.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Security Scan | ${{ needs.security-scan.result == 'success' && '✅ Passed' || needs.security-scan.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Integration | ${{ needs.integration-validation.result == 'success' && '✅ Passed' || needs.integration-validation.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Documentation | ${{ needs.documentation.result == 'success' && '✅ Passed' || needs.documentation.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Build Artifacts | ${{ needs.build-artifacts.result == 'success' && '✅ Passed' || needs.build-artifacts.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+
+          # Job arrays split for readability
+          jobs=("pre-flight" "dependency-sync" "quality-gates" \
+                "security-scan" "integration-validation" \
+                "documentation" "build-artifacts")
+          names=("Pre-flight" "Dependency Sync" "Quality Gates" \
+                 "Security Scan" "Integration" "Documentation" \
+                 "Build Artifacts")
+
+          # Results array split for readability
+          results=(
+            "${{ needs.pre-flight.result }}"
+            "${{ needs.dependency-sync.result }}"
+            "${{ needs.quality-gates.result }}"
+            "${{ needs.security-scan.result }}"
+            "${{ needs.integration-validation.result }}"
+            "${{ needs.documentation.result }}"
+            "${{ needs.build-artifacts.result }}"
+          )
+
+          for i in "${!jobs[@]}"; do
+            case "${results[$i]}" in
+              "success")
+                echo "| ${names[$i]} | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
+                ;;
+              "skipped")
+                echo "| ${names[$i]} | ⏭️ Skipped |" >> $GITHUB_STEP_SUMMARY
+                ;;
+              *)
+                echo "| ${names[$i]} | ❌ Failed |" >> $GITHUB_STEP_SUMMARY
+                ;;
+            esac
+          done
+
           echo "" >> $GITHUB_STEP_SUMMARY
-          
-          # Check if critical jobs passed or were appropriately skipped
-          DEPENDENCY_OK="${{ needs.dependency-sync.result == 'success' || needs.dependency-sync.result == 'skipped' }}"
-          QUALITY_OK="${{ needs.quality-gates.result == 'success' || needs.quality-gates.result == 'skipped' }}"
-          SECURITY_OK="${{ needs.security-scan.result == 'success' || needs.security-scan.result == 'skipped' }}"
-          PREFLIGHT_OK="${{ needs.pre-flight.result == 'success' }}"
-          
-          if [[ "$PREFLIGHT_OK" == "true" && "$DEPENDENCY_OK" == "true" && "$QUALITY_OK" == "true" && "$SECURITY_OK" == "true" ]]; then
-            echo "🎉 **CI Pipeline Successful!** Ready for release automation." >> $GITHUB_STEP_SUMMARY
+
+          # Check critical jobs status
+          critical_jobs=(
+            "${{ needs.pre-flight.result }}"
+            "${{ needs.dependency-sync.result }}"
+            "${{ needs.quality-gates.result }}"
+            "${{ needs.security-scan.result }}"
+          )
+          all_critical_ok=true
+
+          for result in "${critical_jobs[@]}"; do
+            if [[ "$result" != "success" && "$result" != "skipped" ]]; then
+              all_critical_ok=false
+              break
+            fi
+          done
+
+          if [[ "$all_critical_ok" == "true" ]]; then
+            echo "🎉 **CI Pipeline Successful!**" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "### 🚀 Next Steps" >> $GITHUB_STEP_SUMMARY
-            echo "- Run \`npm run pre-push\` locally before pushing changes" >> $GITHUB_STEP_SUMMARY
-            echo "- Use \`npm run ci-cd:validate\` to check release readiness" >> $GITHUB_STEP_SUMMARY
-            echo "- Consider running \`npm run pre-flight\` for intelligent change detection" >> $GITHUB_STEP_SUMMARY
+            echo "- Run \`npm run pre-push\` locally" >> $GITHUB_STEP_SUMMARY
+            echo "- Use \`npm run ci-cd:validate\` for release" \
+              >> $GITHUB_STEP_SUMMARY
           else
-            echo "❌ **CI Pipeline Failed!** Please review the failed jobs above." >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Debug Info:**" >> $GITHUB_STEP_SUMMARY
-            echo "- Pre-flight: ${{ needs.pre-flight.result }}" >> $GITHUB_STEP_SUMMARY
-            echo "- Dependency Sync: ${{ needs.dependency-sync.result }}" >> $GITHUB_STEP_SUMMARY
-            echo "- Quality Gates: ${{ needs.quality-gates.result }}" >> $GITHUB_STEP_SUMMARY
-            echo "- Security Scan: ${{ needs.security-scan.result }}" >> $GITHUB_STEP_SUMMARY
+            echo "❌ **CI Pipeline Failed!**" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "### 🔧 Troubleshooting" >> $GITHUB_STEP_SUMMARY
-            echo "- Run \`npm run pre-push\` locally to catch issues before CI" >> $GITHUB_STEP_SUMMARY
-            echo "- Check if package.json and package-lock.json are in sync" >> $GITHUB_STEP_SUMMARY
-            echo "- Ensure all dependencies are properly installed" >> $GITHUB_STEP_SUMMARY
+            echo "- Run \`npm run pre-push\` locally" >> $GITHUB_STEP_SUMMARY
+            echo "- Check package.json sync" >> $GITHUB_STEP_SUMMARY
             exit 1
           fi
