@@ -13,7 +13,7 @@ describe('Job Output Handler Integration Tests', () => {
   const config = {
     projectId: process.env.TEST_PROJECT_ID || 'prj-grp-data-sci-prod-b425',
     region: process.env.TEST_REGION || 'us-central1',
-    clusterName: process.env.TEST_CLUSTER || 'pricing-api-v202504002',
+    clusterName: process.env.TEST_CLUSTER || 'cool-idea-api-v202504002',
   };
 
   let outputHandler: JobOutputHandler;

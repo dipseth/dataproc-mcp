@@ -1,33 +1,61 @@
 # Dataproc MCP Server
 
-[![npm version](https://badge.fury.io/js/%40dataproc%2Fmcp-server.svg)](https://badge.fury.io/js/%40dataproc%2Fmcp-server)
-[![npm downloads](https://img.shields.io/npm/dm/@dataproc/mcp-server.svg)](https://npmjs.org/package/@dataproc/mcp-server)
+[![npm version](https://badge.fury.io/js/%40dipseth%2Fdataproc-mcp-server.svg)](https://badge.fury.io/js/%40dipseth%2Fdataproc-mcp-server)
+[![npm downloads](https://img.shields.io/npm/dm/@dipseth/dataproc-mcp-server.svg)](https://npmjs.org/package/@dipseth/dataproc-mcp-server)
 [![Build Status](https://github.com/dipseth/dataproc-mcp/workflows/CI/badge.svg)](https://github.com/dipseth/dataproc-mcp/actions)
 [![Coverage Status](https://coveralls.io/repos/github/dipseth/dataproc-mcp/badge.svg?branch=main)](https://coveralls.io/github/dipseth/dataproc-mcp?branch=main)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Node.js Version](https://img.shields.io/node/v/@dataproc/mcp-server.svg)](https://nodejs.org/)
+[![Node.js Version](https://img.shields.io/node/v/@dipseth/dataproc-mcp-server.svg)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue.svg)](https://www.typescriptlang.org/)
 [![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-green.svg)](https://modelcontextprotocol.io/)
 
-A production-ready Model Context Protocol (MCP) server for Google Cloud Dataproc operations with intelligent parameter injection, enterprise-grade security, and comprehensive tooling.
+A production-ready Model Context Protocol (MCP) server for Google Cloud Dataproc operations with intelligent parameter injection, enterprise-grade security, and comprehensive tooling. Designed for seamless integration with **Roo (VS Code)**.
 
 ## 🚀 Quick Start
 
-### Installation
+### **Recommended: Roo (VS Code) Integration**
+
+Add this to your Roo MCP settings:
+
+```json
+{
+  "mcpServers": {
+    "dataproc": {
+      "command": "npx",
+      "args": ["@dipseth/dataproc-mcp-server"],
+      "env": {
+        "LOG_LEVEL": "info"
+      }
+    }
+  }
+}
+```
+
+### **With Custom Config File**
+
+```json
+{
+  "mcpServers": {
+    "dataproc": {
+      "command": "npx",
+      "args": ["@dipseth/dataproc-mcp-server"],
+      "env": {
+        "LOG_LEVEL": "info",
+        "DATAPROC_CONFIG_PATH": "/path/to/your/config.json"
+      }
+    }
+  }
+}
+```
+
+### **Alternative: Global Installation**
 
 ```bash
 # Install globally
-npm install -g @dataproc/mcp-server
+npm install -g @dipseth/dataproc-mcp-server
 
-# Or install locally
-npm install @dataproc/mcp-server
-```
-
-### Basic Usage
-
-```bash
 # Start the server
-dataproc-mcp
+dataproc-mcp-server
 
 # Or run directly
 npx @dataproc/mcp-server
@@ -162,11 +190,11 @@ my-company-analytics-prod-1234:
 }
 ```
 
-### Cline (VS Code)
+### Roo (VS Code)
 
 ```json
 {
-  "cline.mcpServers": {
+  "mcpServers": {
     "dataproc-server": {
       "command": "npx",
       "args": ["@dataproc/mcp-server"],
@@ -186,7 +214,7 @@ my-company-analytics-prod-1234:
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
 │   MCP Client    │────│  Dataproc MCP    │────│  Google Cloud   │
-│  (Claude/Cline) │    │     Server       │    │    Dataproc     │
+│  (Claude/Roo) │    │     Server       │    │    Dataproc     │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
                               │
                        ┌──────┴──────┐

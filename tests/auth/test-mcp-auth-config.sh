@@ -52,7 +52,7 @@ echo "  ${USE_APPLICATION_DEFAULT:-Not set}"
 # Check if the specific service account key file exists
 echo ""
 echo "=== Service Account Key File Check ==="
-KEY_FILE="/Users/srivers/Repositories/pricing-composer/orchestrator/classpath/gcp_prod_keyfile.json"
+KEY_FILE="/Users/user123/Repositories/path/to/prod/keyfile.json"
 echo "Checking: $KEY_FILE"
 if [ -f "$KEY_FILE" ]; then
     echo "✅ Service account key file exists"

@@ -97,7 +97,7 @@ The system now uses **explicit configuration** instead of environment variables 
 Based on comprehensive testing, the optimal configuration uses:
 
 - **Target Service Account**: `grpn-sa-terraform-data-science@prj-grp-central-sa-prod-0b25.iam.gserviceaccount.com`
-- **Source Key File**: `/Users/srivers/Repositories/pricing-composer/orchestrator/classpath/gcp_prod_keyfile.json`
+- **Source Key File**: `/Users/user123/Repositories/path/to/prod/keyfile.json`
 - **Project**: `prj-grp-data-sci-prod-b425`
 - **Authentication Method**: Service account impersonation with explicit source credentials
 
