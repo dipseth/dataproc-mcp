@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- semantic-release-changelog -->
 
+## [1.1.2](https://github.com/dipseth/dataproc-mcp/compare/v1.1.1...v1.1.2) (2025-05-30)
+
+
+### 🐛 Bug Fixes
+
+* remove invalid 'Document' from TypeDoc kindSortOrder ([38ef045](https://github.com/dipseth/dataproc-mcp/commit/38ef04558361426c1b56c592070334681042c74b))
+
+
+### ♻️ Code Refactoring
+
+* improve CI workflow readability and efficiency ([0bfb268](https://github.com/dipseth/dataproc-mcp/commit/0bfb2680b1c96286008fc42e8564b1938c850902))
+
 ## [1.1.1](https://github.com/dipseth/dataproc-mcp/compare/v1.1.0...v1.1.1) (2025-05-30)
 
 
