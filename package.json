@@ -106,7 +106,8 @@
     "changelog:extract": "node scripts/extract-changelog.js",
     "clean": "rm -rf build",
     "pre-flight": "node scripts/pre-flight-check.js",
-    "ci-cd:validate": "npm run pre-flight && npm run prepare-release"
+    "ci-cd:validate": "npm run pre-flight && npm run prepare-release",
+    "pre-push": "npm run build && npm run lint:check && npm run format:check && npm run type-check && npm run test:unit:fast && npm run security:check && npm run validate-package && npm run docs:test-links && echo '🎉 All checks passed! Ready to push.'"
   },
   "dependencies": {
     "@google-cloud/dataproc": "^6.0.1",

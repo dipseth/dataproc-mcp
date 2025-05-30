@@ -48,7 +48,197 @@ graph TD
     style P fill:#2e7d32
 ```
 
-## 📋 Detailed Workflow Breakdown
+## 🚀 **PRE-PUSH VALIDATION**
+
+### **The Golden Command**
+Before pushing any changes, run this single command to ensure CI/CD success:
+
+```bash
+npm run pre-push
+```
+
+This command runs **all the same checks** that the CI pipeline will execute:
+- ✅ **Build**: TypeScript compilation
+- ✅ **Linting**: ESLint validation
+- ✅ ✅ **Formatting**: Prettier check
+- ✅ **Type Checking**: TypeScript validation
+- ✅ **Unit Tests**: Fast test suite
+- ✅ **Security**: Dependency audit
+- ✅ **Package**: Validation and dry-run
+- ✅ **Documentation**: Link validation
+
+### **Why This Matters**
+- **Prevents CI Failures**: Catches issues before they reach GitHub
+- **Saves Time**: No waiting for failed CI runs
+- **Builds Confidence**: Know your push will succeed
+- **Maintains Quality**: Enforces all quality gates locally
+
+## 🔧 **TROUBLESHOOTING & LESSONS LEARNED**
+
+### **Common CI/CD Issues & Solutions**
+
+#### **1. Workflow Not Triggering**
+**Problem**: CI pipeline doesn't run on feature branches
+```yaml
+# ❌ Limited triggers
+on:
+  push:
+    branches: [ main, develop ]
+
+# ✅ Include feature branches
+on:
+  push:
+    branches: [ main, develop, 'feat/**' ]
+```
+
+#### **2. Pre-flight Change Detection Failures**
+**Problem**: `git diff` fails on new branches or force pushes
+```bash
+# ❌ Fragile approach
+git diff --name-only ${{ github.event.before }} ${{ github.sha }}
+
+# ✅ Robust handling
+if [[ "${{ github.event.before }}" == "0000000000000000000000000000000000000000" ]] || [[ -z "${{ github.event.before }}" ]]; then
+  echo "should-run-tests=true" >> $GITHUB_OUTPUT
+```
+
+#### **3. ES Module Compatibility**
+**Problem**: Build scripts using CommonJS in ES module project
+```javascript
+// ❌ CommonJS syntax
+const fs = require('fs');
+
+// ✅ ES module syntax
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+```
+
+#### **4. Missing Script Dependencies**
+**Problem**: CI calls npm scripts that don't exist
+- Always verify script names match between [`package.json`](../package.json) and [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)
+- Use `npm run` to test scripts locally before pushing
+
+### **Pipeline Robustness Features**
+
+#### **Smart Change Detection**
+- Handles new branches, force pushes, and edge cases
+- Includes `scripts/` directory in change patterns
+- Fallback logic for invalid git references
+
+#### **Conditional Execution**
+- Security scans only on main/develop or dependency changes
+- Build artifacts only on main branch
+- Documentation generation on main/develop branches
+
+#### **Error Handling**
+- Clear debug information in pipeline summaries
+- Proper job dependency management
+- Graceful handling of skipped vs failed jobs
+
+### **Best Practices Implemented**
+
+1. **Matrix Testing**: Node.js 18, 20, 22 for compatibility
+2. **Caching Strategy**: npm dependencies cached across jobs
+3. **Security First**: Dependency auditing and vulnerability scanning
+4. **Documentation**: Automated link validation and generation
+5. **Quality Gates**: Comprehensive linting, formatting, and type checking
+
+## 🚀 **PRE-PUSH VALIDATION**
+
+### **The Golden Command**
+Before pushing any changes, run this single command to ensure CI/CD success:
+
+```bash
+npm run pre-push
+```
+
+This command runs **all the same checks** that the CI pipeline will execute:
+- ✅ **Build**: TypeScript compilation
+- ✅ **Linting**: ESLint validation
+- ✅ **Formatting**: Prettier check
+- ✅ **Type Checking**: TypeScript validation
+- ✅ **Unit Tests**: Fast test suite
+- ✅ **Security**: Dependency audit
+- ✅ **Package**: Validation and dry-run
+- ✅ **Documentation**: Link validation
+
+### **Why This Matters**
+- **Prevents CI Failures**: Catches issues before they reach GitHub
+- **Saves Time**: No waiting for failed CI runs
+- **Builds Confidence**: Know your push will succeed
+- **Maintains Quality**: Enforces all quality gates locally
+
+## 🔧 **TROUBLESHOOTING & LESSONS LEARNED**
+
+### **Common CI/CD Issues & Solutions**
+
+#### **1. Workflow Not Triggering**
+**Problem**: CI pipeline doesn't run on feature branches
+```yaml
+# ❌ Limited triggers
+on:
+  push:
+    branches: [ main, develop ]
+
+# ✅ Include feature branches
+on:
+  push:
+    branches: [ main, develop, 'feat/**' ]
+```
+
+#### **2. Pre-flight Change Detection Failures**
+**Problem**: `git diff` fails on new branches or force pushes
+```bash
+# ❌ Fragile approach
+git diff --name-only ${{ github.event.before }} ${{ github.sha }}
+
+# ✅ Robust handling
+if [[ "${{ github.event.before }}" == "0000000000000000000000000000000000000000" ]] || [[ -z "${{ github.event.before }}" ]]; then
+  echo "should-run-tests=true" >> $GITHUB_OUTPUT
+```
+
+#### **3. ES Module Compatibility**
+**Problem**: Build scripts using CommonJS in ES module project
+```javascript
+// ❌ CommonJS syntax
+const fs = require('fs');
+
+// ✅ ES module syntax
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+```
+
+#### **4. Missing Script Dependencies**
+**Problem**: CI calls npm scripts that don't exist
+- Always verify script names match between [`package.json`](../package.json) and [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)
+- Use `npm run` to test scripts locally before pushing
+
+### **Pipeline Robustness Features**
+
+#### **Smart Change Detection**
+- Handles new branches, force pushes, and edge cases
+- Includes `scripts/` directory in change patterns
+- Fallback logic for invalid git references
+
+#### **Conditional Execution**
+- Security scans only on main/develop or dependency changes
+- Build artifacts only on main branch
+- Documentation generation on main/develop branches
+
+#### **Error Handling**
+- Clear debug information in pipeline summaries
+- Proper job dependency management
+- Graceful handling of skipped vs failed jobs
+
+### **Best Practices Implemented**
+
+1. **Matrix Testing**: Node.js 18, 20, 22 for compatibility
+2. **Caching Strategy**: npm dependencies cached across jobs
+3. **Security First**: Dependency auditing and vulnerability scanning
+4. **Documentation**: Automated link validation and generation
+5. **Quality Gates**: Comprehensive linting, formatting, and type checking
+
+## � Detailed Workflow Breakdown
 
 ### 1. 🚀 **Pre-flight Checks** (`pre-flight`)
 - **Purpose**: Intelligent change detection and optimization
