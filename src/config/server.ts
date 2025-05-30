@@ -117,7 +117,8 @@ export async function getServerConfig(configPath?: string): Promise<ServerConfig
   }
 
   // Use config path from environment variable, parameter, or default (now absolute)
-  const filePath = configPath || process.env.DATAPROC_CONFIG_PATH || path.join(APP_ROOT, 'config/server.json');
+  const filePath =
+    configPath || process.env.DATAPROC_CONFIG_PATH || path.join(APP_ROOT, 'config/server.json');
 
   // Log the current working directory and absolute config path for debugging
   console.error(`[DIAGNOSTIC] Server Config: Current working directory: ${process.cwd()}`);
