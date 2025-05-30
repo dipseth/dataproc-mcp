@@ -63,6 +63,7 @@
     "inspector": "npx @modelcontextprotocol/inspector build/index.js",
     "test": "NODE_OPTIONS='--loader ts-node/esm' mocha 'tests/unit/**/*.ts' 'tests/integration/**/*.ts'",
     "test:unit": "NODE_OPTIONS='--loader ts-node/esm' mocha 'tests/unit/**/*.ts'",
+    "test:unit:fast": "mocha 'tests/unit/**/*.js' --exit",
     "test:manual": "NODE_OPTIONS='--loader ts-node/esm' mocha 'tests/manual/**/*.ts' --timeout 60000",
     "test:integration": "NODE_OPTIONS='--loader ts-node/esm' mocha 'tests/integration/**/*.ts' --timeout 30000",
     "test:auth": "node tests/integration/auth-methods.test.ts",
