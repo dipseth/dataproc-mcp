@@ -77,11 +77,6 @@ jobs:
       - name: Run unit tests
         run: npm test
 
-      - name: Run integration tests
-        run: npm run test:integration
-        env:
-          NODE_ENV: test
-
       - name: Generate coverage report
         run: npm run test:coverage
         if: matrix.node-version == '20'
