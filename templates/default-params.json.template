@@ -1,32 +1,29 @@
 {
-  "defaultEnvironment": "production",
+  "defaultEnvironment": "development",
   "parameters": [
     {
       "name": "projectId",
       "type": "string",
-      "required": true,
-      "description": "Google Cloud Project ID"
+      "required": true
     },
     {
       "name": "region",
       "type": "string",
       "required": true,
-      "defaultValue": "us-central1",
-      "description": "Google Cloud region for Dataproc operations"
+      "defaultValue": "us-central1"
     },
     {
       "name": "zone",
       "type": "string",
       "required": false,
-      "defaultValue": "us-central1-a",
-      "description": "Google Cloud zone for Dataproc operations"
+      "defaultValue": "us-central1-a"
     }
   ],
   "environments": [
     {
       "environment": "development",
       "parameters": {
-        "projectId": "your-dev-project-id",
+        "projectId": "YOUR_DEV_PROJECT",
         "region": "us-west1",
         "zone": "us-west1-a"
       }
@@ -34,7 +31,7 @@
     {
       "environment": "staging",
       "parameters": {
-        "projectId": "your-staging-project-id",
+        "projectId": "YOUR_STAGING_PROJECT",
         "region": "us-central1",
         "zone": "us-central1-b"
       }
@@ -42,7 +39,7 @@
     {
       "environment": "production",
       "parameters": {
-        "projectId": "your-production-project-id",
+        "projectId": "YOUR_PROD_PROJECT",
         "region": "us-central1",
         "zone": "us-central1-a"
       }
