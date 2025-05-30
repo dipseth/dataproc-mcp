@@ -99,9 +99,9 @@
     "build:standalone": "npm run build && node scripts/build-standalone.js",
     "build:docs": "npm run docs:api && npm run docs:build",
     "build:templates": "node scripts/build-templates.js",
-    "docs:api": "echo 'API docs generation - implement with typedoc'",
-    "docs:build": "echo 'Documentation build - implement with Jekyll or similar'",
-    "docs:serve": "echo 'Documentation serve - implement with Jekyll or similar'",
+    "docs:api": "typedoc --out docs/api src/index.ts --theme default --readme README.md --exclude '**/*.test.ts' --exclude '**/node_modules/**'",
+    "docs:build": "bundle exec jekyll build --source docs --destination docs/_site",
+    "docs:serve": "bundle exec jekyll serve --source docs --destination docs/_site --port 4000",
     "docs:clean": "rm -rf docs/_site",
     "changelog:extract": "node scripts/extract-changelog.js",
     "clean": "rm -rf build",
@@ -146,6 +146,7 @@
     "semantic-release": "^22.0.5",
     "ts-jest": "^29.1.1",
     "ts-node": "^10.9.2",
+    "typedoc": "^0.25.4",
     "typescript": "^5.3.3"
   }
 }

@@ -152,7 +152,9 @@ class LinkTester {
             /127\.0\.0\.1/,
             /example\.com/,
             /your-domain\.com/,
-            /placeholder/
+            /placeholder/,
+            /your-project/,
+            /your-bucket/
         ];
 
         for (const pattern of skipPatterns) {
@@ -163,15 +165,51 @@ class LinkTester {
             }
         }
 
-        // For now, we'll just validate the URL format for external links
-        // In a real CI environment, you might want to actually test HTTP requests
+        // Validate URL format first
         try {
             new URL(url);
-            this.log(`External URL format valid: ${url}`, 'info');
-            return true;
         } catch (error) {
             this.errors.push(`${link.filePath}:${link.line} - Invalid URL format: ${url}`);
             return false;
+        }
+
+        // In CI environment, perform actual HTTP checks for critical domains
+        const criticalDomains = [
+            'github.com',
+            'npmjs.org',
+            'nodejs.org',
+            'cloud.google.com'
+        ];
+
+        const shouldTestHttp = process.env.CI === 'true' &&
+                              criticalDomains.some(domain => url.includes(domain));
+
+        if (shouldTestHttp) {
+            try {
+                // Use dynamic import for node-fetch to handle ES modules
+                const fetch = (await import('node-fetch')).default;
+                const response = await fetch(url, {
+                    method: 'HEAD',
+                    timeout: 5000,
+                    headers: {
+                        'User-Agent': 'Dataproc-MCP-Server-Link-Checker/1.0'
+                    }
+                });
+                
+                if (!response.ok) {
+                    this.warnings.push(`${link.filePath}:${link.line} - HTTP ${response.status} for: ${url}`);
+                    return false;
+                }
+                
+                this.log(`External URL verified: ${url}`, 'success');
+                return true;
+            } catch (error) {
+                this.warnings.push(`${link.filePath}:${link.line} - HTTP check failed for: ${url} (${error.message})`);
+                return false;
+            }
+        } else {
+            this.log(`External URL format valid: ${url}`, 'info');
+            return true;
         }
     }
 
