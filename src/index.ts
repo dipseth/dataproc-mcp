@@ -665,6 +665,366 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
       }
       
+      case "list_profiles": {
+        // Initialize profile manager if not already done
+        if (!profileManager) {
+          const serverConfig = await getServerConfig();
+          profileManager = new ProfileManager(serverConfig.profileManager);
+          await profileManager.initialize();
+        }
+        
+        const { category } = args;
+        const profiles = profileManager.getAllProfiles();
+        
+        // Filter by category if provided
+        const filteredProfiles = category
+          ? profiles.filter((profile: any) => profile.category === category)
+          : profiles;
+        
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Available profiles:\n${JSON.stringify(filteredProfiles, null, 2)}`,
+            },
+          ],
+        };
+      }
+      
+      case "get_profile": {
+        // Initialize profile manager if not already done
+        if (!profileManager) {
+          const serverConfig = await getServerConfig();
+          profileManager = new ProfileManager(serverConfig.profileManager);
+          await profileManager.initialize();
+        }
+        
+        const { profileId } = args;
+        if (!profileId) {
+          throw new McpError(ErrorCode.InvalidParams, "Missing required parameter: profileId");
+        }
+        
+        const profile = profileManager.getProfile(String(profileId));
+        
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Profile details:\n${JSON.stringify(profile, null, 2)}`,
+            },
+          ],
+        };
+      }
+      
+      case "create_cluster_from_yaml": {
+        const { projectId, region, yamlPath, overrides } = args;
+        
+        if (!projectId || !region || !yamlPath) {
+          throw new McpError(ErrorCode.InvalidParams, "Missing required parameters: projectId, region, yamlPath");
+        }
+        
+        const response = await createClusterFromYaml(
+          String(projectId),
+          String(region),
+          String(yamlPath),
+          overrides as any
+        );
+        
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Cluster created from YAML successfully:\n${JSON.stringify(response, null, 2)}`,
+            },
+          ],
+        };
+      }
+      
+      case "create_cluster_from_profile": {
+        // Initialize services if not already done
+        if (!profileManager) {
+          const serverConfig = await getServerConfig();
+          profileManager = new ProfileManager(serverConfig.profileManager);
+          await profileManager.initialize();
+        }
+        if (!clusterTracker) {
+          const serverConfig = await getServerConfig();
+          clusterTracker = new ClusterTracker(serverConfig.clusterTracker);
+          await clusterTracker.initialize();
+        }
+        if (!clusterManager) {
+          clusterManager = new ClusterManager(profileManager, clusterTracker);
+        }
+        
+        const { projectId, region, profileName, clusterName, overrides } = args;
+        
+        if (!projectId || !region || !profileName || !clusterName) {
+          throw new McpError(ErrorCode.InvalidParams, "Missing required parameters: projectId, region, profileName, clusterName");
+        }
+        
+        const response = await clusterManager.createClusterFromProfile(
+          String(projectId),
+          String(region),
+          String(profileName),
+          String(clusterName),
+          overrides as any
+        );
+        
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Cluster created from profile successfully:\n${JSON.stringify(response, null, 2)}`,
+            },
+          ],
+        };
+      }
+      
+      case "get_cluster": {
+        const { projectId, region, clusterName } = args;
+        
+        if (!projectId || !region || !clusterName) {
+          throw new McpError(ErrorCode.InvalidParams, "Missing required parameters: projectId, region, clusterName");
+        }
+        
+        const response = await getCluster(
+          String(projectId),
+          String(region),
+          String(clusterName)
+        );
+        
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Cluster details:\n${JSON.stringify(response, null, 2)}`,
+            },
+          ],
+        };
+      }
+      
+      case "delete_cluster": {
+        const { projectId, region, clusterName } = args;
+        
+        if (!projectId || !region || !clusterName) {
+          throw new McpError(ErrorCode.InvalidParams, "Missing required parameters: projectId, region, clusterName");
+        }
+        
+        const response = await deleteCluster(
+          String(projectId),
+          String(region),
+          String(clusterName)
+        );
+        
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Cluster deleted successfully:\n${JSON.stringify(response, null, 2)}`,
+            },
+          ],
+        };
+      }
+      
+      case "list_tracked_clusters": {
+        // Initialize services if not already done
+        if (!clusterTracker) {
+          const serverConfig = await getServerConfig();
+          clusterTracker = new ClusterTracker(serverConfig.clusterTracker);
+          await clusterTracker.initialize();
+        }
+        if (!clusterManager) {
+          if (!profileManager) {
+            const serverConfig = await getServerConfig();
+            profileManager = new ProfileManager(serverConfig.profileManager);
+            await profileManager.initialize();
+          }
+          clusterManager = new ClusterManager(profileManager, clusterTracker);
+        }
+        
+        const clusters = clusterManager.listTrackedClusters();
+        
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Tracked clusters:\n${JSON.stringify(clusters, null, 2)}`,
+            },
+          ],
+        };
+      }
+      
+      case "submit_hive_query": {
+        const { projectId, region, clusterName, query, async, queryOptions } = args;
+        
+        if (!projectId || !region || !clusterName || !query) {
+          throw new McpError(ErrorCode.InvalidParams, "Missing required parameters: projectId, region, clusterName, query");
+        }
+        
+        const response = await submitHiveQuery(
+          String(projectId),
+          String(region),
+          String(clusterName),
+          String(query),
+          queryOptions as any,
+          Boolean(async)
+        );
+        
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Hive query submitted:\n${JSON.stringify(response, null, 2)}`,
+            },
+          ],
+        };
+      }
+      
+      case "get_query_status": {
+        const { projectId, region, jobId } = args;
+        
+        if (!projectId || !region || !jobId) {
+          throw new McpError(ErrorCode.InvalidParams, "Missing required parameters: projectId, region, jobId");
+        }
+        
+        const response = await getJobStatusWithRest(
+          String(projectId),
+          String(region),
+          String(jobId)
+        );
+        
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Query status:\n${JSON.stringify(response, null, 2)}`,
+            },
+          ],
+        };
+      }
+      
+      case "get_query_results": {
+        const { projectId, region, jobId, maxResults, pageToken } = args;
+        
+        if (!projectId || !region || !jobId) {
+          throw new McpError(ErrorCode.InvalidParams, "Missing required parameters: projectId, region, jobId");
+        }
+        
+        const response = await getQueryResults(
+          String(projectId),
+          String(region),
+          String(jobId),
+          maxResults ? Number(maxResults) : undefined,
+          pageToken ? String(pageToken) : undefined
+        );
+        
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Query results:\n${JSON.stringify(response, null, 2)}`,
+            },
+          ],
+        };
+      }
+      
+      case "submit_dataproc_job": {
+        const { projectId, region, clusterName, jobType, jobConfig, async } = args;
+        
+        if (!projectId || !region || !clusterName || !jobType || !jobConfig) {
+          throw new McpError(ErrorCode.InvalidParams, "Missing required parameters: projectId, region, clusterName, jobType, jobConfig");
+        }
+        
+        try {
+          const { submitDataprocJob } = await import("./services/job.js");
+          const response = await submitDataprocJob({
+            projectId: String(projectId),
+            region: String(region),
+            clusterName: String(clusterName),
+            jobType: String(jobType) as any,
+            jobConfig: jobConfig as any,
+            async: Boolean(async)
+          });
+          
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Dataproc job submitted:\n${JSON.stringify(response, null, 2)}`,
+              },
+            ],
+          };
+        } catch (error) {
+          throw new McpError(ErrorCode.InternalError, `Failed to submit job: ${error}`);
+        }
+      }
+      
+      case "get_job_results": {
+        const { projectId, region, jobId, maxResults } = args;
+        
+        if (!projectId || !region || !jobId) {
+          throw new McpError(ErrorCode.InvalidParams, "Missing required parameters: projectId, region, jobId");
+        }
+        
+        try {
+          const { getDataprocJobResults } = await import("./services/job.js");
+          const response = await getDataprocJobResults({
+            projectId: String(projectId),
+            region: String(region),
+            jobId: String(jobId),
+            maxDisplayRows: maxResults ? Number(maxResults) : 10
+          });
+          
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Job results:\n${JSON.stringify(response, null, 2)}`,
+              },
+            ],
+          };
+        } catch (error) {
+          throw new McpError(ErrorCode.InternalError, `Failed to get job results: ${error}`);
+        }
+      }
+      
+      case "get_zeppelin_url": {
+        const { projectId, region, clusterName } = args;
+        
+        if (!projectId || !region || !clusterName) {
+          throw new McpError(ErrorCode.InvalidParams, "Missing required parameters: projectId, region, clusterName");
+        }
+        
+        // Get cluster details to check if Zeppelin is enabled
+        const cluster = await getCluster(String(projectId), String(region), String(clusterName));
+        
+        // Check if Zeppelin is enabled in the cluster configuration
+        const zeppelinEnabled = cluster?.config?.softwareConfig?.optionalComponents?.includes('ZEPPELIN');
+        
+        if (!zeppelinEnabled) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Zeppelin is not enabled on cluster ${clusterName}. To enable Zeppelin, recreate the cluster with ZEPPELIN in optionalComponents.`,
+              },
+            ],
+          };
+        }
+        
+        // Construct Zeppelin URL (this is the standard format for Dataproc Zeppelin)
+        const zeppelinUrl = `https://${clusterName}-m:8080`;
+        
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Zeppelin URL for cluster ${clusterName}: ${zeppelinUrl}\n\nNote: You may need to set up SSH tunneling or configure firewall rules to access this URL.`,
+            },
+          ],
+        };
+      }
+      
       default:
         throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${toolName}`);
     }
