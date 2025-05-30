@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- semantic-release-changelog -->
 
+## [1.1.5](https://github.com/dipseth/dataproc-mcp/compare/v1.1.4...v1.1.5) (2025-05-30)
+
+
+### 🐛 Bug Fixes
+
+* update server.json authentication details and add to .gitignore ([5afa561](https://github.com/dipseth/dataproc-mcp/commit/5afa56135c2fff0ca223712bcea8d9e02d25a6fb))
+
+
+### 📚 Documentation
+
+* update MCP configuration examples to use NPM package ([4d22183](https://github.com/dipseth/dataproc-mcp/commit/4d22183bb89f2add4f9b8cfb905a34a268861f6e))
+
 ## [1.1.4](https://github.com/dipseth/dataproc-mcp/compare/v1.1.3...v1.1.4) (2025-05-30)
 
 
