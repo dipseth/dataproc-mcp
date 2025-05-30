@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- semantic-release-changelog -->
 
+## [1.1.6](https://github.com/dipseth/dataproc-mcp/compare/v1.1.5...v1.1.6) (2025-05-30)
+
+
+### 🐛 Bug Fixes
+
+* remove duplicate config/server.json entry from .gitignore ([bbc25a2](https://github.com/dipseth/dataproc-mcp/commit/bbc25a2e03bd00f2a2b142255d0b7c9bb2a79947))
+
 ## [1.1.5](https://github.com/dipseth/dataproc-mcp/compare/v1.1.4...v1.1.5) (2025-05-30)
 
 
