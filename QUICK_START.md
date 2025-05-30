@@ -7,7 +7,7 @@ Get your Dataproc MCP Server up and running in under 5 minutes!
 - **Node.js 18.0.0 or higher** ([Download](https://nodejs.org/))
 - **Google Cloud Project** with Dataproc API enabled
 - **Service account** with appropriate permissions
-- **MCP Client** (Claude Desktop, Cline, or other MCP-compatible client)
+- **MCP Client** (Claude Desktop, Roo, or other MCP-compatible client)
 
 ### 📋 Required GCP APIs
 

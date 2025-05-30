@@ -600,12 +600,12 @@ cluster_config:
 }
 ```
 
-### Cline Configuration
+### Roo Configuration
 
 **File: `.vscode/settings.json`**
 ```json
 {
-  "cline.mcpServers": {
+  "mcpServers": {
     "dataproc-server": {
       "command": "node",
       "args": ["/path/to/dataproc-mcp/build/index.js"],

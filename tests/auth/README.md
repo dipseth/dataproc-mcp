@@ -86,7 +86,7 @@ REGION="us-central1"
 CLUSTER_NAME="your-cluster-name"
 JOB_ID="your-job-id"
 SERVICE_ACCOUNT="grpn-sa-ds-mwaa-dataproc@prj-grp-central-sa-prod-0b25.iam.gserviceaccount.com"
-KEY_FILE="/Users/srivers/Repositories/pricing-composer/orchestrator/classpath/gcp_prod_keyfile.json"
+KEY_FILE="/Users/user123/Repositories/path/to/prod/keyfile.json"
 ```
 
 ## Prerequisites

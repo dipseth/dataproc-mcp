@@ -8,10 +8,10 @@ set -e
 # Configuration - UPDATED VALUES
 PROJECT_ID="prj-grp-data-sci-prod-b425"
 REGION="us-central1"
-CLUSTER_NAME="test-pricing-cluster-fixed"
+CLUSTER_NAME="test-cool-idea-cluster-fixed"
 JOB_ID="your-job-id"              # UPDATE WITH ACTUAL JOB ID WHEN AVAILABLE
 SERVICE_ACCOUNT="grpn-sa-terraform-ds-pnp@prj-grp-central-sa-prod-0b25.iam.gserviceaccount.com"
-KEY_FILE="/Users/srivers/Repositories/pricing-composer/orchestrator/classpath/gcp_prod_keyfile.json"
+KEY_FILE="/Users/user123/Repositories/path/to/prod/keyfile.json"
 
 echo "=== Dataproc Authentication Testing ==="
 echo "Project: $PROJECT_ID"

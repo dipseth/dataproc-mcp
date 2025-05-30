@@ -1,9 +1,10 @@
 {
   "name": "@dipseth/dataproc-mcp-server",
   "version": "1.0.2",
-  "description": "A production-ready Model Context Protocol server for Google Cloud Dataproc operations with intelligent defaults and comprehensive tooling",
+  "description": "A production-ready Model Context Protocol (MCP) server for Google Cloud Dataproc operations. Provides intelligent defaults, comprehensive tooling, and seamless integration with Roo (VS Code) for big data workflows.",
   "type": "module",
   "keywords": [
+    "mcpServers",
     "mcp",
     "dataproc",
     "google-cloud",
@@ -14,7 +15,10 @@
     "gcp",
     "cluster-management"
   ],
-  "author": "dipseth",
+  "author": {
+    "name": "dipseth",
+    "url": "https://github.com/dipseth"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",

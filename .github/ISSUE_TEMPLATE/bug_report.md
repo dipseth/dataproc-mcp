@@ -30,7 +30,7 @@ If applicable, add screenshots to help explain your problem.
 - OS: [e.g. macOS, Windows, Linux]
 - Node.js version: [e.g. 18.17.0]
 - Package version: [e.g. 1.0.0]
-- MCP Client: [e.g. Claude Desktop, Cline]
+- MCP Client: [e.g. Claude Desktop, Roo]
 
 **Google Cloud Environment:**
 - Project ID: [if relevant]

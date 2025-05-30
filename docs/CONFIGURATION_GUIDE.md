@@ -61,7 +61,7 @@ For most users, configure the MCP server globally in your MCP settings. This is 
   "dataproc-server1": {
     "command": "node",
     "args": [
-      "/Users/srivers/Documents/Cline/MCP/dataproc-server/build/index.js"
+      "@dipseth/dataproc-mcp-server"
     ],
     "disabled": false,
     "timeout": 60,
@@ -163,7 +163,7 @@ profiles/
 ├── development/
 │   └── small.yaml
 └── production/
-    ├── pricing-promotions.yaml
+    ├── cool-idea-promotions.yaml
     └── high-memory/
         └── analysis.yaml
 ```

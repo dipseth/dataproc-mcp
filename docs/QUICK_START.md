@@ -114,14 +114,14 @@ Add to your Claude Desktop configuration:
 }
 ```
 
-### Cline (VS Code)
+### Roo (VS Code)
 
 Add to your VS Code settings:
 
 **File: `.vscode/settings.json`**
 ```json
 {
-  "cline.mcpServers": {
+  "mcpServers": {
     "dataproc-server": {
       "command": "dataproc-mcp",
       "disabled": false,
