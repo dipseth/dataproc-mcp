@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- semantic-release-changelog -->
 
+## [2.0.0](https://github.com/dipseth/dataproc-mcp/compare/v1.1.6...v2.0.0) (2025-05-31)
+
+
+### ⚠ BREAKING CHANGES
+
+* None (fully backward compatible)
+
+### 🚀 Features
+
+* add production-ready web hosting and enhanced async query tracking ([#12](https://github.com/dipseth/dataproc-mcp/issues/12)) ([21c3437](https://github.com/dipseth/dataproc-mcp/commit/21c3437127fcc0d3b891b51677a5c38717c47a69)), closes [#11](https://github.com/dipseth/dataproc-mcp/issues/11)
+
 ## [1.1.6](https://github.com/dipseth/dataproc-mcp/compare/v1.1.5...v1.1.6) (2025-05-30)
 
 
