@@ -115,5 +115,5 @@ export interface SchemaField {
 }
 
 export interface QueryRow {
-  values?: any[];
+  values?: unknown[];
 }

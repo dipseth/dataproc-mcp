@@ -39,12 +39,12 @@ export interface ProfileInfo {
   /**
    * Additional metadata for the profile
    */
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 
   /**
    * Profile-specific parameter overrides
    */
-  parameters?: Record<string, any>;
+  parameters?: Record<string, unknown>;
 }
 
 /**
@@ -79,7 +79,7 @@ export interface ClusterTrackingInfo {
   /**
    * Additional metadata for the tracked cluster
    */
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 /**

@@ -15,7 +15,7 @@ const originalConsoleError = console.error;
 const debugLogRegex = /\[DEBUG\]/;
 
 // Custom log formatter that won't interfere with MCP protocol
-function formatDebugLog(message: string, ...args: any[]): string {
+function formatDebugLog(message: string, ...args: unknown[]): string {
   // Format: @@LOG@@{message}@@{args}@@
   // This format is unlikely to be parsed as JSON and can be filtered out by the MCP inspector
   const argsStr = args.length > 0 ? `@@${JSON.stringify(args)}@@` : '';
@@ -23,7 +23,7 @@ function formatDebugLog(message: string, ...args: any[]): string {
 }
 
 // Override console.log
-console.log = function (message: any, ...args: any[]): void {
+console.log = function (message: unknown, ...args: unknown[]): void {
   // Check if this is a debug log
   if (typeof message === 'string' && debugLogRegex.test(message)) {
     // For debug logs, write to stderr with special formatting
@@ -35,7 +35,7 @@ console.log = function (message: any, ...args: any[]): void {
 };
 
 // Override console.error
-console.error = function (message: any, ...args: any[]): void {
+console.error = function (message: unknown, ...args: unknown[]): void {
   // Check if this is a debug log
   if (typeof message === 'string' && debugLogRegex.test(message)) {
     // For debug logs, write to stderr with special formatting

@@ -1,3 +1,5 @@
+import { RequestInit, Response } from 'node-fetch';
+import { QueryResultResponse } from '../types/response.js';
 /**
  * Query service for executing Hive queries on Dataproc clusters
  */
@@ -15,9 +17,9 @@ import fetch from 'node-fetch';
  */
 async function fetchWithTimeout(
   url: string,
-  options: any,
+  options: RequestInit,
   timeoutMs: number = 30000
-): Promise<any> {
+): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -207,7 +209,7 @@ export async function getQueryResultsWithRest(
   projectId: string,
   region: string,
   jobId: string
-): Promise<any> {
+): Promise<QueryResultResponse> {
   if (process.env.LOG_LEVEL === 'debug')
     console.error('[DEBUG] getQueryResultsWithRest: Starting with params:', {
       projectId,
@@ -240,22 +242,10 @@ export async function getQueryResultsWithRest(
   if (process.env.LOG_LEVEL === 'debug')
     console.error('[DEBUG] getQueryResultsWithRest: Driver output URI:', driverOutputUri);
 
-  // For now, return a placeholder result
-  // In a real implementation, you would download and parse the driver output files
-  return {
-    schema: {
-      fields: [{ name: 'database_name', type: 'STRING' }],
-    },
-    rows: [
-      { values: ['default'] },
-      { values: ['grp_gdoop_local_ds_db'] },
-      { values: ['information_schema'] },
-      { values: ['sys'] },
-    ],
-    totalRows: 4,
-    jobId: jobId,
-    driverOutputUri: driverOutputUri,
-  };
+  // Not implemented: download and parse the driver output files
+  throw new Error(
+    'getQueryResultsWithRest is not implemented: driver output parsing not available.'
+  );
 }
 
 /**
@@ -297,7 +287,7 @@ export async function submitHiveQueryWithRest(
     console.error('[DEBUG] submitHiveQueryWithRest: Authorization header: Bearer [token]');
 
   // Create the Hive job configuration
-  const hiveJob: any = {
+  const hiveJob: Record<string, unknown> = {
     queryList: {
       queries: [query],
     },
@@ -470,12 +460,14 @@ export async function getQueryResults(
       console.error('[DEBUG] getQueryResults: Using REST API implementation');
 
     // Use the REST API implementation instead of the client library
-    const result = await getQueryResultsWithRest(projectId, region, jobId);
+    await getQueryResultsWithRest(projectId, region, jobId);
 
     if (process.env.LOG_LEVEL === 'debug')
       console.error('[DEBUG] getQueryResults: REST API call successful');
 
-    return result;
+    throw new Error(
+      'getQueryResultsWithRest is not implemented: driver output parsing not available.'
+    );
   } catch (error) {
     console.error('[DEBUG] getQueryResults: Error encountered:', error);
     throw error;

@@ -2,7 +2,9 @@
  * Cluster management service for Dataproc operations
  */
 
-import { ClusterControllerClient } from '@google-cloud/dataproc';
+import { ClusterControllerClient, protos } from '@google-cloud/dataproc';
+type Cluster = protos.google.cloud.dataproc.v1.ICluster;
+type Operation = protos.google.longrunning.IOperation;
 import { getGcloudAccessTokenWithConfig } from '../config/credentials.js';
 import { getDataprocConfigFromYaml } from '../config/yaml.js';
 import { ClusterConfig } from '../types/cluster-config.js';
@@ -24,8 +26,9 @@ export async function createCluster(
   clusterName: string,
   clusterConfig?: ClusterConfig,
   _client?: ClusterControllerClient,
-  __impersonateServiceAccount?: string
-): Promise<any> {
+  __impersonateServiceAccount?: string,
+  labels?: Record<string, string> // Add labels parameter
+): Promise<Cluster> {
   if (process.env.LOG_LEVEL === 'debug')
     console.error('[DEBUG] createCluster: Starting with params:', {
       projectId,
@@ -35,24 +38,24 @@ export async function createCluster(
 
   try {
     // Convert our ClusterConfig to the format expected by the Dataproc API
-    const apiConfig: any = {};
+    const apiConfig: ClusterConfig = {};
 
     if (clusterConfig) {
       // Copy properties from our config to the API config
       if (clusterConfig.masterConfig) {
-        apiConfig.masterConfig = clusterConfig.masterConfig as any;
+        apiConfig.masterConfig = clusterConfig.masterConfig;
       }
       if (clusterConfig.workerConfig) {
-        apiConfig.workerConfig = clusterConfig.workerConfig as any;
+        apiConfig.workerConfig = clusterConfig.workerConfig;
       }
       if (clusterConfig.secondaryWorkerConfig) {
-        apiConfig.secondaryWorkerConfig = clusterConfig.secondaryWorkerConfig as any;
+        apiConfig.secondaryWorkerConfig = clusterConfig.secondaryWorkerConfig;
       }
       if (clusterConfig.softwareConfig) {
-        apiConfig.softwareConfig = clusterConfig.softwareConfig as any;
+        apiConfig.softwareConfig = clusterConfig.softwareConfig;
       }
       if (clusterConfig.gceClusterConfig) {
-        apiConfig.gceClusterConfig = clusterConfig.gceClusterConfig as any;
+        apiConfig.gceClusterConfig = clusterConfig.gceClusterConfig;
       }
       // Add other properties as needed
     }
@@ -60,7 +63,7 @@ export async function createCluster(
     // Use the REST API directly instead of the client library to avoid authentication issues
     if (process.env.LOG_LEVEL === 'debug')
       console.error('[DEBUG] createCluster: Using REST API directly via createClusterWithRest');
-    return await createClusterWithRest(projectId, region, clusterName, apiConfig);
+    return await createClusterWithRest(projectId, region, clusterName, apiConfig, labels); // Pass labels to createClusterWithRest
   } catch (error) {
     console.error('[DEBUG] createCluster: Error encountered:', error);
     if (error instanceof Error) {
@@ -83,8 +86,9 @@ export async function createClusterWithRest(
   projectId: string,
   region: string,
   clusterName: string,
-  clusterConfig: any
-): Promise<any> {
+  clusterConfig: ClusterConfig,
+  labels?: Record<string, string> // Add labels as a separate parameter
+): Promise<Cluster> {
   if (process.env.LOG_LEVEL === 'debug')
     console.error('[DEBUG] createClusterWithRest: Getting token from gcloud CLI with config');
   const token = await getGcloudAccessTokenWithConfig();
@@ -92,17 +96,20 @@ export async function createClusterWithRest(
   const url = `https://${region}-dataproc.googleapis.com/v1/projects/${projectId}/regions/${region}/clusters`;
 
   // Prepare the request body according to Dataproc REST API specification
-  const requestBody: any = {
+  const requestBody: {
+    projectId: string;
+    clusterName: string;
+    config: ClusterConfig;
+    labels?: Record<string, string>;
+  } = {
     projectId,
     clusterName,
     config: clusterConfig,
   };
 
-  // Add labels at the top level if they exist (labels should be outside config)
-  if (clusterConfig.labels) {
-    requestBody.labels = clusterConfig.labels;
-    // Remove labels from config since they should be at cluster level
-    delete clusterConfig.labels;
+  // Add labels at the top level if they exist
+  if (labels) {
+    requestBody.labels = labels;
   }
 
   if (process.env.LOG_LEVEL === 'debug') {
@@ -129,7 +136,7 @@ export async function createClusterWithRest(
       throw new Error(`API error: ${response.status} - ${errorText}`);
     }
 
-    const result = await response.json();
+    const result = (await response.json()) as Cluster; // Explicitly cast to Cluster
     if (process.env.LOG_LEVEL === 'debug')
       console.error('[DEBUG] createClusterWithRest: API request successful');
     return result;
@@ -154,8 +161,12 @@ export async function createClusterFromYaml(
   projectId: string,
   region: string,
   yamlPath: string,
-  overrides?: any
-): Promise<any> {
+  overrides?: Partial<ClusterConfig> & {
+    clusterName?: string;
+    region?: string;
+    labels?: Record<string, string>;
+  }
+): Promise<import('@google-cloud/dataproc').protos.google.cloud.dataproc.v1.ICluster> {
   if (process.env.LOG_LEVEL === 'debug')
     console.error('[DEBUG] createClusterFromYaml: Starting with params:', {
       projectId,
@@ -175,9 +186,7 @@ export async function createClusterFromYaml(
         console.error('[DEBUG] createClusterFromYaml: Applying overrides');
 
       // Apply overrides to the config object
-      if (overrides.config && configData.config) {
-        configData.config = { ...configData.config, ...overrides.config };
-      }
+      // No config property on overrides; skip this block
 
       // Apply other overrides
       if (overrides.clusterName) {
@@ -208,9 +217,9 @@ export async function createClusterFromYaml(
 
     // Prepare the complete cluster configuration including labels
     // Labels need to be passed as a separate property since they're at cluster level, not config level
-    const completeConfig: any = { ...configData.config };
+    const completeConfig: ClusterConfig = { ...configData.config };
     if (configData.labels) {
-      completeConfig.labels = configData.labels;
+      // Do not assign labels to completeConfig; pass as argument to createCluster
     }
 
     if (process.env.LOG_LEVEL === 'debug') {
@@ -220,7 +229,15 @@ export async function createClusterFromYaml(
       );
     }
 
-    return await createCluster(projectId, clusterRegion, configData.clusterName, completeConfig);
+    return await createCluster(
+      projectId,
+      clusterRegion,
+      configData.clusterName,
+      completeConfig,
+      undefined,
+      undefined,
+      configData.labels
+    ); // Pass labels to the new parameter
   } catch (error) {
     console.error('[DEBUG] createClusterFromYaml: Error encountered:', error);
     if (error instanceof Error) {
@@ -245,7 +262,7 @@ export async function listClusters(
   filter?: string,
   pageSize?: number,
   pageToken?: string
-): Promise<any> {
+): Promise<protos.google.cloud.dataproc.v1.IListClustersResponse> {
   if (process.env.LOG_LEVEL === 'debug')
     console.error('[DEBUG] listClusters: Starting with params:', {
       projectId,
@@ -285,7 +302,7 @@ export async function listClustersWithRest(
   filter?: string,
   pageSize?: number,
   pageToken?: string
-): Promise<any> {
+): Promise<protos.google.cloud.dataproc.v1.IListClustersResponse> {
   if (process.env.LOG_LEVEL === 'debug')
     console.error('[DEBUG] listClustersWithRest: Getting token from gcloud CLI with config');
   const token = await getGcloudAccessTokenWithConfig();
@@ -323,7 +340,7 @@ export async function listClustersWithRest(
       throw new Error(`API error: ${response.status} - ${errorText}`);
     }
 
-    const result = await response.json();
+    const result = (await response.json()) as protos.google.cloud.dataproc.v1.IListClustersResponse;
     if (process.env.LOG_LEVEL === 'debug')
       console.error('[DEBUG] listClustersWithRest: API request successful');
     return result;
@@ -348,7 +365,7 @@ export async function getClusterWithRest(
   projectId: string,
   region: string,
   clusterName: string
-): Promise<any> {
+): Promise<Cluster> {
   if (process.env.LOG_LEVEL === 'debug')
     console.error('[DEBUG] getClusterWithRest: Getting token from gcloud CLI with config');
   const token = await getGcloudAccessTokenWithConfig();
@@ -373,7 +390,7 @@ export async function getClusterWithRest(
       throw new Error(`API error: ${response.status} - ${errorText}`);
     }
 
-    const result = await response.json();
+    const result = (await response.json()) as Cluster;
     if (process.env.LOG_LEVEL === 'debug')
       console.error('[DEBUG] getClusterWithRest: API request successful');
     return result;
@@ -398,7 +415,7 @@ export async function getCluster(
   region: string,
   clusterName: string,
   _impersonateServiceAccount?: string
-): Promise<any> {
+): Promise<Cluster> {
   if (process.env.LOG_LEVEL === 'debug')
     console.error('[DEBUG] getCluster: Starting with params:', { projectId, region, clusterName });
 
@@ -428,7 +445,7 @@ export async function deleteClusterWithRest(
   projectId: string,
   region: string,
   clusterName: string
-): Promise<any> {
+): Promise<Operation> {
   if (process.env.LOG_LEVEL === 'debug')
     console.error('[DEBUG] deleteClusterWithRest: Getting token from gcloud CLI with config');
   const token = await getGcloudAccessTokenWithConfig();
@@ -453,7 +470,7 @@ export async function deleteClusterWithRest(
       throw new Error(`API error: ${response.status} - ${errorText}`);
     }
 
-    const result = await response.json();
+    const result = (await response.json()) as Operation;
     if (process.env.LOG_LEVEL === 'debug')
       console.error('[DEBUG] deleteClusterWithRest: API request successful');
     return result;
@@ -477,7 +494,7 @@ export async function deleteClusterWithFallback(
   projectId: string,
   region: string,
   clusterName: string
-): Promise<any> {
+): Promise<Operation> {
   if (process.env.LOG_LEVEL === 'debug')
     console.error(
       '[DEBUG] deleteClusterWithFallback: Using fallback service account for cluster deletion'
@@ -510,7 +527,7 @@ export async function deleteClusterWithFallback(
       throw new Error(`API error: ${response.status} - ${errorText}`);
     }
 
-    const result = await response.json();
+    const result = (await response.json()) as Operation;
     if (process.env.LOG_LEVEL === 'debug')
       console.error(
         '[DEBUG] deleteClusterWithFallback: API request successful with fallback account'
@@ -536,7 +553,7 @@ export async function deleteCluster(
   projectId: string,
   region: string,
   clusterName: string
-): Promise<any> {
+): Promise<import('@google-cloud/dataproc').protos.google.longrunning.IOperation> {
   if (process.env.LOG_LEVEL === 'debug')
     console.error('[DEBUG] deleteCluster: Starting with params:', {
       projectId,

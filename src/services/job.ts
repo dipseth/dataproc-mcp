@@ -3,12 +3,13 @@
  * Supports Hive, Spark, PySpark, Presto, and other job types
  */
 
-import fetch from 'node-fetch';
+import fetch, { Response, RequestInit } from 'node-fetch';
 import { getGcloudAccessTokenWithConfig } from '../config/credentials.js';
 import { JobOutputHandler, JobOutputOptions } from './job-output-handler.js';
 import { OutputFormat } from '../types/gcs-types.js';
 import { GCSService } from './gcs.js';
 import { logger } from '../utils/logger.js';
+import { protos } from '@google-cloud/dataproc';
 
 /**
  * Fetch with timeout wrapper
@@ -19,9 +20,9 @@ import { logger } from '../utils/logger.js';
  */
 async function fetchWithTimeout(
   url: string,
-  options: any,
+  options: RequestInit,
   timeoutMs: number = 30000
-): Promise<any> {
+): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -56,7 +57,7 @@ export interface SubmitDataprocJobOptions {
   region: string;
   clusterName: string;
   jobType: DataprocJobType;
-  jobConfig: any;
+  jobConfig: Record<string, unknown>;
   async?: boolean;
 }
 
@@ -86,7 +87,17 @@ export interface GetJobResultsOptions extends JobOutputOptions {
 /**
  * Submit a Dataproc job (generic)
  */
-export async function submitDataprocJob(options: SubmitDataprocJobOptions): Promise<any> {
+export interface SubmitJobResponse {
+  jobReference?: protos.google.cloud.dataproc.v1.IJobReference;
+  operation?: protos.google.longrunning.IOperation;
+  jobId?: string;
+  status?: string;
+  details?: protos.google.cloud.dataproc.v1.IJob;
+}
+
+export async function submitDataprocJob(
+  options: SubmitDataprocJobOptions
+): Promise<SubmitJobResponse> {
   const { projectId, region, clusterName, jobType, jobConfig, async } = options;
 
   // Use the service account from the server configuration
@@ -95,7 +106,7 @@ export async function submitDataprocJob(options: SubmitDataprocJobOptions): Prom
   const url = `https://${region}-dataproc.googleapis.com/v1/projects/${projectId}/regions/${region}/jobs:submit`;
 
   // Build the job object based on type
-  const job: any = {
+  const job: protos.google.cloud.dataproc.v1.IJob = {
     placement: { clusterName },
   };
 
@@ -148,33 +159,34 @@ export async function submitDataprocJob(options: SubmitDataprocJobOptions): Prom
     throw new Error(`Dataproc job submission failed: ${response.status} - ${errorText}`);
   }
 
-  const result: any = await response.json();
+  const result = (await response.json()) as protos.google.cloud.dataproc.v1.IJob;
 
   // If async, return immediately with job reference
   if (async) {
     return {
-      jobReference: result.reference || result.jobReference || { jobId: result.id },
+      jobReference: result.reference || undefined,
       operation: result,
+      jobId: result.reference?.jobId || undefined,
     };
   }
 
   // Otherwise, poll for job completion
-  const jobId = result.reference?.jobId || result.jobReference?.jobId || result.id;
+  const jobId = result.reference?.jobId;
   if (!jobId) throw new Error('No jobId found in Dataproc job submission response');
 
-  let jobStatus;
+  let jobStatus: protos.google.cloud.dataproc.v1.IJob;
   do {
     await new Promise((res) => setTimeout(res, 2000));
     jobStatus = await getDataprocJobStatus({ projectId, region, jobId });
   } while (
-    jobStatus.status?.state !== 'DONE' &&
-    jobStatus.status?.state !== 'ERROR' &&
-    jobStatus.status?.state !== 'CANCELLED'
+    jobStatus.status?.state !== protos.google.cloud.dataproc.v1.JobStatus.State.DONE &&
+    jobStatus.status?.state !== protos.google.cloud.dataproc.v1.JobStatus.State.ERROR &&
+    jobStatus.status?.state !== protos.google.cloud.dataproc.v1.JobStatus.State.CANCELLED
   );
 
   return {
     jobId,
-    status: jobStatus.status?.state,
+    status: jobStatus.status?.state as unknown as string, // Cast to string for simplicity
     details: jobStatus,
   };
 }
@@ -186,7 +198,7 @@ export async function getDataprocJobStatus(options: {
   projectId: string;
   region: string;
   jobId: string;
-}): Promise<any> {
+}): Promise<protos.google.cloud.dataproc.v1.IJob> {
   const startTime = Date.now();
   console.error(`[TIMING] getDataprocJobStatus: Starting MCP tool execution`);
   const { projectId, region, jobId } = options;
@@ -229,7 +241,7 @@ export async function getDataprocJobStatus(options: {
     }
 
     const parseStartTime = Date.now();
-    const result = await response.json();
+    const result = (await response.json()) as protos.google.cloud.dataproc.v1.IJob;
     const parseDuration = Date.now() - parseStartTime;
     const totalDuration = Date.now() - startTime;
 
@@ -257,7 +269,7 @@ const outputHandler = new JobOutputHandler();
  * @param tables Table data to save
  * @returns Path to the saved file
  */
-async function saveResultsAsTsv(jobId: string, tables: any[]): Promise<string> {
+async function saveResultsAsTsv(jobId: string, tables: unknown[]): Promise<string> {
   // Ensure the output directory exists
   const fs = await import('fs/promises');
   const path = await import('path');
@@ -272,13 +284,18 @@ async function saveResultsAsTsv(jobId: string, tables: any[]): Promise<string> {
   const outputPath = path.join(outputDir, `job-${jobId}-results.tsv`);
 
   // If there are no tables or no rows, create an empty file
-  if (!tables || tables.length === 0 || !tables[0].rows || tables[0].rows.length === 0) {
+  if (
+    !tables ||
+    tables.length === 0 ||
+    !(tables[0] as { rows?: unknown[] })?.rows ||
+    (tables[0] as { rows?: unknown[] })?.rows?.length === 0
+  ) {
     await fs.writeFile(outputPath, 'No data available', 'utf8');
     return outputPath;
   }
 
   // Get the first table (most common case)
-  const table = tables[0];
+  const table = tables[0] as { columns: string[]; rows: unknown[][] };
   const { columns, rows } = table;
 
   // Create TSV content
@@ -287,7 +304,7 @@ async function saveResultsAsTsv(jobId: string, tables: any[]): Promise<string> {
   // Add all rows
   for (const row of rows) {
     const rowValues = columns.map((col: string) => {
-      const value = row[col];
+      const value = (row as unknown[])[columns.indexOf(col)];
       // Handle null/undefined values and escape tabs in values
       return value !== undefined && value !== null
         ? String(value).replace(/\t/g, ' ') // Replace tabs with spaces
@@ -397,13 +414,20 @@ export async function getDataprocJobResults<T>(
             // generate the formatted output using the OutputParser
             try {
               const outputParser = new (await import('./output-parser.js')).OutputParser();
-              const typedOutput = parsedOutput as any;
+              const typedOutput = parsedOutput as Record<string, unknown>;
 
               // Only attempt to format if tables data is available
               if (typedOutput.tables) {
                 // Generate a formatted ASCII table representation of the data
                 // This enhances readability for users viewing the results
-                typedOutput.formattedOutput = outputParser.formatTablesOutput(typedOutput.tables);
+                typedOutput.formattedOutput = outputParser.formatTablesOutput(
+                  Array.isArray(typedOutput.tables)
+                    ? (typedOutput.tables as Array<{
+                        columns: string[];
+                        rows: Array<Record<string, unknown>>;
+                      }>)
+                    : []
+                );
               }
             } catch (formatError) {
               console.error('[DEBUG] getDataprocJobResults: Error formatting output:', formatError);
@@ -414,7 +438,10 @@ export async function getDataprocJobResults<T>(
           let tsvFilePath = '';
           if (parsedOutput && typeof parsedOutput === 'object' && 'tables' in parsedOutput) {
             try {
-              tsvFilePath = await saveResultsAsTsv(jobId, (parsedOutput as any).tables);
+              tsvFilePath = await saveResultsAsTsv(
+                jobId,
+                (parsedOutput as { tables: unknown[] }).tables
+              );
               console.log(
                 `[DEBUG] getDataprocJobResults: Saved results to TSV file: ${tsvFilePath}`
               );
@@ -473,12 +500,19 @@ export async function getDataprocJobResults<T>(
           // This provides consistent behavior regardless of where the data comes from
           try {
             const outputParser = new (await import('./output-parser.js')).OutputParser();
-            const typedOutput = parsedOutput as any;
+            const typedOutput = parsedOutput as Record<string, unknown>;
 
             if (typedOutput.tables) {
               // Generate formatted table output for better readability
               // This uses the same formatting logic as the direct output approach
-              typedOutput.formattedOutput = outputParser.formatTablesOutput(typedOutput.tables);
+              typedOutput.formattedOutput = outputParser.formatTablesOutput(
+                Array.isArray(typedOutput.tables)
+                  ? (typedOutput.tables as Array<{
+                      columns: string[];
+                      rows: Array<Record<string, unknown>>;
+                    }>)
+                  : []
+              );
             }
           } catch (formatError) {
             console.error(
@@ -492,7 +526,10 @@ export async function getDataprocJobResults<T>(
         let tsvFilePath = '';
         if (parsedOutput && typeof parsedOutput === 'object' && 'tables' in parsedOutput) {
           try {
-            tsvFilePath = await saveResultsAsTsv(jobId, (parsedOutput as any).tables);
+            tsvFilePath = await saveResultsAsTsv(
+              jobId,
+              (parsedOutput as { tables: unknown[] }).tables
+            );
             console.log(`[DEBUG] getDataprocJobResults: Saved results to TSV file: ${tsvFilePath}`);
           } catch (saveError) {
             console.error('[DEBUG] getDataprocJobResults: Error saving TSV file:', saveError);
@@ -504,10 +541,14 @@ export async function getDataprocJobResults<T>(
           parsedOutput,
           tsvFilePath,
         } as unknown as T;
-      } catch (localFileError: any) {
-        console.log(
-          `[DEBUG] getDataprocJobResults: Local file not found or error: ${localFileError.message || 'Unknown error'}`
-        );
+      } catch (localFileError: unknown) {
+        const msg =
+          typeof localFileError === 'object' &&
+          localFileError !== null &&
+          'message' in localFileError
+            ? (localFileError as { message?: string }).message
+            : 'Unknown error';
+        console.log(`[DEBUG] getDataprocJobResults: Local file not found or error: ${msg}`);
         // Continue to next approach
       }
     } catch (localError) {
@@ -601,12 +642,19 @@ export async function getDataprocJobResults<T>(
         // We still want to provide formatted output for consistency across all approaches
         try {
           const outputParser = new (await import('./output-parser.js')).OutputParser();
-          const typedOutput = parsedOutput as any;
+          const typedOutput = parsedOutput as { tables?: unknown[]; [key: string]: unknown };
 
           if (typedOutput.tables) {
             // Generate formatted output for directory-based results
             // This ensures all three approaches provide the same enhanced output format
-            typedOutput.formattedOutput = outputParser.formatTablesOutput(typedOutput.tables);
+            typedOutput.formattedOutput = outputParser.formatTablesOutput(
+              Array.isArray(typedOutput.tables)
+                ? (typedOutput.tables as Array<{
+                    columns: string[];
+                    rows: Array<Record<string, unknown>>;
+                  }>)
+                : []
+            );
           }
         } catch (formatError) {
           console.error(
@@ -620,7 +668,12 @@ export async function getDataprocJobResults<T>(
       let tsvFilePath = '';
       if (parsedOutput && typeof parsedOutput === 'object' && 'tables' in parsedOutput) {
         try {
-          tsvFilePath = await saveResultsAsTsv(jobId, (parsedOutput as any).tables);
+          tsvFilePath = await saveResultsAsTsv(
+            jobId,
+            Array.isArray((parsedOutput as { tables?: unknown[] }).tables)
+              ? (parsedOutput as { tables: unknown[] }).tables
+              : []
+          );
           console.log(`[DEBUG] getDataprocJobResults: Saved results to TSV file: ${tsvFilePath}`);
         } catch (saveError) {
           console.error('[DEBUG] getDataprocJobResults: Error saving TSV file:', saveError);
@@ -632,26 +685,36 @@ export async function getDataprocJobResults<T>(
         parsedOutput,
         tsvFilePath,
       } as unknown as T;
-    } catch (outputError: any) {
+    } catch (outputError: unknown) {
       console.error(
         '[DEBUG] getDataprocJobResults: Error in outputHandler.getJobOutputs:',
         outputError
       );
-      logger.error('getDataprocJobResults: Error in outputHandler.getJobOutputs:', outputError);
-      logger.error('getDataprocJobResults: Error details:', {
-        message: outputError.message,
-        name: outputError.name,
-        code: outputError.code,
-      });
+      if (typeof outputError === 'object' && outputError !== null) {
+        logger.error('getDataprocJobResults: Error in outputHandler.getJobOutputs:', outputError);
+        logger.error('getDataprocJobResults: Error details:', {
+          message: (outputError as { message?: string }).message,
+          name: (outputError as { name?: string }).name,
+          code: (outputError as { code?: string | number }).code,
+        });
+      }
       throw outputError; // Re-throw to be caught by outer catch
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(
       '[DEBUG] getDataprocJobResults: Error downloading or processing GCS output:',
       error
     );
-    logger.error('getDataprocJobResults: Error downloading or processing GCS output:', error);
-    logger.error('getDataprocJobResults: Error type:', error.constructor?.name || 'Unknown');
+    if (typeof error === 'object' && error !== null && 'constructor' in error) {
+      logger.error('getDataprocJobResults: Error downloading or processing GCS output:', error);
+      logger.error(
+        'getDataprocJobResults: Error type:',
+        (error as { constructor?: { name?: string } }).constructor?.name || 'Unknown'
+      );
+    } else {
+      logger.error('getDataprocJobResults: Error downloading or processing GCS output:', error);
+      logger.error('getDataprocJobResults: Error type:', 'Unknown');
+    }
     logger.error('getDataprocJobResults: Returning job details without parsedOutput');
     return jobDetails as unknown as T;
   }

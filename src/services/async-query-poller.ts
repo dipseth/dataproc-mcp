@@ -115,7 +115,8 @@ export class AsyncQueryPoller extends EventEmitter {
       // Use modern Node.js timers/promises for better async handling
       const startTime = Date.now();
 
-      for await (const _interval of setInterval(this.config.intervalMs!, startTime, {
+      const intervalMs = typeof this.config.intervalMs === 'number' ? this.config.intervalMs : 1000;
+      for await (const _interval of setInterval(intervalMs, startTime, {
         signal: this.pollingController.signal,
       })) {
         void _interval; // Explicitly ignore the interval value
@@ -130,8 +131,13 @@ export class AsyncQueryPoller extends EventEmitter {
           this.emit('pollError', { error, timestamp: new Date().toISOString() });
         }
       }
-    } catch (error: any) {
-      if (error.name === 'AbortError') {
+    } catch (error: unknown) {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'name' in error &&
+        (error as { name: string }).name === 'AbortError'
+      ) {
         logger.info('AsyncQueryPoller: Polling stopped via abort signal');
       } else {
         logger.error('AsyncQueryPoller: Polling error:', error);
@@ -160,7 +166,9 @@ export class AsyncQueryPoller extends EventEmitter {
     try {
       logger.debug('AsyncQueryPoller: Starting cleanup interval');
 
-      for await (const _cleanup of setInterval(this.config.cleanupIntervalMs!, Date.now(), {
+      const cleanupIntervalMs =
+        typeof this.config.cleanupIntervalMs === 'number' ? this.config.cleanupIntervalMs : 60000;
+      for await (const _cleanup of setInterval(cleanupIntervalMs, Date.now(), {
         signal: this.cleanupController.signal,
       })) {
         void _cleanup; // Explicitly ignore the cleanup value
@@ -181,8 +189,15 @@ export class AsyncQueryPoller extends EventEmitter {
           timestamp: new Date().toISOString(),
         });
       }
-    } catch (error: any) {
-      if (error.name !== 'AbortError') {
+    } catch (error: unknown) {
+      if (
+        !(
+          typeof error === 'object' &&
+          error !== null &&
+          'name' in error &&
+          (error as { name: string }).name === 'AbortError'
+        )
+      ) {
         logger.error('AsyncQueryPoller: Cleanup interval error:', error);
       }
     }
@@ -323,7 +338,10 @@ export class AsyncQueryPoller extends EventEmitter {
     }
 
     // Implement concurrency control to prevent API overwhelming
-    const batchSize = Math.min(this.config.maxConcurrentPolls!, autoUpdateJobs.length);
+    const batchSize = Math.min(
+      typeof this.config.maxConcurrentPolls === 'number' ? this.config.maxConcurrentPolls : 5,
+      autoUpdateJobs.length
+    );
     const batches: string[][] = [];
 
     for (let i = 0; i < autoUpdateJobs.length; i += batchSize) {
@@ -369,13 +387,16 @@ export class AsyncQueryPoller extends EventEmitter {
       this.concurrentPolls++;
       await this.updateQueryStatus(jobId);
     } catch (error) {
-      if (retryCount < this.config.maxRetries!) {
+      const maxRetries = typeof this.config.maxRetries === 'number' ? this.config.maxRetries : 3;
+      if (retryCount < maxRetries) {
         logger.warn(
-          `AsyncQueryPoller: Retrying job ${jobId} (attempt ${retryCount + 1}/${this.config.maxRetries})`
+          `AsyncQueryPoller: Retrying job ${jobId} (attempt ${retryCount + 1}/${maxRetries})`
         );
 
         // Exponential backoff for retries
-        const delay = this.config.retryDelayMs! * Math.pow(2, retryCount);
+        const retryDelayMs =
+          typeof this.config.retryDelayMs === 'number' ? this.config.retryDelayMs : 1000;
+        const delay = retryDelayMs * Math.pow(2, retryCount);
         await new Promise((resolve) => setTimeout(resolve, delay));
 
         return this.updateQueryStatusWithRetry(jobId, retryCount + 1);

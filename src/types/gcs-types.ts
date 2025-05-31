@@ -55,8 +55,8 @@ export type GCSErrorType = (typeof GCSErrorTypes)[keyof typeof GCSErrorTypes];
  */
 export class GCSError extends Error {
   type: GCSErrorType;
-  details?: any;
-  constructor(type: GCSErrorType, message: string, details?: any) {
+  details?: unknown;
+  constructor(type: GCSErrorType, message: string, details?: unknown) {
     super(message);
     this.type = type;
     this.details = details;

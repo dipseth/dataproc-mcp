@@ -191,10 +191,10 @@ export class ProfileManager {
         : path.basename(relativePath, '.yaml');
 
     // Extract metadata from the YAML
-    const metadata: Record<string, any> = {};
+    const metadata: Record<string, unknown> = {};
 
     let clusterName: string;
-    let parameters: Record<string, any> | undefined;
+    let parameters: Record<string, unknown> | undefined;
 
     // Check if it's the traditional format
     if ('cluster' in yamlConfig) {
@@ -237,7 +237,10 @@ export class ProfileManager {
       }
 
       // Extract parameters from enhanced config
-      parameters = config?.parameters;
+      parameters =
+        typeof config?.parameters === 'object' && config.parameters !== null
+          ? (config.parameters as Record<string, unknown>)
+          : undefined;
     }
 
     // Create the profile info
@@ -284,7 +287,7 @@ export class ProfileManager {
    * @param profileId Profile ID
    * @returns Resolved parameters including defaults and overrides
    */
-  getProfileParameters(profileId: string): Record<string, any> {
+  getProfileParameters(profileId: string): Record<string, unknown> {
     const profile = this.profiles.get(profileId);
     if (!profile) {
       throw new Error(`Profile ${profileId} not found`);

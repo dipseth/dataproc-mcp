@@ -8,7 +8,7 @@ import { DefaultParameterManagerConfig, ParameterDefinition } from '../types/def
 export class DefaultParameterManager {
   private config: DefaultParameterManagerConfig;
   private parameterDefinitions: Map<string, ParameterDefinition>;
-  private environmentParams: Map<string, Record<string, any>>;
+  private environmentParams: Map<string, Record<string, unknown>>;
 
   constructor(config: DefaultParameterManagerConfig) {
     this.config = config;
@@ -39,7 +39,7 @@ export class DefaultParameterManager {
    * @param environment Optional environment name (uses default if not specified)
    * @returns Parameter value
    */
-  getParameterValue(paramName: string, environment?: string): any {
+  getParameterValue(paramName: string, environment?: string): unknown {
     const paramDef = this.parameterDefinitions.get(paramName);
     if (!paramDef) {
       throw new Error(`Parameter ${paramName} not found`);
@@ -72,8 +72,8 @@ export class DefaultParameterManager {
    * @param environment Optional environment name (uses default if not specified)
    * @returns Record of parameter names to values
    */
-  getAllParameters(environment?: string): Record<string, any> {
-    const result: Record<string, any> = {};
+  getAllParameters(environment?: string): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
     const env = environment || this.config.defaultEnvironment;
 
     for (const [paramName, paramDef] of this.parameterDefinitions) {
@@ -97,7 +97,7 @@ export class DefaultParameterManager {
    * @param paramDef Parameter definition
    * @param value Value to validate
    */
-  private validateValue(paramDef: ParameterDefinition, value: any): void {
+  private validateValue(paramDef: ParameterDefinition, value: unknown): void {
     // Skip validation if value is undefined and parameter is not required
     if (value === undefined) {
       if (paramDef.required) {
@@ -153,7 +153,7 @@ export class DefaultParameterManager {
    * @param environment Environment name
    * @param parameters Parameter values to update
    */
-  updateEnvironmentParameters(environment: string, parameters: Record<string, any>): void {
+  updateEnvironmentParameters(environment: string, parameters: Record<string, unknown>): void {
     // Validate all parameters before updating
     for (const [paramName, value] of Object.entries(parameters)) {
       const paramDef = this.parameterDefinitions.get(paramName);

@@ -151,7 +151,7 @@ export class ClusterTracker {
     clusterName: string,
     profileId?: string,
     profilePath?: string,
-    metadata?: Record<string, any>
+    metadata?: Record<string, unknown>
   ): void {
     const trackingInfo: ClusterTrackingInfo = {
       clusterId,
@@ -179,7 +179,7 @@ export class ClusterTracker {
     clusterId: string,
     clusterName: string,
     profile: ProfileInfo,
-    metadata?: Record<string, any>
+    metadata?: Record<string, unknown>
   ): void {
     this.trackCluster(clusterId, clusterName, profile.id, profile.path, {
       ...metadata,
