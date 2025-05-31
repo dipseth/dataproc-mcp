@@ -171,7 +171,7 @@
             "label": "TypeScript Definitions"
           }
         ],
-        "successComment": "🎉 This ${issue.pull_request ? 'PR is included' : 'issue has been resolved'} in version ${nextRelease.version} :tada:\n\nThe release is available on:\n- [npm package (@latest dist-tag)](https://www.npmjs.com/package/@dipseth/dataproc-mcp-server/v/${nextRelease.version})\n- [GitHub release](${releases.filter(release => release.name === 'GitHub')[0].url})\n\nYour **[semantic-release](https://github.com/semantic-release/semantic-release)** bot :package::rocket:",
+        "successComment": "🎉 This ${issue.pull_request ? 'PR is included' : 'issue has been resolved'} in version ${nextRelease.version} :tada:\n\nThe release is available on:\n- [npm package (@latest dist-tag)](https://www.npmjs.com/package/@dipseth/dataproc-mcp-server/v/${nextRelease.version})\n- [GitHub release](https://github.com/dipseth/dataproc-mcp/releases/tag/v${nextRelease.version})\n\nYour **[semantic-release](https://github.com/semantic-release/semantic-release)** bot :package::rocket:",
         "failComment": "❌ The release from branch `${branch.name}` had failed due to the following errors:\n- ${errors.map(err => err.message).join('\\n- ')}\n\nYour **[semantic-release](https://github.com/semantic-release/semantic-release)** bot :package::rocket:",
         "labels": [
           "released"
