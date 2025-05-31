@@ -54,7 +54,7 @@ export interface QueryResultResponse {
       type: string;
     }[];
   };
-  rows: any[][];
+  rows: unknown[][];
   totalRows: number;
   nextPageToken?: string;
 }

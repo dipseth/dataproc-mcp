@@ -68,7 +68,9 @@ export class JobTracker {
     );
 
     // Enforce max tracked jobs limit
-    if (this.jobs.size > this.config.maxTrackedJobs!) {
+    const maxTrackedJobs =
+      typeof this.config.maxTrackedJobs === 'number' ? this.config.maxTrackedJobs : 1000;
+    if (this.jobs.size > maxTrackedJobs) {
       this.cleanupOldestJobs();
     }
   }
@@ -211,9 +213,11 @@ export class JobTracker {
     const failureRate = metrics.totalJobs > 0 ? metrics.failedJobs / metrics.totalJobs : 0;
 
     let status: 'healthy' | 'degraded' | 'unhealthy' = 'healthy';
-    if (failureRate > 0.5 || metrics.totalJobs > this.config.maxTrackedJobs! * 0.9) {
+    const maxTrackedJobs =
+      typeof this.config.maxTrackedJobs === 'number' ? this.config.maxTrackedJobs : 1000;
+    if (failureRate > 0.5 || metrics.totalJobs > maxTrackedJobs * 0.9) {
       status = 'unhealthy';
-    } else if (failureRate > 0.2 || metrics.totalJobs > this.config.maxTrackedJobs! * 0.7) {
+    } else if (failureRate > 0.2 || metrics.totalJobs > maxTrackedJobs * 0.7) {
       status = 'degraded';
     }
 
@@ -250,7 +254,9 @@ export class JobTracker {
       (a, b) => new Date(a.lastUpdated).getTime() - new Date(b.lastUpdated).getTime()
     );
 
-    const toRemove = sortedJobs.slice(0, jobs.length - this.config.maxTrackedJobs! + 100);
+    const maxTrackedJobs =
+      typeof this.config.maxTrackedJobs === 'number' ? this.config.maxTrackedJobs : 1000;
+    const toRemove = sortedJobs.slice(0, jobs.length - maxTrackedJobs + 100);
 
     for (const job of toRemove) {
       // Don't remove jobs with auto-update enabled
@@ -265,16 +271,19 @@ export class JobTracker {
    * NEW: Start automatic cleanup interval
    */
   private startAutoCleanup(): void {
-    this.cleanupInterval = setInterval(() => {
-      const cleaned = this.cleanupCompletedAutoUpdateJobs();
-      this.cleanupOldestJobs();
+    this.cleanupInterval = setInterval(
+      () => {
+        const cleaned = this.cleanupCompletedAutoUpdateJobs();
+        this.cleanupOldestJobs();
 
-      if (this.config.enableMetrics) {
-        this.recalculateMetrics();
-      }
+        if (this.config.enableMetrics) {
+          this.recalculateMetrics();
+        }
 
-      logger.debug(`JobTracker: Auto-cleanup completed, cleaned ${cleaned} jobs`);
-    }, this.config.autoCleanupInterval!);
+        logger.debug(`JobTracker: Auto-cleanup completed, cleaned ${cleaned} jobs`);
+      },
+      typeof this.config.autoCleanupInterval === 'number' ? this.config.autoCleanupInterval : 60000
+    );
 
     logger.info(
       `JobTracker: Auto-cleanup started with ${this.config.autoCleanupInterval}ms interval`

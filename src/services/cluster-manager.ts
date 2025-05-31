@@ -8,6 +8,7 @@ import { ClusterInfo, ClusterListResponse } from '../types/response.js';
 import { ProfileInfo } from '../types/profile.js';
 import { ProfileManager } from './profile.js';
 import { ClusterTracker } from './tracker.js';
+import { protos } from '@google-cloud/dataproc';
 import {
   createCluster,
   createClusterFromYaml,
@@ -75,7 +76,7 @@ export class ClusterManager {
     profileId: string,
     clusterNameOverride?: string,
     configOverrides?: Partial<ClusterConfig>
-  ): Promise<any> {
+  ): Promise<import('@google-cloud/dataproc').protos.google.cloud.dataproc.v1.ICluster> {
     if (process.env.LOG_LEVEL === 'debug')
       console.error('[DEBUG] ClusterManager: Creating cluster from profile:', profileId);
 
@@ -98,12 +99,10 @@ export class ClusterManager {
 
     // Apply overrides
     const finalClusterName = clusterNameOverride || clusterName;
-    const finalConfig: any = configOverrides ? { ...config, ...configOverrides } : config;
+    const finalConfig: ClusterConfig = configOverrides ? { ...config, ...configOverrides } : config;
 
     // Add labels to the config so they get passed to the API
-    if (labels) {
-      finalConfig.labels = labels;
-    }
+    // labels are passed as a separate argument to createCluster
 
     if (process.env.LOG_LEVEL === 'debug') {
       console.error('[DEBUG] ClusterManager: Final cluster name:', finalClusterName);
@@ -111,7 +110,15 @@ export class ClusterManager {
     }
 
     // Create the cluster
-    const response = await createCluster(projectId, region, finalClusterName, finalConfig);
+    const response = await createCluster(
+      projectId,
+      region,
+      finalClusterName,
+      finalConfig,
+      undefined,
+      undefined,
+      labels
+    );
 
     // Update profile usage
     this.profileManager.updateProfileUsage(profileId);
@@ -141,7 +148,7 @@ export class ClusterManager {
     region: string,
     yamlPath: string,
     overrides?: Partial<ClusterConfig>
-  ): Promise<any> {
+  ): Promise<import('@google-cloud/dataproc').protos.google.cloud.dataproc.v1.ICluster> {
     if (process.env.LOG_LEVEL === 'debug')
       console.error('[DEBUG] ClusterManager: Creating cluster from YAML:', yamlPath);
 
@@ -195,35 +202,65 @@ export class ClusterManager {
     const trackedClusters = this.clusterTracker.getAllTrackedClusters();
 
     // Add tracking information to the clusters
-    const enhancedClusters: ClusterInfo[] = response.clusters.map((cluster: ClusterInfo) => {
-      const trackedCluster = trackedClusters.find((tc) => tc.clusterId === cluster.clusterUuid);
+    const enhancedClusters: ClusterInfo[] = (response.clusters || []).map(
+      (cluster: protos.google.cloud.dataproc.v1.ICluster) => {
+        const trackedCluster = trackedClusters.find((tc) => tc.clusterId === cluster.clusterUuid);
 
-      if (trackedCluster) {
-        // Add tracking information to the cluster
-        return {
-          ...cluster,
-          labels: {
-            ...cluster.labels,
-            trackedByMcp: 'true',
-            profileId: trackedCluster.profileId || 'none',
+        // Map ICluster to ClusterInfo, extracting createTime from status
+        const clusterInfo: ClusterInfo = {
+          projectId: cluster.projectId || '',
+          clusterName: cluster.clusterName || '',
+          status: (cluster.status?.state || 'UNKNOWN') as string,
+          createTime: cluster.status?.stateStartTime?.toString() || '', // Convert ITimestamp to string
+          labels: cluster.labels || {},
+          metrics: {
+            hdfsMetrics: cluster.metrics?.hdfsMetrics
+              ? Object.fromEntries(
+                  Object.entries(cluster.metrics.hdfsMetrics).map(([k, v]) => [k, String(v)])
+                )
+              : undefined,
+            yarnMetrics: cluster.metrics?.yarnMetrics
+              ? Object.fromEntries(
+                  Object.entries(cluster.metrics.yarnMetrics).map(([k, v]) => [k, String(v)])
+                )
+              : undefined,
           },
-          // Add tracking metadata to the cluster
-          metadata: {
-            trackedByMcp: true,
-            profileId: trackedCluster.profileId,
-            profilePath: trackedCluster.profilePath,
-            createdAt: trackedCluster.createdAt,
-            ...trackedCluster.metadata,
-          },
+          statusHistory: (cluster.statusHistory || []).map((history) => ({
+            state: (history.state || 'UNKNOWN') as string,
+            stateStartTime: history.stateStartTime?.toString() || '',
+            detail: history.detail || undefined,
+            substate: (history.substate || undefined) as string | undefined,
+          })),
+          clusterUuid: cluster.clusterUuid || '',
         };
-      }
 
-      return cluster;
-    });
+        if (trackedCluster) {
+          // Add tracking information to the cluster
+          return {
+            ...clusterInfo,
+            labels: {
+              ...clusterInfo.labels,
+              trackedByMcp: 'true',
+              profileId: trackedCluster.profileId || 'none',
+            },
+            // Add tracking metadata to the cluster
+            metadata: {
+              trackedByMcp: true,
+              profileId: trackedCluster.profileId,
+              profilePath: trackedCluster.profilePath,
+              createdAt: trackedCluster.createdAt,
+              ...trackedCluster.metadata,
+            },
+          };
+        }
+
+        return clusterInfo;
+      }
+    );
 
     return {
       clusters: enhancedClusters,
-      nextPageToken: response.nextPageToken,
+      nextPageToken: response.nextPageToken as string | undefined,
     };
   }
 
@@ -238,7 +275,9 @@ export class ClusterManager {
     projectId: string,
     region: string,
     clusterName: string
-  ): Promise<any> {
+  ): Promise<
+    import('@google-cloud/dataproc').protos.google.cloud.dataproc.v1.ICluster | undefined
+  > {
     if (process.env.LOG_LEVEL === 'debug')
       console.error('[DEBUG] ClusterManager: Getting cluster with tracking info:', clusterName);
 
@@ -261,7 +300,7 @@ export class ClusterManager {
           trackedByMcp: 'true',
           profileId: trackedCluster.profileId || 'none',
         },
-        // Add tracking metadata to the cluster
+        // Add tracking metadata to the cluster (not part of ICluster)
         metadata: {
           trackedByMcp: true,
           profileId: trackedCluster.profileId,
@@ -269,7 +308,7 @@ export class ClusterManager {
           createdAt: trackedCluster.createdAt,
           ...trackedCluster.metadata,
         },
-      };
+      } as object;
     }
 
     return cluster;
@@ -299,7 +338,11 @@ export class ClusterManager {
    * @param clusterName Cluster name
    * @returns Operation details
    */
-  async deleteCluster(projectId: string, region: string, clusterName: string): Promise<any> {
+  async deleteCluster(
+    projectId: string,
+    region: string,
+    clusterName: string
+  ): Promise<import('@google-cloud/dataproc').protos.google.longrunning.IOperation> {
     if (process.env.LOG_LEVEL === 'debug')
       console.error('[DEBUG] ClusterManager: Deleting cluster:', clusterName);
 

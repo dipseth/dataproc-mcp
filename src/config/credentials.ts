@@ -4,7 +4,7 @@
  * Enhanced with service account impersonation support
  */
 
-import { GoogleAuth, OAuth2Client, Impersonated } from 'google-auth-library';
+import { GoogleAuth, OAuth2Client, Impersonated, AuthClient } from 'google-auth-library';
 import { ClusterControllerClient, JobControllerClient } from '@google-cloud/dataproc';
 import { execSync } from 'child_process';
 import { getServerConfig } from './server.js';
@@ -45,7 +45,7 @@ export interface AuthResult {
   strategy: AuthStrategy;
   success: boolean;
   error?: string;
-  auth?: any;
+  auth?: GoogleAuth;
 }
 
 /**
@@ -260,25 +260,15 @@ export async function createAuth(options: DataprocClientOptions = {}): Promise<A
         `[DEBUG] createAuth: Service account impersonation successful for ${targetServiceAccount}`
       );
 
-      // Return the impersonated client directly wrapped in GoogleAuth interface
-      // The Impersonated client can be used directly with Google Cloud client libraries
-      const auth = {
-        getClient: () => impersonatedClient,
-        getAccessToken: () => impersonatedClient.getAccessToken(),
-        getProjectId: async () => {
-          // Try to get project ID from server config or environment
-          return (
-            serverConfig?.authentication?.projectId ||
-            process.env.GOOGLE_CLOUD_PROJECT ||
-            process.env.GCLOUD_PROJECT
-          );
-        },
-      };
+      // Create a GoogleAuth instance that wraps the impersonated client
+      const googleAuth = new GoogleAuth({
+        authClient: impersonatedClient,
+      });
 
       return {
-        strategy: AuthStrategy.KEY_FILE, // Use KEY_FILE as closest match for impersonation
+        strategy: AuthStrategy.KEY_FILE,
         success: true,
-        auth: auth as any, // Cast to match expected interface
+        auth: googleAuth,
       };
     } catch (error) {
       const impersonationFailDuration = Date.now() - startTime;
@@ -403,7 +393,7 @@ export async function createDataprocClient(
   const { region } = options;
 
   // Set up client options
-  const clientOptions: Record<string, any> = {};
+  const clientOptions: { apiEndpoint?: string; auth?: AuthClient } = {};
 
   // Configure region-specific endpoint if provided
   if (region) {
@@ -420,7 +410,10 @@ export async function createDataprocClient(
     throw new Error(`Failed to create authentication: ${authResult.error}`);
   }
 
-  clientOptions.auth = authResult.auth;
+  if (!authResult.auth) {
+    throw new Error('Authentication failed: auth object is undefined');
+  }
+  clientOptions.auth = await authResult.auth.getClient();
 
   if (process.env.LOG_LEVEL === 'debug') {
     console.error(
@@ -428,7 +421,9 @@ export async function createDataprocClient(
     );
   }
 
-  return new ClusterControllerClient(clientOptions);
+  return new ClusterControllerClient(
+    clientOptions as ConstructorParameters<typeof ClusterControllerClient>[0]
+  );
 }
 
 /**
@@ -453,7 +448,7 @@ export async function createJobClient(
 
   // Set up client options
   const optionsStartTime = Date.now();
-  const clientOptions: Record<string, any> = {};
+  const clientOptions: { apiEndpoint?: string; auth?: AuthClient } = {};
 
   // Configure region-specific endpoint if provided
   if (region) {
@@ -479,7 +474,10 @@ export async function createJobClient(
     throw new Error(`Failed to create authentication: ${authResult.error}`);
   }
 
-  clientOptions.auth = authResult.auth;
+  if (!authResult.auth) {
+    throw new Error('Authentication failed: auth object is undefined');
+  }
+  clientOptions.auth = await authResult.auth.getClient();
 
   if (process.env.LOG_LEVEL === 'debug') {
     console.error(`[DEBUG] createJobClient: Using authentication strategy: ${authResult.strategy}`);
@@ -488,7 +486,9 @@ export async function createJobClient(
   // Create the JobControllerClient
   console.error(`[TIMING] createJobClient: Creating JobControllerClient instance...`);
   const clientCreateStartTime = Date.now();
-  const client = new JobControllerClient(clientOptions);
+  const client = new JobControllerClient(
+    clientOptions as ConstructorParameters<typeof JobControllerClient>[0]
+  );
   const clientCreateDuration = Date.now() - clientCreateStartTime;
   const totalDuration = Date.now() - startTime;
 

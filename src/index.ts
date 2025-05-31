@@ -1251,9 +1251,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           });
 
           // If async mode and we have a job ID, register with AsyncQueryPoller
-          if (Boolean(async) && response.jobUuid) {
+          if (Boolean(async) && response.jobId) {
             asyncQueryPoller.registerQuery({
-              jobId: response.jobUuid,
+              jobId: response.jobId,
               projectId: String(projectId),
               region: String(region),
               toolName: 'submit_dataproc_job',
@@ -1264,7 +1264,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               content: [
                 {
                   type: 'text',
-                  text: `Dataproc job submitted (async mode - auto-tracking enabled):\n${JSON.stringify(response, null, 2)}\n\nJob registered for automatic status updates. Use dataproc://query/${projectId}/${region}/${response.jobUuid} resource to monitor progress.`,
+                  text: `Dataproc job submitted (async mode - auto-tracking enabled):\n${JSON.stringify(response, null, 2)}\n\nJob registered for automatic status updates. Use dataproc://query/${projectId}/${region}/${response.jobId} resource to monitor progress.`,
                 },
               ],
             };
@@ -1329,8 +1329,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const cluster = await getCluster(String(projectId), String(region), String(clusterName));
 
         // Check if Zeppelin is enabled in the cluster configuration
-        const zeppelinEnabled =
-          cluster?.config?.softwareConfig?.optionalComponents?.includes('ZEPPELIN');
+        const zeppelinEnabled = (
+          cluster?.config?.softwareConfig?.optionalComponents as string[] | undefined
+        )?.includes('ZEPPELIN');
 
         if (!zeppelinEnabled) {
           return {

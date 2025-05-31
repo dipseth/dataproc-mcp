@@ -14,7 +14,7 @@ export interface EnvironmentParams {
   /**
    * Parameter values specific to this environment
    */
-  parameters: Record<string, any>;
+  parameters: Record<string, unknown>;
 }
 
 /**
@@ -39,7 +39,7 @@ export interface ParameterDefinition {
   /**
    * Default value for the parameter
    */
-  defaultValue?: any;
+  defaultValue?: unknown;
 
   /**
    * Type of the parameter value
@@ -68,7 +68,7 @@ export interface ParameterDefinition {
     /**
      * Allowed values for any type
      */
-    enum?: any[];
+    enum?: unknown[];
   };
 }
 

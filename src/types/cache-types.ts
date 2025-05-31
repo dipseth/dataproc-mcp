@@ -39,7 +39,7 @@ export interface CacheConfig {
 /**
  * Cache entry metadata
  */
-export interface CacheEntry<T = any> {
+export interface CacheEntry<T = unknown> {
   /**
    * The cached data
    */

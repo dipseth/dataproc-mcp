@@ -168,7 +168,7 @@ export class SecurityMiddleware {
   /**
    * Sanitize object recursively
    */
-  static sanitizeObject(obj: any): any {
+  static sanitizeObject(obj: unknown): unknown {
     if (obj === null || obj === undefined) {
       return obj;
     }
@@ -186,7 +186,7 @@ export class SecurityMiddleware {
     }
 
     if (typeof obj === 'object') {
-      const sanitized: any = {};
+      const sanitized: Record<string, unknown> = {};
       for (const [key, value] of Object.entries(obj)) {
         const sanitizedKey = this.sanitizeString(key);
         sanitized[sanitizedKey] = this.sanitizeObject(value);
@@ -200,7 +200,7 @@ export class SecurityMiddleware {
   /**
    * Remove sensitive information from data for logging
    */
-  static sanitizeForLogging(data: any): any {
+  static sanitizeForLogging(data: unknown): unknown {
     if (typeof data === 'string') {
       // Mask potential credentials
       return data
@@ -216,7 +216,7 @@ export class SecurityMiddleware {
     }
 
     if (typeof data === 'object' && data !== null) {
-      const sanitized: any = {};
+      const sanitized: Record<string, unknown> = {};
       for (const [key, value] of Object.entries(data)) {
         // Skip sensitive fields entirely
         if (
@@ -306,7 +306,11 @@ export class SecurityMiddleware {
   /**
    * Audit log security events
    */
-  static auditLog(event: string, details: any, severity: 'info' | 'warn' | 'error' = 'info'): void {
+  static auditLog(
+    event: string,
+    details: unknown,
+    severity: 'info' | 'warn' | 'error' = 'info'
+  ): void {
     const auditEntry = {
       timestamp: new Date().toISOString(),
       event,

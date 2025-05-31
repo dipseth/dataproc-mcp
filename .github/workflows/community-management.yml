@@ -18,17 +18,55 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       issues: write
+      contents: read
     steps:
       - name: Auto-label bug reports
         if: contains(github.event.issue.title, '[BUG]') || contains(github.event.issue.body, 'Bug Description')
         uses: actions/github-script@v7
         with:
           script: |
-            github.rest.issues.addLabels({
+            const labels = ['bug', 'needs-triage'];
+            
+            // Ensure labels exist before adding them
+            for (const label of labels) {
+              try {
+                await github.rest.issues.getLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: label
+                });
+              } catch (error) {
+                if (error.status === 404) {
+                  // Label doesn't exist, create it
+                  const labelColors = {
+                    'bug': 'd73a4a',
+                    'needs-triage': 'fbca04',
+                    'enhancement': 'a2eeef',
+                    'documentation': '0075ca',
+                    'security': 'b60205',
+                    'high-priority': 'e11d21',
+                    'breaking-change': 'd93f0b',
+                    'needs-review': 'fbca04',
+                    'stale': 'ededed'
+                  };
+                  
+                  await github.rest.issues.createLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    name: label,
+                    color: labelColors[label] || 'ededed',
+                    description: `Auto-created label: ${label}`
+                  });
+                }
+              }
+            }
+            
+            // Add labels to the issue
+            await github.rest.issues.addLabels({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              labels: ['bug', 'needs-triage']
+              labels: labels
             });
 
       - name: Auto-label feature requests
@@ -36,11 +74,46 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            github.rest.issues.addLabels({
+            const labels = ['enhancement', 'needs-triage'];
+            
+            // Ensure labels exist before adding them
+            for (const label of labels) {
+              try {
+                await github.rest.issues.getLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: label
+                });
+              } catch (error) {
+                if (error.status === 404) {
+                  const labelColors = {
+                    'bug': 'd73a4a',
+                    'needs-triage': 'fbca04',
+                    'enhancement': 'a2eeef',
+                    'documentation': '0075ca',
+                    'security': 'b60205',
+                    'high-priority': 'e11d21',
+                    'breaking-change': 'd93f0b',
+                    'needs-review': 'fbca04',
+                    'stale': 'ededed'
+                  };
+                  
+                  await github.rest.issues.createLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    name: label,
+                    color: labelColors[label] || 'ededed',
+                    description: `Auto-created label: ${label}`
+                  });
+                }
+              }
+            }
+            
+            await github.rest.issues.addLabels({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              labels: ['enhancement', 'needs-triage']
+              labels: labels
             });
 
       - name: Auto-label documentation issues
@@ -48,11 +121,46 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            github.rest.issues.addLabels({
+            const labels = ['documentation', 'needs-triage'];
+            
+            // Ensure labels exist before adding them
+            for (const label of labels) {
+              try {
+                await github.rest.issues.getLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: label
+                });
+              } catch (error) {
+                if (error.status === 404) {
+                  const labelColors = {
+                    'bug': 'd73a4a',
+                    'needs-triage': 'fbca04',
+                    'enhancement': 'a2eeef',
+                    'documentation': '0075ca',
+                    'security': 'b60205',
+                    'high-priority': 'e11d21',
+                    'breaking-change': 'd93f0b',
+                    'needs-review': 'fbca04',
+                    'stale': 'ededed'
+                  };
+                  
+                  await github.rest.issues.createLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    name: label,
+                    color: labelColors[label] || 'ededed',
+                    description: `Auto-created label: ${label}`
+                  });
+                }
+              }
+            }
+            
+            await github.rest.issues.addLabels({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              labels: ['documentation', 'needs-triage']
+              labels: labels
             });
 
       - name: Auto-label security issues
@@ -60,11 +168,46 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            github.rest.issues.addLabels({
+            const labels = ['security', 'high-priority', 'needs-triage'];
+            
+            // Ensure labels exist before adding them
+            for (const label of labels) {
+              try {
+                await github.rest.issues.getLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: label
+                });
+              } catch (error) {
+                if (error.status === 404) {
+                  const labelColors = {
+                    'bug': 'd73a4a',
+                    'needs-triage': 'fbca04',
+                    'enhancement': 'a2eeef',
+                    'documentation': '0075ca',
+                    'security': 'b60205',
+                    'high-priority': 'e11d21',
+                    'breaking-change': 'd93f0b',
+                    'needs-review': 'fbca04',
+                    'stale': 'ededed'
+                  };
+                  
+                  await github.rest.issues.createLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    name: label,
+                    color: labelColors[label] || 'ededed',
+                    description: `Auto-created label: ${label}`
+                  });
+                }
+              }
+            }
+            
+            await github.rest.issues.addLabels({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              labels: ['security', 'high-priority', 'needs-triage']
+              labels: labels
             });
 
   # Welcome new contributors
@@ -203,17 +346,53 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
+      contents: read
     steps:
       - name: Label breaking changes
         if: contains(github.event.pull_request.title, 'BREAKING') || contains(github.event.pull_request.body, 'breaking change')
         uses: actions/github-script@v7
         with:
           script: |
-            github.rest.issues.addLabels({
+            const labels = ['breaking-change', 'needs-review'];
+            
+            // Ensure labels exist before adding them
+            for (const label of labels) {
+              try {
+                await github.rest.issues.getLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: label
+                });
+              } catch (error) {
+                if (error.status === 404) {
+                  const labelColors = {
+                    'bug': 'd73a4a',
+                    'needs-triage': 'fbca04',
+                    'enhancement': 'a2eeef',
+                    'documentation': '0075ca',
+                    'security': 'b60205',
+                    'high-priority': 'e11d21',
+                    'breaking-change': 'd93f0b',
+                    'needs-review': 'fbca04',
+                    'stale': 'ededed'
+                  };
+                  
+                  await github.rest.issues.createLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    name: label,
+                    color: labelColors[label] || 'ededed',
+                    description: `Auto-created label: ${label}`
+                  });
+                }
+              }
+            }
+            
+            await github.rest.issues.addLabels({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.payload.pull_request.number,
-              labels: ['breaking-change', 'needs-review']
+              labels: labels
             });
 
       - name: Label documentation PRs
@@ -221,11 +400,46 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            github.rest.issues.addLabels({
+            const labels = ['documentation'];
+            
+            // Ensure labels exist before adding them
+            for (const label of labels) {
+              try {
+                await github.rest.issues.getLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: label
+                });
+              } catch (error) {
+                if (error.status === 404) {
+                  const labelColors = {
+                    'bug': 'd73a4a',
+                    'needs-triage': 'fbca04',
+                    'enhancement': 'a2eeef',
+                    'documentation': '0075ca',
+                    'security': 'b60205',
+                    'high-priority': 'e11d21',
+                    'breaking-change': 'd93f0b',
+                    'needs-review': 'fbca04',
+                    'stale': 'ededed'
+                  };
+                  
+                  await github.rest.issues.createLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    name: label,
+                    color: labelColors[label] || 'ededed',
+                    description: `Auto-created label: ${label}`
+                  });
+                }
+              }
+            }
+            
+            await github.rest.issues.addLabels({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.payload.pull_request.number,
-              labels: ['documentation']
+              labels: labels
             });
 
       - name: Label security PRs
@@ -233,11 +447,46 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            github.rest.issues.addLabels({
+            const labels = ['security', 'high-priority'];
+            
+            // Ensure labels exist before adding them
+            for (const label of labels) {
+              try {
+                await github.rest.issues.getLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: label
+                });
+              } catch (error) {
+                if (error.status === 404) {
+                  const labelColors = {
+                    'bug': 'd73a4a',
+                    'needs-triage': 'fbca04',
+                    'enhancement': 'a2eeef',
+                    'documentation': '0075ca',
+                    'security': 'b60205',
+                    'high-priority': 'e11d21',
+                    'breaking-change': 'd93f0b',
+                    'needs-review': 'fbca04',
+                    'stale': 'ededed'
+                  };
+                  
+                  await github.rest.issues.createLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    name: label,
+                    color: labelColors[label] || 'ededed',
+                    description: `Auto-created label: ${label}`
+                  });
+                }
+              }
+            }
+            
+            await github.rest.issues.addLabels({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.payload.pull_request.number,
-              labels: ['security', 'high-priority']
+              labels: labels
             });
 
   # Community metrics collection
