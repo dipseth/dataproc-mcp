@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- semantic-release-changelog -->
 
+## [2.0.2](https://github.com/dipseth/dataproc-mcp/compare/v2.0.1...v2.0.2) (2025-05-31)
+
+
+### 🐛 Bug Fixes
+
+* resolve semantic-release template error in successComment ([757b95d](https://github.com/dipseth/dataproc-mcp/commit/757b95dca5af18d9f3a9b04b2014c4bb4ec42239))
+
 ## [2.0.1](https://github.com/dipseth/dataproc-mcp/compare/v2.0.0...v2.0.1) (2025-05-31)
 
 
