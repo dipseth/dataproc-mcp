@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- semantic-release-changelog -->
 
+## [2.0.1](https://github.com/dipseth/dataproc-mcp/compare/v2.0.0...v2.0.1) (2025-05-31)
+
+
+### 🐛 Bug Fixes
+
+* resolve GitHub Actions label permissions and enhance TypeScript safety ([c8ab9df](https://github.com/dipseth/dataproc-mcp/commit/c8ab9df82070e74d593845926ac2cddaa5249fc1))
+
 ## [2.0.0](https://github.com/dipseth/dataproc-mcp/compare/v1.1.6...v2.0.0) (2025-05-31)
 
 
