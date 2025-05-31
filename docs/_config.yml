@@ -5,8 +5,8 @@ url: https://dipseth.github.io
 baseurl: /dataproc-mcp
 
 # Theme
-theme: minima
-remote_theme: pages-themes/minimal@v0.2.0
+# theme: minima
+# remote_theme: pages-themes/minimal@v0.2.0
 
 # Plugins
 plugins:
@@ -98,7 +98,7 @@ defaults:
       path: ""
       type: "pages"
     values:
-      layout: "page"
+      layout: "default" # Use our custom default layout
   - scope:
       path: ""
       type: "guides"

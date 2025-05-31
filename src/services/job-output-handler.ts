@@ -134,7 +134,7 @@ export class JobOutputHandler {
     if (format === 'json') {
       // Merge arrays or objects
       if (results.every((r) => Array.isArray(r))) {
-        return ([] as any[]).concat(...(results as any[][])) as unknown as T;
+        return ([] as unknown[]).concat(...(results as unknown[][])) as unknown as T;
       }
       if (results.every((r) => typeof r === 'object')) {
         return Object.assign({}, ...results) as T;
@@ -151,11 +151,20 @@ export class JobOutputHandler {
       // Add diagnostic log to check if results contain rawOutput
       logger.debug('JobOutputHandler.getJobOutputs: Merging tables from multiple results', {
         resultCount: results.length,
-        resultsWithRawOutput: results.filter((r: any) => 'rawOutput' in r).length,
+        resultsWithRawOutput: results.filter(
+          (r) => typeof r === 'object' && r !== null && 'rawOutput' in (r as object)
+        ).length,
         sampleResultKeys: results.length > 0 ? Object.keys(results[0] as object) : [],
       });
 
-      const allTables = results.flatMap((r: any) => r.tables || []);
+      const allTables = results.flatMap((r) =>
+        typeof r === 'object' &&
+        r !== null &&
+        'tables' in (r as object) &&
+        Array.isArray((r as { tables?: unknown[] }).tables)
+          ? (r as unknown as { tables: unknown[] }).tables
+          : []
+      );
       return { tables: allTables } as unknown as T;
     }
 
@@ -182,7 +191,7 @@ export class JobOutputHandler {
    * @param jobId The ID of the job.
    * @returns The cached output, or undefined if not found.
    */
-  getCachedOutput(jobId: string): any | undefined {
+  getCachedOutput(jobId: string): unknown | undefined {
     // Iterate through all cached items using the public get method
     // We need to check all cache keys since we don't have direct access to the cache
     const cacheStats = this.cacheManager.getStats();

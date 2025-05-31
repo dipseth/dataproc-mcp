@@ -15,8 +15,8 @@ const TraditionalClusterConfigSchema = z.object({
   cluster: z.object({
     name: z.string(),
     region: z.string().optional(),
-    config: z.record(z.any()).optional(),
-    parameters: z.record(z.any()).optional(),
+    config: z.record(z.unknown()).optional(),
+    parameters: z.record(z.unknown()).optional(),
   }),
 });
 
@@ -28,9 +28,9 @@ const EnhancedClusterConfigSchema = z.record(
     region: z.string(),
     tags: z.array(z.string()).optional(),
     labels: z.record(z.string()).optional(),
-    cluster_config: z.record(z.any()).optional(),
-    clusterConfig: z.record(z.any()).optional(),
-    parameters: z.record(z.any()).optional(),
+    cluster_config: z.record(z.unknown()).optional(),
+    clusterConfig: z.record(z.unknown()).optional(),
+    parameters: z.record(z.unknown()).optional(),
   })
 );
 
@@ -38,8 +38,8 @@ export type TraditionalYamlClusterConfig = {
   cluster: {
     name: string;
     region?: string;
-    config?: Record<string, any>;
-    parameters?: Record<string, any>;
+    config?: Record<string, unknown>;
+    parameters?: Record<string, unknown>;
   };
 };
 
@@ -48,9 +48,9 @@ export type EnhancedYamlClusterConfig = {
     region: string;
     tags?: string[];
     labels?: Record<string, string>;
-    cluster_config?: Record<string, any>;
-    clusterConfig?: Record<string, any>;
-    parameters?: Record<string, any>;
+    cluster_config?: Record<string, unknown>;
+    clusterConfig?: Record<string, unknown>;
+    parameters?: Record<string, unknown>;
   };
 };
 
@@ -61,22 +61,22 @@ export type YamlClusterConfig = TraditionalYamlClusterConfig | EnhancedYamlClust
  * @param obj Object with snake_case keys
  * @returns Object with camelCase keys
  */
-function convertSnakeToCamel(obj: any): any {
+function convertSnakeToCamel(obj: unknown): unknown {
   if (obj === null || typeof obj !== 'object') {
     return obj;
   }
 
   if (Array.isArray(obj)) {
-    return obj.map((item) => convertSnakeToCamel(item));
+    return obj.map(convertSnakeToCamel);
   }
 
-  const camelCaseObj: Record<string, any> = {};
+  const camelCaseObj: Record<string, unknown> = {};
 
   for (const key in obj) {
     if (Object.prototype.hasOwnProperty.call(obj, key)) {
       // Convert snake_case to camelCase
       const camelKey = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
-      camelCaseObj[camelKey] = convertSnakeToCamel(obj[key]);
+      camelCaseObj[camelKey] = convertSnakeToCamel((obj as Record<string, unknown>)[key]);
     }
   }
 
@@ -139,7 +139,7 @@ export function convertYamlToDataprocConfig(
   region?: string;
   config: ClusterConfig;
   labels?: Record<string, string>;
-  parameters?: Record<string, any>;
+  parameters?: Record<string, unknown>;
 } {
   // Check if it's the traditional format
   if ('cluster' in yamlConfig) {
@@ -183,7 +183,7 @@ export function convertYamlToDataprocConfig(
     }
 
     // Convert snake_case to camelCase for the entire config
-    const camelCaseConfig = convertSnakeToCamel(clusterConfig);
+    const camelCaseConfig = convertSnakeToCamel(clusterConfig) as ClusterConfig;
 
     if (process.env.LOG_LEVEL === 'debug') {
       console.error('[DEBUG] YAML: Transformed config:', JSON.stringify(camelCaseConfig, null, 2));
@@ -202,7 +202,7 @@ export function convertYamlToDataprocConfig(
     return {
       clusterName,
       region: projectConfig.region,
-      config: camelCaseConfig as ClusterConfig,
+      config: camelCaseConfig,
       labels: projectConfig.labels,
       parameters: projectConfig.parameters,
     };
@@ -219,7 +219,7 @@ export async function getDataprocConfigFromYaml(filePath: string): Promise<{
   region?: string;
   config: ClusterConfig;
   labels?: Record<string, string>;
-  parameters?: Record<string, any>;
+  parameters?: Record<string, unknown>;
 }> {
   const yamlConfig = await readYamlConfig(filePath);
   return convertYamlToDataprocConfig(yamlConfig, filePath);

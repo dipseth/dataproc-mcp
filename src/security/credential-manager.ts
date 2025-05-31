@@ -243,7 +243,7 @@ export class CredentialManager {
   /**
    * Sanitize credential data for logging
    */
-  static sanitizeCredentialData(data: any): any {
+  static sanitizeCredentialData(data: unknown): unknown {
     if (typeof data === 'string') {
       return data
         .replace(
@@ -260,7 +260,7 @@ export class CredentialManager {
     }
 
     if (typeof data === 'object' && data !== null) {
-      const sanitized: any = {};
+      const sanitized: Record<string, unknown> = {};
       for (const [key, value] of Object.entries(data)) {
         if (
           ['private_key', 'client_secret', 'refresh_token', 'access_token'].includes(
@@ -391,22 +391,24 @@ export class CredentialManager {
   /**
    * Validate credential configuration
    */
-  static validateCredentialConfiguration(config: any): CredentialValidationResult {
+  static validateCredentialConfiguration(
+    config: Record<string, unknown>
+  ): CredentialValidationResult {
     const result: CredentialValidationResult = {
       isValid: false,
       errors: [],
       warnings: [],
     };
 
-    if (!config.authentication) {
-      result.errors.push('No authentication configuration found');
+    if (!config.authentication || typeof config.authentication !== 'object') {
+      result.errors.push('No valid authentication configuration found');
       return result;
     }
 
-    const auth = config.authentication;
+    const auth = config.authentication as Record<string, unknown>;
 
     // Check for service account impersonation setup
-    if (auth.impersonateServiceAccount) {
+    if (typeof auth.impersonateServiceAccount === 'string') {
       try {
         SecurityMiddleware.validateServiceAccount(auth.impersonateServiceAccount);
       } catch (error) {
@@ -415,7 +417,7 @@ export class CredentialManager {
         );
       }
 
-      if (!auth.fallbackKeyPath) {
+      if (typeof auth.fallbackKeyPath !== 'string') {
         result.warnings.push(
           'No fallback key path specified for impersonation - may cause authentication failures'
         );
@@ -425,7 +427,7 @@ export class CredentialManager {
     }
 
     // Check direct key file authentication
-    if (auth.keyFilePath) {
+    if (typeof auth.keyFilePath === 'string') {
       if (!fs.existsSync(auth.keyFilePath)) {
         result.errors.push(`Key file not found: ${auth.keyFilePath}`);
       } else {
@@ -436,13 +438,13 @@ export class CredentialManager {
     }
 
     // Security recommendations
-    if (auth.useApplicationDefaultFallback) {
+    if (auth.useApplicationDefaultFallback === true) {
       result.warnings.push(
         'Application Default Credentials fallback is enabled - ensure this is intended for your environment'
       );
     }
 
-    if (!auth.preferImpersonation && auth.impersonateServiceAccount) {
+    if (auth.preferImpersonation !== true && typeof auth.impersonateServiceAccount === 'string') {
       result.warnings.push(
         'Service account impersonation is configured but not preferred - consider enabling preferImpersonation'
       );
@@ -488,18 +490,25 @@ export function validateServiceAccountKey(keyPath: string): {
   }
 }
 
-export function validateImpersonationConfig(config: any): {
+export function validateImpersonationConfig(config: Record<string, unknown>): {
   isValid: boolean;
   targetServiceAccount?: string;
   errors?: string[];
 } {
   const errors: string[] = [];
 
-  if (!config.sourceCredentials || config.sourceCredentials.type !== 'service_account') {
+  if (
+    !config.sourceCredentials ||
+    typeof config.sourceCredentials !== 'object' ||
+    (config.sourceCredentials as { type?: unknown }).type !== 'service_account'
+  ) {
     errors.push('Invalid source credentials');
   }
 
-  if (!config.targetServiceAccount || !config.targetServiceAccount.includes('@')) {
+  if (
+    typeof config.targetServiceAccount !== 'string' ||
+    !config.targetServiceAccount.includes('@')
+  ) {
     errors.push('Invalid target service account email');
   }
 
@@ -509,7 +518,8 @@ export function validateImpersonationConfig(config: any): {
 
   return {
     isValid: errors.length === 0,
-    targetServiceAccount: config.targetServiceAccount,
+    targetServiceAccount:
+      typeof config.targetServiceAccount === 'string' ? config.targetServiceAccount : undefined,
     errors: errors.length > 0 ? errors : undefined,
   };
 }
@@ -539,7 +549,7 @@ export async function checkADCAvailability(): Promise<{ available: boolean; sour
   return { available: false, source: 'none' };
 }
 
-export function checkCredentialExpiration(credential: any): {
+export function checkCredentialExpiration(credential: { created_at?: string | number | Date }): {
   isExpired: boolean;
   daysUntilExpiration: number;
 } {
@@ -574,16 +584,16 @@ export async function validateEnvironmentAuth(): Promise<{
 }
 
 export function validateSecurityCompliance(
-  credential: any,
-  config: any
+  credential: Record<string, unknown>,
+  config: Record<string, unknown>
 ): { compliant: boolean; violations: string[] } {
   const violations: string[] = [];
 
   // Check domain restrictions
-  if (config.allowedServiceAccountDomains) {
-    const email = credential.client_email || '';
-    const isAllowedDomain = config.allowedServiceAccountDomains.some((domain: string) =>
-      email.endsWith(domain)
+  if (Array.isArray(config.allowedServiceAccountDomains)) {
+    const email = typeof credential.client_email === 'string' ? credential.client_email : '';
+    const isAllowedDomain = config.allowedServiceAccountDomains.some(
+      (domain) => typeof domain === 'string' && email.endsWith(domain)
     );
     if (!isAllowedDomain) {
       violations.push('Service account domain not in allowed list');
@@ -591,7 +601,12 @@ export function validateSecurityCompliance(
   }
 
   // Check credential age
-  if (config.maxCredentialAge && credential.created_at) {
+  if (
+    typeof config.maxCredentialAge === 'number' &&
+    (typeof credential.created_at === 'string' ||
+      typeof credential.created_at === 'number' ||
+      credential.created_at instanceof Date)
+  ) {
     const createdAt = new Date(credential.created_at);
     const maxAge = config.maxCredentialAge * 24 * 60 * 60 * 1000; // Convert days to ms
     const age = Date.now() - createdAt.getTime();

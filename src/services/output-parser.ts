@@ -56,7 +56,7 @@ export class OutputParser {
     content: Buffer | string,
     format: OutputFormat,
     options: ParseOptions = {}
-  ): Promise<any> {
+  ): Promise<unknown> {
     const opts = { ...DEFAULT_PARSE_OPTIONS, ...options };
 
     try {
@@ -84,7 +84,7 @@ export class OutputParser {
   /**
    * Parse JSON content
    */
-  private parseJSON(content: string, options: ParseOptions): any {
+  private parseJSON(content: string, options: ParseOptions): unknown {
     const text = options.trim ? content.trim() : content;
     if (!text) {
       return null;
@@ -161,7 +161,7 @@ export class OutputParser {
         } else {
           inQuotes = !inQuotes;
         }
-      } else if (char === options.delimiter! && !inQuotes) {
+      } else if (typeof options.delimiter === 'string' && char === options.delimiter && !inQuotes) {
         values.push(options.trim ? current.trim() : current);
         current = '';
       } else {
@@ -176,12 +176,18 @@ export class OutputParser {
   /**
    * Parse plain text content into lines or structured data
    */
-  private parseText(content: string, options: ParseOptions): any {
+  private parseText(content: string, options: ParseOptions): unknown {
     const lines = content.split('\n');
 
     // First try to parse as Hive table output
     const hiveResult = this.parseHiveTableOutput(content);
-    if (hiveResult && hiveResult.tables && hiveResult.tables.length > 0) {
+    if (
+      hiveResult &&
+      typeof hiveResult === 'object' &&
+      'tables' in hiveResult &&
+      Array.isArray((hiveResult as { tables?: unknown[] }).tables) &&
+      (hiveResult as { tables: unknown[] }).tables.length > 0
+    ) {
       console.log('[DEBUG] OutputParser: Successfully parsed Hive table output');
       return hiveResult;
     }
@@ -204,7 +210,7 @@ export class OutputParser {
    * | val1 | val2 |
    * +----+----+
    */
-  private parseHiveTableOutput(content: string): any {
+  private parseHiveTableOutput(content: string): unknown {
     const lines = content.split('\n');
 
     // Check if this is Hive CLI output with connection info
@@ -258,7 +264,7 @@ export class OutputParser {
       .map((col) => col.trim());
 
     // Extract data rows (all data lines after the header)
-    const rows: any[] = [];
+    const rows: Record<string, unknown>[] = [];
     for (const dataLine of dataLines) {
       // Skip the header
       if (dataLine.index <= headerIndex) continue;
@@ -275,7 +281,7 @@ export class OutputParser {
       if (values.length === 0) continue; // Skip empty rows
 
       // Create a row object
-      const row: any = {};
+      const row: Record<string, unknown> = {};
       columns.forEach((col, colIdx) => {
         if (colIdx < values.length) {
           row[col] = values[colIdx];
@@ -286,7 +292,7 @@ export class OutputParser {
     }
 
     // Return a single table with all the rows
-    const tables: any[] = [
+    const tables: Array<{ columns: string[]; rows: Record<string, unknown>[] }> = [
       {
         columns,
         rows,
@@ -311,7 +317,7 @@ export class OutputParser {
    * - Repeated headers throughout the output
    * - Footer information
    */
-  private parseHiveOutputToCleanCSV(content: string): any {
+  private parseHiveOutputToCleanCSV(content: string): unknown {
     const lines = content.split('\n');
 
     // Skip connection info at the top (lines 1-4)
@@ -348,7 +354,7 @@ export class OutputParser {
     }
 
     // Extract all data rows (skipping repeated headers and boundaries)
-    const rows: any[] = [];
+    const rows: Record<string, unknown>[] = [];
 
     for (const dataLine of dataLines) {
       const line = dataLine.content;
@@ -373,7 +379,7 @@ export class OutputParser {
       if (values.length === 0) continue;
 
       // Create a row object with the column name as the key
-      const row: any = {};
+      const row: Record<string, unknown> = {};
       columns.forEach((col, colIdx) => {
         if (colIdx < values.length) {
           row[col] = values[colIdx];
@@ -384,7 +390,7 @@ export class OutputParser {
     }
 
     // Return a single table with all the rows
-    const tables: any[] = [
+    const tables: Array<{ columns: string[]; rows: Record<string, unknown>[] }> = [
       {
         columns,
         rows,
@@ -408,13 +414,13 @@ export class OutputParser {
   /**
    * Recursively parse numbers in object
    */
-  private parseNumbersInObject(obj: any): any {
+  private parseNumbersInObject(obj: unknown): unknown {
     if (Array.isArray(obj)) {
       return obj.map((item) => this.parseNumbersInObject(item));
     }
 
     if (obj && typeof obj === 'object') {
-      const result: Record<string, any> = {};
+      const result: Record<string, unknown> = {};
       for (const [key, value] of Object.entries(obj)) {
         result[key] = this.parseNumbersInObject(value);
       }
@@ -441,7 +447,9 @@ export class OutputParser {
    * @param tables Array of table objects with columns and rows
    * @returns Formatted string representation of the tables
    */
-  formatTablesOutput(tables: any[]): string {
+  formatTablesOutput(
+    tables: Array<{ columns: string[]; rows: Array<Record<string, unknown>> }>
+  ): string {
     // Handle case with no tables or empty array
     if (!tables || tables.length === 0) {
       return 'No table data available';
@@ -474,7 +482,7 @@ export class OutputParser {
       }
 
       // Configure table options for clean formatting
-      const tableConfig: any = {
+      const tableConfig: Record<string, unknown> = {
         // Use 'norc' border style for clean, minimal borders
         border: getBorderCharacters('norc'),
         // Add padding around cell content for readability

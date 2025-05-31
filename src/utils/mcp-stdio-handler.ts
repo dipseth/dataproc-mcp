@@ -17,7 +17,7 @@ const originalConsoleDebug = console.debug;
 /**
  * Format a log message for stderr
  */
-function formatLogForStderr(prefix: string, message: any, ...args: any[]): string {
+function formatLogForStderr(prefix: string, message: unknown, ...args: unknown[]): string {
   const timestamp = new Date().toISOString();
   const msgStr = typeof message === 'string' ? message : JSON.stringify(message);
   const argsStr =
@@ -29,28 +29,28 @@ function formatLogForStderr(prefix: string, message: any, ...args: any[]): strin
 }
 
 // Override console methods to use stderr directly
-console.log = function (message: any, ...args: any[]): void {
+console.log = function (message: unknown, ...args: unknown[]): void {
   process.stderr.write(formatLogForStderr('LOG', message, ...args));
 };
 
-console.error = function (message: any, ...args: any[]): void {
+console.error = function (message: unknown, ...args: unknown[]): void {
   process.stderr.write(formatLogForStderr('ERROR', message, ...args));
 };
 
-console.warn = function (message: any, ...args: any[]): void {
+console.warn = function (message: unknown, ...args: unknown[]): void {
   process.stderr.write(formatLogForStderr('WARN', message, ...args));
 };
 
-console.info = function (message: any, ...args: any[]): void {
+console.info = function (message: unknown, ...args: unknown[]): void {
   process.stderr.write(formatLogForStderr('INFO', message, ...args));
 };
 
-console.debug = function (message: any, ...args: any[]): void {
+console.debug = function (message: unknown, ...args: unknown[]): void {
   process.stderr.write(formatLogForStderr('DEBUG', message, ...args));
 };
 
 // Create a special function for MCP-safe JSON output
-export function mcpSafeOutput(data: any): void {
+export function mcpSafeOutput(data: unknown): void {
   try {
     // Ensure data is serializable
     const jsonString = JSON.stringify(data);

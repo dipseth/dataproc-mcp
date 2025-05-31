@@ -32,25 +32,25 @@ function logToFile(level: string, message: string, data?: unknown): void {
 
 // Logger functions
 export const logger = {
-  debug: (message: string, data?: any) => {
+  debug: (message: string, data?: unknown) => {
     if (shouldLog('debug')) {
       logToFile('DEBUG', message, data);
     }
   },
 
-  info: (message: string, data?: any) => {
+  info: (message: string, data?: unknown) => {
     if (shouldLog('info')) {
       logToFile('INFO', message, data);
     }
   },
 
-  warn: (message: string, data?: any) => {
+  warn: (message: string, data?: unknown) => {
     if (shouldLog('warn')) {
       logToFile('WARN', message, data);
     }
   },
 
-  error: (message: string, data?: any) => {
+  error: (message: string, data?: unknown) => {
     if (shouldLog('error')) {
       logToFile('ERROR', message, data);
     }

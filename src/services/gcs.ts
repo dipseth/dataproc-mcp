@@ -71,9 +71,18 @@ export class GCSService {
       const [metadata] = await this.storage.bucket(bucket).file(path).getMetadata();
 
       return this.convertMetadata(metadata);
-    } catch (error: any) {
-      if (error.code === 404) {
-        throw new GCSError(GCSErrorTypes.NOT_FOUND, `File not found: ${uri}`, error);
+    } catch (error: unknown) {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        (error as { code?: number }).code === 404
+      ) {
+        throw new GCSError(
+          GCSErrorTypes.NOT_FOUND,
+          `File not found: ${uri}`,
+          error instanceof Error ? error : new Error(String(error))
+        );
       }
       if (error instanceof GCSError) {
         throw error;
@@ -81,7 +90,7 @@ export class GCSService {
       throw new GCSError(
         GCSErrorTypes.PERMISSION_DENIED,
         `Failed to get metadata for ${uri}`,
-        error
+        error as Error
       );
     }
   }
@@ -196,7 +205,8 @@ export class GCSService {
     let attempt = 0;
     let lastError: Error | undefined;
 
-    while (attempt < opts.retries!) {
+    const retries = typeof opts.retries === 'number' ? opts.retries : 3;
+    while (attempt < retries) {
       let buffer: Buffer; // Declare buffer here
       try {
         // Create fetch promise with timeout
@@ -314,18 +324,26 @@ export class GCSService {
           }
         }
         return buffer;
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error(`[DEBUG] GCSService.downloadFile: Error downloading ${uri}:`, error);
-        console.error(`[DEBUG] GCSService.downloadFile: Error type: ${error.constructor?.name}`);
-        if (error.code) console.error(`[DEBUG] GCSService.downloadFile: Error code: ${error.code}`);
+        if (typeof error === 'object' && error !== null && 'constructor' in error) {
+          console.error(
+            `[DEBUG] GCSService.downloadFile: Error type: ${(error as { constructor?: { name?: string } }).constructor?.name}`
+          );
+        }
+        if (typeof error === 'object' && error !== null && 'code' in error) {
+          console.error(
+            `[DEBUG] GCSService.downloadFile: Error code: ${(error as { code?: string | number }).code}`
+          );
+        }
 
-        lastError = error;
+        lastError = error instanceof Error ? error : new Error(String(error));
         attempt++;
 
-        if (attempt < opts.retries!) {
+        if (attempt < retries) {
           // Exponential backoff before retry
           console.log(
-            `[DEBUG] GCSService.downloadFile: Retrying download (attempt ${attempt}/${opts.retries})`
+            `[DEBUG] GCSService.downloadFile: Retrying download (attempt ${attempt}/${retries})`
           );
           await new Promise((resolve) => setTimeout(resolve, Math.pow(2, attempt) * 1000));
         }
