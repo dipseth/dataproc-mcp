@@ -5,6 +5,13 @@
 
 import { z } from 'zod';
 
+// Quick job status check schema
+export const CheckActiveJobsSchema = z.object({
+  projectId: z.string().optional(),
+  region: z.string().optional(),
+  includeCompleted: z.boolean().optional().default(false),
+});
+
 // Common validation patterns
 const GCP_PROJECT_ID_REGEX = /^[a-z][a-z0-9-]{4,28}[a-z0-9]$/;
 const GCP_REGION_REGEX = /^[a-z]+-[a-z]+\d+$/;

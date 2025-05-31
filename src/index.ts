@@ -42,6 +42,7 @@ import {
   ListTrackedClustersSchema,
   ListProfilesSchema,
   GetProfileSchema,
+  CheckActiveJobsSchema,
 } from './validation/schemas.js';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -74,6 +75,7 @@ import { ClusterTracker } from './services/tracker.js';
 import { ClusterManager } from './services/cluster-manager.js';
 import { JobTracker } from './services/job-tracker.js';
 import { JobOutputHandler } from './services/job-output-handler.js';
+import { AsyncQueryPoller } from './services/async-query-poller.js';
 
 // Parse command line arguments
 const args = process.argv.slice(2);
@@ -95,6 +97,7 @@ let clusterTracker: ClusterTracker;
 let clusterManager: ClusterManager;
 let jobTracker: JobTracker;
 let jobOutputHandler: JobOutputHandler;
+let asyncQueryPoller: AsyncQueryPoller;
 let defaultParamManager: DefaultParameterManager;
 
 // Initialize default parameter manager
@@ -424,6 +427,31 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ['projectId', 'region', 'clusterName'],
         },
       },
+
+      // New tool: quick status check for active jobs
+      {
+        name: 'check_active_jobs',
+        description:
+          "🚀 Quick status check for all active and recent jobs - perfect for seeing what's running!",
+        inputSchema: {
+          type: 'object',
+          properties: {
+            projectId: {
+              type: 'string',
+              description: 'GCP project ID (optional, shows all if not specified)',
+            },
+            region: {
+              type: 'string',
+              description: 'Dataproc region (optional, shows all if not specified)',
+            },
+            includeCompleted: {
+              type: 'boolean',
+              description: 'Include recently completed jobs (default: false)',
+            },
+          },
+          required: [],
+        },
+      },
     ],
   };
 });
@@ -444,6 +472,9 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => {
     }
     if (!jobTracker) {
       jobTracker = new JobTracker();
+    }
+    if (!asyncQueryPoller) {
+      asyncQueryPoller = new AsyncQueryPoller(jobTracker);
     }
     if (!clusterManager) {
       clusterManager = new ClusterManager(profileManager, clusterTracker);
@@ -487,6 +518,18 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => {
           description: `Dataproc job status and results`,
           mimeType: 'application/json',
         })),
+        // Query resources (NEW) - Async trackable queries
+        ...trackedJobs
+          .filter(
+            (job: any) =>
+              job.toolName && ['submit_hive_query', 'submit_dataproc_job'].includes(job.toolName)
+          )
+          .map((job: any) => ({
+            uri: `dataproc://query/${job.projectId}/${job.region}/${job.jobId}`,
+            name: `Query: ${job.jobId}`,
+            description: `Async ${job.toolName} query - ${job.status}${jobTracker?.isAutoUpdateEnabled(job.jobId) ? ' (auto-updating)' : ''}`,
+            mimeType: 'application/json',
+          })),
       ],
     };
   } catch (error) {
@@ -580,6 +623,36 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
             uri,
             mimeType: 'application/json',
             text: JSON.stringify(jobStatus, null, 2),
+          },
+        ],
+      };
+    }
+
+    if (uri.startsWith('dataproc://query/')) {
+      const parts = uri.replace('dataproc://query/', '').split('/');
+      const [projectId, region, jobId] = parts;
+
+      // Get enhanced query information from AsyncQueryPoller
+      const queryInfo = asyncQueryPoller.getQueryInfo(jobId);
+      const jobStatus = await getJobStatusWithRest(projectId, region, jobId);
+
+      const enhancedQueryData = {
+        jobId,
+        projectId,
+        region,
+        status: jobStatus,
+        queryInfo: queryInfo || null,
+        isAutoUpdating: jobTracker?.isAutoUpdateEnabled(jobId) || false,
+        pollerStats: asyncQueryPoller.getStatus(),
+        lastUpdated: new Date().toISOString(),
+      };
+
+      return {
+        contents: [
+          {
+            uri,
+            mimeType: 'application/json',
+            text: JSON.stringify(enhancedQueryData, null, 2),
           },
         ],
       };
@@ -1072,6 +1145,26 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           Boolean(async)
         );
 
+        // If async mode and we have a job ID, register with AsyncQueryPoller
+        if (Boolean(async) && response.jobUuid) {
+          asyncQueryPoller.registerQuery({
+            jobId: response.jobUuid,
+            projectId: String(projectId),
+            region: String(region),
+            toolName: 'submit_hive_query',
+            submissionTime: new Date().toISOString(),
+          });
+
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Hive query submitted (async mode - auto-tracking enabled):\n${JSON.stringify(response, null, 2)}\n\nQuery registered for automatic status updates. Use dataproc://query/${projectId}/${region}/${response.jobUuid} resource to monitor progress.`,
+              },
+            ],
+          };
+        }
+
         return {
           content: [
             {
@@ -1156,6 +1249,26 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             jobConfig: jobConfig as any,
             async: Boolean(async),
           });
+
+          // If async mode and we have a job ID, register with AsyncQueryPoller
+          if (Boolean(async) && response.jobUuid) {
+            asyncQueryPoller.registerQuery({
+              jobId: response.jobUuid,
+              projectId: String(projectId),
+              region: String(region),
+              toolName: 'submit_dataproc_job',
+              submissionTime: new Date().toISOString(),
+            });
+
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: `Dataproc job submitted (async mode - auto-tracking enabled):\n${JSON.stringify(response, null, 2)}\n\nJob registered for automatic status updates. Use dataproc://query/${projectId}/${region}/${response.jobUuid} resource to monitor progress.`,
+                },
+              ],
+            };
+          }
 
           return {
             content: [
@@ -1243,6 +1356,104 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
+      case 'check_active_jobs': {
+        const { projectId, region, includeCompleted } = args;
+
+        // Get all tracked jobs
+        const allJobs = jobTracker.listJobs();
+
+        // Filter jobs based on parameters
+        let filteredJobs = allJobs;
+
+        if (projectId) {
+          filteredJobs = filteredJobs.filter((job) => job.projectId === projectId);
+        }
+
+        if (region) {
+          filteredJobs = filteredJobs.filter((job) => job.region === region);
+        }
+
+        if (!includeCompleted) {
+          filteredJobs = filteredJobs.filter(
+            (job) => !['DONE', 'COMPLETED', 'FAILED', 'CANCELLED', 'ERROR'].includes(job.status)
+          );
+        }
+
+        // Get async query poller stats
+        const pollerStats = asyncQueryPoller.getStatus();
+
+        // Categorize jobs
+        const runningJobs = filteredJobs.filter((job) =>
+          ['RUNNING', 'PENDING', 'SETUP_DONE'].includes(job.status)
+        );
+        const completedJobs = filteredJobs.filter((job) =>
+          ['DONE', 'COMPLETED'].includes(job.status)
+        );
+        const failedJobs = filteredJobs.filter((job) =>
+          ['FAILED', 'CANCELLED', 'ERROR'].includes(job.status)
+        );
+
+        // Create summary
+        const summary = {
+          totalJobs: filteredJobs.length,
+          runningJobs: runningJobs.length,
+          completedJobs: completedJobs.length,
+          failedJobs: failedJobs.length,
+          pollerActive: pollerStats.isPolling,
+          activeQueries: pollerStats.activeQueries,
+          lastPollTime: pollerStats.lastPollTime,
+        };
+
+        // Format response
+        let response = `🚀 **Job Status Dashboard**\n\n`;
+        response += `📊 **Summary**: ${summary.totalJobs} total jobs`;
+        if (projectId) response += ` in ${projectId}`;
+        if (region) response += ` (${region})`;
+        response += `\n`;
+        response += `   • 🟢 Running: ${summary.runningJobs}\n`;
+        response += `   • ✅ Completed: ${summary.completedJobs}\n`;
+        response += `   • ❌ Failed: ${summary.failedJobs}\n\n`;
+
+        response += `🔄 **AsyncQueryPoller**: ${pollerStats.isPolling ? '🟢 Active' : '🔴 Inactive'}\n`;
+        response += `   • Active Queries: ${pollerStats.activeQueries}\n`;
+        response += `   • Total Polls: ${pollerStats.totalPolls}\n`;
+        response += `   • Uptime: ${pollerStats.uptime ? Math.round(pollerStats.uptime / 1000) : 0}s\n\n`;
+
+        if (runningJobs.length > 0) {
+          response += `🏃 **Currently Running Jobs**:\n`;
+          runningJobs.forEach((job) => {
+            const duration = job.submissionTime
+              ? Math.round((Date.now() - new Date(job.submissionTime).getTime()) / 1000)
+              : 0;
+            response += `   • ${job.jobId} (${job.toolName}) - ${job.status} - ${duration}s\n`;
+            response += `     📍 Resource: dataproc://query/${job.projectId}/${job.region}/${job.jobId}\n`;
+          });
+          response += `\n`;
+        }
+
+        if (includeCompleted && completedJobs.length > 0) {
+          response += `✅ **Recently Completed Jobs**:\n`;
+          completedJobs.slice(-5).forEach((job) => {
+            const duration = job.duration ? Math.round(job.duration / 1000) : 'unknown';
+            response += `   • ${job.jobId} (${job.toolName}) - completed in ${duration}s\n`;
+          });
+        }
+
+        if (runningJobs.length === 0 && !includeCompleted) {
+          response += `🎉 **All quiet!** No jobs currently running.\n`;
+          response += `💡 Use \`includeCompleted: true\` to see recent completions.`;
+        }
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: response,
+            },
+          ],
+        };
+      }
+
       default:
         throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${toolName}`);
     }
@@ -1291,6 +1502,10 @@ async function main() {
       jobTracker = new JobTracker();
 
       if (process.env.LOG_LEVEL === 'debug')
+        console.error('[DEBUG] MCP Server: Initializing AsyncQueryPoller');
+      asyncQueryPoller = new AsyncQueryPoller(jobTracker);
+
+      if (process.env.LOG_LEVEL === 'debug')
         console.error('[DEBUG] MCP Server: Initializing ClusterManager');
       clusterManager = new ClusterManager(profileManager, clusterTracker);
     }
@@ -1312,6 +1527,13 @@ async function main() {
       console.error('[DEBUG] MCP Server: Connecting server to transport');
     await server.connect(transport);
 
+    // Start AsyncQueryPoller for automatic query tracking
+    if (asyncQueryPoller) {
+      if (process.env.LOG_LEVEL === 'debug')
+        console.error('[DEBUG] MCP Server: Starting AsyncQueryPoller');
+      asyncQueryPoller.startPolling();
+    }
+
     if (process.env.LOG_LEVEL === 'debug')
       console.error('[DEBUG] MCP Server: Successfully connected and ready to receive requests');
   } catch (error) {
@@ -1319,6 +1541,29 @@ async function main() {
     throw error;
   }
 }
+
+// Graceful shutdown handling
+process.on('SIGINT', async () => {
+  console.error('[INFO] MCP Server: Received SIGINT, shutting down gracefully...');
+  if (asyncQueryPoller) {
+    await asyncQueryPoller.shutdown();
+  }
+  if (jobTracker) {
+    await jobTracker.shutdown();
+  }
+  process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+  console.error('[INFO] MCP Server: Received SIGTERM, shutting down gracefully...');
+  if (asyncQueryPoller) {
+    await asyncQueryPoller.shutdown();
+  }
+  if (jobTracker) {
+    await jobTracker.shutdown();
+  }
+  process.exit(0);
+});
 
 main().catch((error) => {
   console.error('[DEBUG] MCP Server: Fatal error:', error);
