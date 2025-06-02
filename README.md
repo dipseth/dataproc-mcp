@@ -166,11 +166,11 @@ my-company-analytics-prod-1234:
 
 ## 📚 Documentation
 
-- **[Quick Start Guide](https://dipseth.github.io/dataproc-mcp/quick-start/)** - Get started in 5 minutes
+- **[Quick Start Guide](https://dipseth.github.io/dataproc-mcp/QUICK_START)** - Get started in 5 minutes
 - **[API Reference](https://dipseth.github.io/dataproc-mcp/api/)** - Complete tool documentation
-- **[Configuration Examples](https://dipseth.github.io/dataproc-mcp/configuration/)** - Real-world configurations
+- **[Configuration Examples](https://dipseth.github.io/dataproc-mcp/CONFIGURATION_EXAMPLES)** - Real-world configurations
 - **[Security Guide](https://dipseth.github.io/dataproc-mcp/security/)** - Best practices and compliance
-- **[Troubleshooting](https://dipseth.github.io/dataproc-mcp/troubleshooting/)** - Common issues and solutions
+- **[Installation Guide](https://dipseth.github.io/dataproc-mcp/INSTALLATION_GUIDE)** - Detailed setup instructions
 
 ## 🔧 MCP Client Integration
 
