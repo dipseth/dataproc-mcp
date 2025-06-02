@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- semantic-release-changelog -->
 
+## [2.0.3](https://github.com/dipseth/dataproc-mcp/compare/v2.0.2...v2.0.3) (2025-06-02)
+
+
+### 🐛 Bug Fixes
+
+* resolve metastore configuration issue and update README ([0f0d060](https://github.com/dipseth/dataproc-mcp/commit/0f0d0603a810e4d1d567f6e7ee71b4056b4b2865)), closes [#17](https://github.com/dipseth/dataproc-mcp/issues/17) [#17](https://github.com/dipseth/dataproc-mcp/issues/17)
+
+
+### 📚 Documentation
+
+* fix GitHub Pages links and add comprehensive configuration section ([12e8f2c](https://github.com/dipseth/dataproc-mcp/commit/12e8f2c96ff9db9fb78083dc2a296919dc46436c))
+
 ## [2.0.2](https://github.com/dipseth/dataproc-mcp/compare/v2.0.1...v2.0.2) (2025-05-31)
 
 
