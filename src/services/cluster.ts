@@ -41,23 +41,10 @@ export async function createCluster(
     const apiConfig: ClusterConfig = {};
 
     if (clusterConfig) {
-      // Copy properties from our config to the API config
-      if (clusterConfig.masterConfig) {
-        apiConfig.masterConfig = clusterConfig.masterConfig;
-      }
-      if (clusterConfig.workerConfig) {
-        apiConfig.workerConfig = clusterConfig.workerConfig;
-      }
-      if (clusterConfig.secondaryWorkerConfig) {
-        apiConfig.secondaryWorkerConfig = clusterConfig.secondaryWorkerConfig;
-      }
-      if (clusterConfig.softwareConfig) {
-        apiConfig.softwareConfig = clusterConfig.softwareConfig;
-      }
-      if (clusterConfig.gceClusterConfig) {
-        apiConfig.gceClusterConfig = clusterConfig.gceClusterConfig;
-      }
-      // Add other properties as needed
+      // Copy all properties from our config to the API config
+      // This ensures all configuration sections (including metastoreConfig) are properly applied
+      // Fixes issue #17: Metastore configuration from profile not applied during cluster creation
+      Object.assign(apiConfig, clusterConfig);
     }
 
     // Use the REST API directly instead of the client library to avoid authentication issues

@@ -18,6 +18,8 @@ export interface ClusterConfig {
   endpointConfig?: EndpointConfig;
   metastoreConfig?: MetastoreConfig;
   initializationActions?: InitializationAction[];
+  dataprocMetricConfig?: DataprocMetricConfig;
+  auxiliaryNodeGroups?: AuxiliaryNodeGroup[];
 }
 
 export interface GceClusterConfig {
@@ -161,4 +163,25 @@ export interface ClusterOperationStatus {
   innerState?: string;
   details?: string;
   stateStartTime?: string;
+}
+
+export interface DataprocMetricConfig {
+  metrics?: Metric[];
+}
+
+export interface Metric {
+  metricSource?: string;
+  metricOverrides?: string[];
+}
+
+export interface AuxiliaryNodeGroup {
+  nodeGroup?: NodeGroup;
+  nodeGroupId?: string;
+}
+
+export interface NodeGroup {
+  name?: string;
+  roles?: string[];
+  nodeGroupConfig?: InstanceGroupConfig;
+  labels?: Record<string, string>;
 }
