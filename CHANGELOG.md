@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- semantic-release-changelog -->
 
+## [2.1.0](https://github.com/dipseth/dataproc-mcp/compare/v2.0.3...v2.1.0) (2025-06-03)
+
+
+### 🚀 Features
+
+* 🧠 Knowledge Base Semantic Search - Complete Implementation & Documentation ([808f97d](https://github.com/dipseth/dataproc-mcp/commit/808f97d352ad266d4cf85f3dec0f30ff54a7e946))
+
 ## [2.0.3](https://github.com/dipseth/dataproc-mcp/compare/v2.0.2...v2.0.3) (2025-06-02)
 
 
