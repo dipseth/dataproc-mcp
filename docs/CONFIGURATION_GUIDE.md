@@ -334,7 +334,7 @@ If you were using the old auto-creating system:
     {
       "environment": "production",
       "parameters": {
-        "projectId": "prj-grp-data-sci-prod-b425",
+        "projectId": "your-project-id",
         "region": "us-central1"
       }
     }
@@ -371,7 +371,7 @@ If you were using the old auto-creating system:
     {
       "environment": "production",
       "parameters": {
-        "projectId": "prj-grp-data-sci-prod-b425",
+        "projectId": "your-project-id",
         "region": "us-central1",
         "zone": "us-central1-a"
       }
@@ -385,7 +385,7 @@ If you were using the old auto-creating system:
 **Before (required explicit parameters):**
 ```json
 {
-  "projectId": "prj-grp-data-sci-prod-b425",
+  "projectId": "your-project-id",
   "region": "us-central1",
   "jobId": "my-job-id"
 }
@@ -405,6 +405,77 @@ If you were using the old auto-creating system:
   "region": "us-west1",
   "jobId": "my-job-id"
 }
+```
+
+## Knowledge Base and Semantic Search Configuration
+
+### Qdrant Vector Database Setup (Optional)
+
+The MCP server supports optional semantic search capabilities through Qdrant integration:
+
+```bash
+# Start Qdrant vector database
+docker run -p 6334:6333 qdrant/qdrant
+
+# Verify connection
+curl http://localhost:6334/health
+```
+
+### Response Filter Configuration
+
+Configure semantic search in `config/response-filter.json`:
+
+```json
+{
+  "qdrant": {
+    "url": "http://localhost:6334",
+    "collectionName": "dataproc_knowledge",
+    "vectorSize": 384,
+    "distance": "Cosine"
+  },
+  "tokenLimits": {
+    "list_clusters": 500,
+    "get_cluster": 300,
+    "default": 400
+  },
+  "extractionRules": {
+    "list_clusters": {
+      "maxClusters": 10,
+      "essentialFields": ["clusterName", "status", "machineType"],
+      "summaryFormat": "table"
+    }
+  }
+}
+```
+
+### Semantic Search Benefits
+
+**With Qdrant Enabled:**
+- Natural language queries: "clusters with pip packages"
+- Intelligent data extraction and indexing
+- Vector similarity search with confidence scores
+- Enhanced filtering and discovery capabilities
+
+**Without Qdrant (Graceful Degradation):**
+- All core functionality remains available
+- Standard data retrieval and management
+- Helpful setup guidance when semantic features are requested
+- No breaking changes or dependencies
+
+### Troubleshooting Qdrant Setup
+
+```bash
+# Check if Qdrant is running
+docker ps | grep qdrant
+
+# Test connection
+curl http://localhost:6334/health
+
+# Check collections
+curl http://localhost:6334/collections
+
+# View logs
+docker logs $(docker ps -q --filter ancestor=qdrant/qdrant)
 ```
 
 This approach keeps configuration simple while providing flexibility and dramatically improved user experience.

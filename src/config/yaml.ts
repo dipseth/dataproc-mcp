@@ -57,30 +57,41 @@ export type EnhancedYamlClusterConfig = {
 export type YamlClusterConfig = TraditionalYamlClusterConfig | EnhancedYamlClusterConfig;
 
 /**
- * Converts snake_case to camelCase
+ * Converts snake_case to camelCase, but preserves metadata keys in their original format
  * @param obj Object with snake_case keys
- * @returns Object with camelCase keys
+ * @param isMetadata Whether this object is metadata (should preserve original keys)
+ * @returns Object with camelCase keys (except metadata)
  */
-function convertSnakeToCamel(obj: unknown): unknown {
+function convertSnakeToCamel(obj: unknown, isMetadata = false): unknown {
   if (obj === null || typeof obj !== 'object') {
     return obj;
   }
 
   if (Array.isArray(obj)) {
-    return obj.map(convertSnakeToCamel);
+    return obj.map((item) => convertSnakeToCamel(item, isMetadata));
   }
 
-  const camelCaseObj: Record<string, unknown> = {};
+  const resultObj: Record<string, unknown> = {};
 
   for (const key in obj) {
     if (Object.prototype.hasOwnProperty.call(obj, key)) {
-      // Convert snake_case to camelCase
-      const camelKey = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
-      camelCaseObj[camelKey] = convertSnakeToCamel((obj as Record<string, unknown>)[key]);
+      const value = (obj as Record<string, unknown>)[key];
+
+      // Check if this is the metadata section
+      const isMetadataSection = key === 'metadata';
+
+      if (isMetadata || isMetadataSection) {
+        // Preserve original key format for metadata
+        resultObj[key] = convertSnakeToCamel(value, true);
+      } else {
+        // Convert snake_case to camelCase for non-metadata keys
+        const camelKey = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+        resultObj[camelKey] = convertSnakeToCamel(value, false);
+      }
     }
   }
 
-  return camelCaseObj;
+  return resultObj;
 }
 
 /**
