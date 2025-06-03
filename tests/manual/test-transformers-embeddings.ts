@@ -4,15 +4,33 @@
  * Test the modern Transformers.js embedding service
  */
 
-import { TransformersEmbeddingService } from '../../src/services/transformers-embeddings.js';
+import { TransformersEmbeddingService } from '../../build/services/transformers-embeddings.js';
 
-async function testTransformersEmbeddings() {
+interface TestClusterData {
+  clusterName: string;
+  projectId: string;
+  region: string;
+  config: {
+    softwareConfig?: {
+      properties?: Record<string, string>;
+      optionalComponents?: string[];
+    };
+    masterConfig?: {
+      machineTypeUri?: string;
+      numInstances?: number;
+    };
+  };
+  labels: Record<string, string>;
+  [key: string]: unknown;
+}
+
+async function testTransformersEmbeddings(): Promise<void> {
   console.log('🤖 **Testing Transformers.js Embedding Service**\n');
 
   const embeddingService = new TransformersEmbeddingService();
 
-  // Test cluster data similar to what we get from GCP
-  const testClusterData = {
+  // Test cluster data similar to what we get from GCP - using proper types
+  const testClusterData: TestClusterData = {
     clusterName: 'test-pandas-cluster',
     projectId: 'test-project',
     region: 'us-central1',
@@ -24,7 +42,8 @@ async function testTransformersEmbeddings() {
         optionalComponents: ['ZEPPELIN', 'JUPYTER']
       },
       masterConfig: {
-        machineTypeUri: 'projects/test/zones/us-central1-f/machineTypes/n1-standard-8'
+        machineTypeUri: 'projects/test/zones/us-central1-f/machineTypes/n1-standard-8',
+        numInstances: 1
       }
     },
     labels: {

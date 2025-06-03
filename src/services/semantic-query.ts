@@ -1,12 +1,114 @@
 /**
  * Semantic Query Service for Qdrant-stored cluster data
  *
- * Enables natural language queries against stored cluster configurations
- * without requiring verbose responses.
+ * This service enables natural language queries against stored cluster configurations
+ * and provides intelligent data extraction with confidence scoring.
+ *
+ * KEY CAPABILITIES:
+ * - Natural language query processing: "show me clusters with pip packages"
+ * - Vector similarity search using Transformers.js embeddings
+ * - Confidence scoring and relevance ranking
+ * - Intelligent data extraction from cluster configurations
+ * - Graceful degradation when Qdrant is unavailable
+ *
+ * SUPPORTED QUERY TYPES:
+ * - Package queries: "pip packages", "machine learning libraries"
+ * - Infrastructure queries: "high memory configurations", "SSD storage"
+ * - Component queries: "Jupyter notebooks", "Spark configurations"
+ * - Network queries: "service accounts", "subnet configurations"
+ *
+ * GRACEFUL DEGRADATION:
+ * - Automatically detects Qdrant availability
+ * - Provides helpful setup guidance when Qdrant is not connected
+ * - Falls back to standard data retrieval without breaking functionality
+ * - Maintains consistent API regardless of backend availability
+ *
+ * USAGE EXAMPLES:
+ * - query_cluster_data: Direct semantic queries against knowledge base
+ * - list_clusters with semanticQuery: Enhanced cluster listing
+ * - get_cluster with semanticQuery: Focused data extraction
+ *
+ * CONFIGURATION:
+ * - Uses config/response-filter.json for Qdrant connection settings
+ * - Default port: 6334, collection: dataproc_knowledge
+ * - Vector size: 384 (Transformers.js compatible)
+ * - Distance metric: Cosine similarity
  */
 
 import { QdrantStorageService } from './qdrant-storage.js';
+import { QdrantStorageMetadata } from '../types/response-filter.js';
+import { ClusterConfig } from '../types/cluster-config.js';
 import { logger } from '../utils/logger.js';
+
+// Type definitions for better type safety
+interface QdrantSearchResult {
+  id: string;
+  score: number;
+  metadata: QdrantStorageMetadata;
+  data: unknown;
+}
+
+interface ClusterData {
+  clusterName?: string;
+  projectId?: string;
+  region?: string;
+  config?: ClusterConfig;
+  labels?: Record<string, string>;
+  status?: {
+    state?: string;
+    stateStartTime?: string;
+  };
+  [key: string]: unknown;
+}
+
+interface ExtractedInfo {
+  type?: string;
+  packages?: string[];
+  count?: number;
+  rawValue?: string;
+  pipPackages?: string[];
+  machineTypes?: string[];
+  components?: string[];
+  properties?: Record<string, string>;
+  master?: {
+    instances?: number;
+    machineType?: string;
+    diskSize?: number;
+    diskType?: string;
+  };
+  workers?:
+    | number
+    | {
+        instances?: number;
+        machineType?: string;
+        diskSize?: number;
+        diskType?: string;
+      };
+  secondaryWorkers?: {
+    instances?: number;
+    machineType?: string;
+    preemptible?: boolean;
+  } | null;
+  optionalComponents?: string[];
+  imageVersion?: string;
+  initializationActions?: Array<{
+    script?: string;
+    timeout?: string;
+  }>;
+  keyProperties?: Record<string, string>;
+  name?: string;
+  status?: string;
+  created?: string;
+  zone?: string;
+  subnet?: string;
+  network?: string;
+  internalIpOnly?: boolean;
+  serviceAccount?: string;
+  tags?: string[];
+  shieldedInstance?: unknown;
+  machineType?: string;
+  [key: string]: unknown;
+}
 
 export interface SemanticQueryResult {
   clusterId: string;
@@ -15,7 +117,7 @@ export interface SemanticQueryResult {
   region: string;
   matchedContent: string;
   confidence: number;
-  extractedInfo: any;
+  extractedInfo: ExtractedInfo;
 }
 
 export interface QueryResponse {
@@ -42,6 +144,11 @@ export class SemanticQueryService {
     };
 
     this.qdrantService = new QdrantStorageService(config);
+
+    // DEBUG: Log configuration for diagnosis
+    console.log(
+      `🔍 [DEBUG] SemanticQueryService initialized with collection: ${config.collectionName}`
+    );
   }
 
   async initialize(): Promise<void> {
@@ -155,13 +262,13 @@ export class SemanticQueryService {
   }
 
   private filterResults(
-    results: any[],
+    results: QdrantSearchResult[],
     options: {
       projectId?: string;
       region?: string;
       clusterName?: string;
     }
-  ): any[] {
+  ): QdrantSearchResult[] {
     return results.filter((result) => {
       const metadata = result.metadata || {};
 
@@ -181,7 +288,10 @@ export class SemanticQueryService {
     });
   }
 
-  private async processQueryResults(query: string, results: any[]): Promise<SemanticQueryResult[]> {
+  private async processQueryResults(
+    query: string,
+    results: QdrantSearchResult[]
+  ): Promise<SemanticQueryResult[]> {
     const processedResults: SemanticQueryResult[] = [];
 
     for (const result of results) {
@@ -193,7 +303,7 @@ export class SemanticQueryService {
         const extractedInfo = this.extractRelevantInfo(query, data);
 
         processedResults.push({
-          clusterId: metadata.clusterId || 'unknown',
+          clusterId: `${metadata.projectId || 'unknown'}-${metadata.region || 'unknown'}-${metadata.clusterName || 'unknown'}`,
           clusterName: metadata.clusterName || 'unknown',
           projectId: metadata.projectId || 'unknown',
           region: metadata.region || 'unknown',
@@ -209,7 +319,7 @@ export class SemanticQueryService {
     return processedResults.sort((a, b) => b.confidence - a.confidence);
   }
 
-  private extractRelevantInfo(query: string, data: any): any {
+  private extractRelevantInfo(query: string, data: unknown): ExtractedInfo {
     const lowerQuery = query.toLowerCase();
 
     // Pip packages extraction
@@ -252,9 +362,11 @@ export class SemanticQueryService {
     return this.extractSummary(data);
   }
 
-  private extractPipPackages(data: any): any {
+  private extractPipPackages(data: unknown): ExtractedInfo {
     try {
-      const pipPackages = data?.config?.softwareConfig?.properties?.['dataproc:pip.packages'];
+      const clusterData = data as ClusterData;
+      const pipPackages =
+        clusterData?.config?.softwareConfig?.properties?.['dataproc:pip.packages'];
       if (pipPackages) {
         const packages = pipPackages.split(',').map((pkg: string) => pkg.trim());
         return {
@@ -270,27 +382,30 @@ export class SemanticQueryService {
     return { type: 'pip_packages', packages: [], count: 0 };
   }
 
-  private extractMachineConfig(data: any): any {
+  private extractMachineConfig(data: unknown): ExtractedInfo {
     try {
-      const config = data?.config;
+      const clusterData = data as ClusterData;
+      const config = clusterData?.config;
       return {
         type: 'machine_config',
         master: {
           instances: config?.masterConfig?.numInstances,
-          machineType: this.extractMachineType(config?.masterConfig?.machineTypeUri),
+          machineType: this.extractMachineType(config?.masterConfig?.machineTypeUri || ''),
           diskSize: config?.masterConfig?.diskConfig?.bootDiskSizeGb,
           diskType: config?.masterConfig?.diskConfig?.bootDiskType,
         },
         workers: {
           instances: config?.workerConfig?.numInstances,
-          machineType: this.extractMachineType(config?.workerConfig?.machineTypeUri),
+          machineType: this.extractMachineType(config?.workerConfig?.machineTypeUri || ''),
           diskSize: config?.workerConfig?.diskConfig?.bootDiskSizeGb,
           diskType: config?.workerConfig?.diskConfig?.bootDiskType,
         },
         secondaryWorkers: config?.secondaryWorkerConfig
           ? {
               instances: config.secondaryWorkerConfig.numInstances,
-              machineType: this.extractMachineType(config.secondaryWorkerConfig.machineTypeUri),
+              machineType: this.extractMachineType(
+                config.secondaryWorkerConfig.machineTypeUri || ''
+              ),
               preemptible: config.secondaryWorkerConfig.isPreemptible,
             }
           : null,
@@ -301,9 +416,10 @@ export class SemanticQueryService {
     return { type: 'machine_config' };
   }
 
-  private extractNetworkConfig(data: any): any {
+  private extractNetworkConfig(data: unknown): ExtractedInfo {
     try {
-      const gceConfig = data?.config?.gceClusterConfig;
+      const clusterData = data as ClusterData;
+      const gceConfig = clusterData?.config?.gceClusterConfig;
       return {
         type: 'network_config',
         zone: gceConfig?.zoneUri,
@@ -319,10 +435,11 @@ export class SemanticQueryService {
     return { type: 'network_config' };
   }
 
-  private extractSoftwareConfig(data: any): any {
+  private extractSoftwareConfig(data: unknown): ExtractedInfo {
     try {
-      const softwareConfig = data?.config?.softwareConfig;
-      const initActions = data?.config?.initializationActions || [];
+      const clusterData = data as ClusterData;
+      const softwareConfig = clusterData?.config?.softwareConfig;
+      const initActions = (clusterData as any)?.config?.initializationActions || [];
 
       return {
         type: 'software_config',
@@ -340,15 +457,18 @@ export class SemanticQueryService {
     return { type: 'software_config' };
   }
 
-  private extractSummary(data: any): any {
+  private extractSummary(data: unknown): ExtractedInfo {
     try {
+      const clusterData = data as ClusterData;
       return {
         type: 'cluster_summary',
-        name: data?.clusterName,
-        status: data?.status?.state,
-        created: data?.status?.stateStartTime,
-        workers: data?.config?.workerConfig?.numInstances,
-        machineType: this.extractMachineType(data?.config?.workerConfig?.machineTypeUri),
+        name: clusterData?.clusterName,
+        status: (clusterData as any)?.status?.state,
+        created: (clusterData as any)?.status?.stateStartTime,
+        workers: clusterData?.config?.workerConfig?.numInstances,
+        machineType: this.extractMachineType(
+          clusterData?.config?.workerConfig?.machineTypeUri || ''
+        ),
       };
     } catch (error) {
       logger.warn('Failed to extract summary:', error);
@@ -383,7 +503,7 @@ export class SemanticQueryService {
     return keyProps;
   }
 
-  private getMatchedContent(query: string, data: any): string {
+  private getMatchedContent(query: string, data: unknown): string {
     // Return a snippet of the matched content for context
     try {
       const dataStr = JSON.stringify(data, null, 2);

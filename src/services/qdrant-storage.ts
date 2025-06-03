@@ -1,6 +1,44 @@
 /**
  * QdrantStorageService
- * Handles storage and retrieval of full response data in Qdrant vector database
+ *
+ * Handles storage and retrieval of full response data in Qdrant vector database.
+ * This service is a key component of the semantic search feature, providing
+ * vector storage and similarity search capabilities.
+ *
+ * KEY FEATURES:
+ * - Automatic collection creation and management
+ * - Vector embedding storage using Transformers.js
+ * - Similarity search with configurable distance metrics
+ * - Metadata storage for filtering and context
+ * - Graceful error handling and connection management
+ *
+ * COLLECTIONS MANAGED:
+ * - dataproc_knowledge: Extracted cluster knowledge and configurations
+ * - dataproc_responses: Full API responses for token optimization
+ *
+ * VECTOR OPERATIONS:
+ * - Store: Converts text to embeddings and stores with metadata
+ * - Search: Performs similarity search with confidence scoring
+ * - Retrieve: Gets stored data by ID or similarity
+ * - Update: Modifies existing vectors and metadata
+ *
+ * GRACEFUL DEGRADATION:
+ * - Detects Qdrant availability automatically
+ * - Provides meaningful error messages when unavailable
+ * - Allows core functionality to continue without vector storage
+ * - Supports optional enhancement pattern
+ *
+ * CONFIGURATION:
+ * - URL: Default http://localhost:6334 (configurable)
+ * - Vector Size: 384 dimensions (Transformers.js compatible)
+ * - Distance: Cosine similarity (configurable: Cosine, Euclidean, Dot)
+ * - Collections: Auto-created with proper vector configuration
+ *
+ * USAGE PATTERNS:
+ * - Called by KnowledgeIndexer to store extracted cluster data
+ * - Used by SemanticQueryService for similarity searches
+ * - Integrated with ResponseFilter for token optimization
+ * - Supports both knowledge base and response caching use cases
  */
 
 import { QdrantClient } from '@qdrant/js-client-rest';
@@ -34,7 +72,7 @@ export class QdrantStorageService {
   /**
    * Initialize Qdrant collection if it doesn't exist
    */
-  private async ensureCollection(): Promise<void> {
+  async ensureCollection(): Promise<void> {
     if (this.collectionInitialized) return;
 
     try {
@@ -65,18 +103,18 @@ export class QdrantStorageService {
   /**
    * Store cluster data with metadata and return resource URI
    */
-  async storeClusterData(data: any, metadata: QdrantStorageMetadata): Promise<string> {
+  async storeClusterData(data: unknown, metadata: QdrantStorageMetadata): Promise<string> {
     try {
       await this.ensureCollection();
 
       // Train the embedding model with this cluster data
-      this.embeddingService.trainOnClusterData(data);
+      this.embeddingService.trainOnClusterData(data as any);
 
       // Generate a unique ID for this storage
       const id = this.generateId(metadata);
 
       // Generate embedding vector using the trained model
-      const vector = await this.embeddingService.generateClusterEmbedding(data);
+      const vector = await this.embeddingService.generateClusterEmbedding(data as any);
 
       // Prepare payload with metadata and data
       const payload = {
@@ -113,7 +151,7 @@ export class QdrantStorageService {
   /**
    * Retrieve data by ID
    */
-  async retrieveById(id: string): Promise<any | null> {
+  async retrieveById(id: string): Promise<unknown | null> {
     try {
       await this.ensureCollection();
 
@@ -142,10 +180,10 @@ export class QdrantStorageService {
    * Search for similar responses
    */
   async searchSimilar(
-    queryData: any,
+    queryData: unknown,
     limit: number = 5,
     scoreThreshold: number = 0.0
-  ): Promise<Array<{ id: string; score: number; metadata: QdrantStorageMetadata; data: any }>> {
+  ): Promise<Array<{ id: string; score: number; metadata: QdrantStorageMetadata; data: unknown }>> {
     try {
       await this.ensureCollection();
 
@@ -194,7 +232,7 @@ export class QdrantStorageService {
   /**
    * Get collection statistics
    */
-  async getStats(): Promise<any> {
+  async getStats(): Promise<unknown> {
     try {
       await this.ensureCollection();
 
@@ -267,7 +305,7 @@ export class QdrantStorageService {
    * Generate embedding vector from data (simple hash-based approach for prototype)
    * In production, this should use a proper embedding model
    */
-  private generateEmbedding(data: any): number[] {
+  private generateEmbedding(data: unknown): number[] {
     const text = JSON.stringify(data);
     const vector = new Array(this.config.vectorSize).fill(0);
 

@@ -14,7 +14,7 @@
 {
   "clusters": [
     {
-      "projectId": "prj-grp-data-sci-prod-b425",
+      "projectId": "your-project-id",
       "clusterName": "dag-aog-search-term-targeting-tg-add-ai-search-te",
       "config": {
         "configBucket": "dataproc-staging-us-central1-570127783956-ajghf8gj",
@@ -405,11 +405,11 @@ export class ResponseFormatter {
 
 ### Before (Current):
 ```
-Clusters in project prj-grp-data-sci-prod-b425, region us-central1:
+Clusters in project your-project-id, region us-central1:
 {
   "clusters": [
     {
-      "projectId": "prj-grp-data-sci-prod-b425",
+      "projectId": "your-project-id",
       "clusterName": "dag-aog-search-term-targeting-tg-add-ai-search-te",
       "config": {
         "configBucket": "dataproc-staging-us-central1-570127783956-ajghf8gj",

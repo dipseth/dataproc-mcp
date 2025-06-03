@@ -1,15 +1,52 @@
 /**
  * Knowledge Indexer Service
  *
- * Builds and maintains a comprehensive knowledge base of:
- * - Cluster configurations and names
- * - Hive query outputs (first few rows/columns)
- * - Job submission types (Hive, Spark, etc.)
- * - Error patterns and troubleshooting
+ * This service is the core of the semantic search feature, providing intelligent
+ * data extraction and indexing capabilities for Dataproc infrastructure.
+ *
+ * FEATURES:
+ * - Builds and maintains a comprehensive knowledge base of cluster configurations
+ * - Extracts meaningful information from Hive query outputs (first few rows/columns)
+ * - Tracks job submission patterns (Hive, Spark, PySpark, etc.)
+ * - Indexes error patterns and troubleshooting information
+ * - Enables natural language queries against stored data
+ *
+ * GRACEFUL DEGRADATION:
+ * - Works with or without Qdrant vector database
+ * - Provides helpful setup guidance when Qdrant is unavailable
+ * - Core functionality never breaks regardless of optional dependencies
+ *
+ * KNOWLEDGE BASE STRUCTURE:
+ * - Cluster configurations: machine types, worker counts, components
+ * - Package information: pip packages, initialization scripts
+ * - Network configurations: zones, subnets, service accounts
+ * - Operational data: creation times, owners, environments
+ *
+ * USAGE:
+ * - Automatically indexes data from list_clusters and get_cluster operations
+ * - Powers semantic queries like "show me clusters with machine learning packages"
+ * - Provides confidence scoring for search results
+ * - Supports filtering by project, region, and cluster name
  */
 
 import { QdrantStorageService } from './qdrant-storage.js';
+import { TransformersEmbeddingService } from './transformers-embeddings.js';
+import { ClusterConfig } from '../types/cluster-config.js';
 import { logger } from '../utils/logger.js';
+
+// Type for cluster data that includes metadata beyond just config
+interface ClusterData {
+  clusterName?: string | null;
+  projectId?: string | null;
+  region?: string | null;
+  config?: ClusterConfig | null;
+  labels?: Record<string, string>;
+  status?: {
+    state?: string;
+    stateStartTime?: string;
+  };
+  [key: string]: unknown;
+}
 
 export interface ClusterKnowledge {
   clusterName: string;
@@ -46,7 +83,7 @@ export interface JobKnowledge {
   duration?: number;
   outputSample?: {
     columns: string[];
-    rows: any[][];
+    rows: unknown[][];
     totalRows?: number;
   };
   errorInfo?: {
@@ -76,6 +113,7 @@ export interface ErrorPattern {
 
 export class KnowledgeIndexer {
   private qdrantService: QdrantStorageService;
+  private embeddingService: TransformersEmbeddingService;
   private clusterKnowledge: Map<string, ClusterKnowledge> = new Map();
   private jobKnowledge: Map<string, JobKnowledge> = new Map();
   private errorPatterns: Map<string, ErrorPattern> = new Map();
@@ -94,15 +132,30 @@ export class KnowledgeIndexer {
     };
 
     this.qdrantService = new QdrantStorageService(config);
+    this.embeddingService = new TransformersEmbeddingService();
+  }
+
+  /**
+   * Initialize the knowledge indexer (ensures Qdrant collection exists)
+   */
+  async initialize(): Promise<void> {
+    try {
+      // Initialize the underlying Qdrant service
+      await this.qdrantService.ensureCollection();
+      logger.info('🧠 Knowledge indexer initialized successfully');
+    } catch (error) {
+      logger.error('Failed to initialize knowledge indexer:', error);
+      throw error;
+    }
   }
 
   /**
    * Index cluster configuration when first encountered
    */
-  async indexClusterConfiguration(clusterData: any): Promise<void> {
+  async indexClusterConfiguration(clusterData: ClusterData): Promise<void> {
     try {
-      const clusterName = clusterData.clusterName;
-      const projectId = clusterData.projectId;
+      const clusterName = clusterData.clusterName || 'unknown';
+      const projectId = clusterData.projectId || 'unknown';
       const region = this.extractRegion(clusterData);
       const key = `${projectId}/${region}/${clusterName}`;
 
@@ -164,7 +217,7 @@ export class KnowledgeIndexer {
     submissionTime?: string;
     duration?: number;
     results?: any;
-    error?: any;
+    error?: unknown;
   }): Promise<void> {
     try {
       const jobKnowledge: JobKnowledge = {
@@ -206,7 +259,7 @@ export class KnowledgeIndexer {
   async queryKnowledge(
     query: string,
     options: {
-      type?: 'clusters' | 'jobs' | 'errors' | 'all';
+      type?: 'clusters' | 'cluster' | 'jobs' | 'job' | 'errors' | 'error' | 'all';
       limit?: number;
       projectId?: string;
       region?: string;
@@ -215,13 +268,40 @@ export class KnowledgeIndexer {
     try {
       const searchResults = await this.qdrantService.searchSimilar(query, options.limit || 10);
 
-      // Filter by type if specified
+      // Filter by type if specified with flexible matching
       let filteredResults = searchResults;
       if (options.type && options.type !== 'all') {
         filteredResults = searchResults.filter((result) => {
           // Extract type from the stored data or metadata
-          const storedType = result.data?.type || (result.metadata as any)?.type;
-          return storedType === options.type;
+          const storedType = (result.data as any)?.type || (result.metadata as any)?.type;
+
+          // Flexible type matching - handle both singular/plural and case variations
+          if (!storedType) return false;
+
+          const normalizedStoredType = storedType.toLowerCase();
+          const normalizedQueryType = options.type!.toLowerCase();
+
+          // Direct match
+          if (normalizedStoredType === normalizedQueryType) return true;
+
+          // Handle singular/plural variations
+          const singularForms = {
+            clusters: 'cluster',
+            jobs: 'job',
+            errors: 'error',
+          };
+
+          const pluralForms = {
+            cluster: 'clusters',
+            job: 'jobs',
+            error: 'errors',
+          };
+
+          // Check if query type matches stored type in singular/plural form
+          if (singularForms[normalizedQueryType] === normalizedStoredType) return true;
+          if (pluralForms[normalizedQueryType] === normalizedStoredType) return true;
+
+          return false;
         });
       }
 
@@ -239,7 +319,7 @@ export class KnowledgeIndexer {
       }
 
       return filteredResults.map((result) => {
-        const dataType = result.data?.type || (result.metadata as any)?.type || 'unknown';
+        const dataType = (result.data as any)?.type || (result.metadata as any)?.type || 'unknown';
         return {
           type: dataType,
           confidence: result.score,
@@ -556,6 +636,9 @@ export class KnowledgeIndexer {
   }
 
   private async storeClusterKnowledge(knowledge: ClusterKnowledge): Promise<void> {
+    // Train the embedding model with this cluster data (like QdrantStorageService does)
+    this.embeddingService.trainOnClusterData(knowledge as any);
+
     // Add type information to the data itself for easier retrieval
     const dataWithType = {
       ...knowledge,
@@ -599,18 +682,6 @@ export class KnowledgeIndexer {
     };
 
     await this.qdrantService.storeClusterData(dataWithType, metadata);
-  }
-
-  private generateEmbedding(text: string): Promise<number[]> {
-    // Simple hash-based embedding for prototype
-    const hash = this.hashCode(text);
-    const embedding = new Array(384).fill(0);
-
-    for (let i = 0; i < 384; i++) {
-      embedding[i] = Math.sin(hash * (i + 1)) * 0.5;
-    }
-
-    return Promise.resolve(embedding);
   }
 
   private hashCode(str: string): number {

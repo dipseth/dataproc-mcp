@@ -8,7 +8,32 @@
 import { pipeline } from '@huggingface/transformers';
 import { writeFileSync, readFileSync, existsSync } from 'fs';
 import { join } from 'path';
+import { ClusterConfig } from '../types/cluster-config.js';
 import { logger } from '../utils/logger.js';
+
+// Type definitions for better type safety - using unknown for complex Transformers.js types
+// Type guard for tensor-like results
+interface TensorLike {
+  tolist?: () => unknown;
+  data?: ArrayLike<number>;
+}
+
+function isTensorLike(obj: unknown): obj is TensorLike {
+  return typeof obj === 'object' && obj !== null;
+}
+
+interface ClusterData {
+  clusterName?: string;
+  projectId?: string;
+  region?: string;
+  config?: ClusterConfig;
+  labels?: Record<string, string>;
+  status?: {
+    state?: string;
+    stateStartTime?: string;
+  };
+  [key: string]: unknown;
+}
 
 export interface EmbeddingStats {
   modelName: string;
@@ -28,7 +53,7 @@ export interface TrainingData {
 }
 
 export class TransformersEmbeddingService {
-  private pipeline: any = null;
+  private pipeline: unknown = null;
   private modelName: string;
   private vectorSize: number;
   private trainingDataPath: string;
@@ -55,12 +80,12 @@ export class TransformersEmbeddingService {
       logger.info(`🤖 Loading Transformers.js model: ${this.modelName}`);
 
       try {
-        this.pipeline = await pipeline('feature-extraction', this.modelName, {
+        this.pipeline = (await pipeline('feature-extraction', this.modelName, {
           // Use quantized model for better performance
           dtype: 'q8',
           // Cache models locally
           cache_dir: join(process.cwd(), 'state', 'transformers-cache'),
-        });
+        })) as unknown;
 
         logger.info(`✅ Model loaded successfully: ${this.modelName}`);
       } catch (error) {
@@ -112,7 +137,7 @@ export class TransformersEmbeddingService {
   /**
    * Extract comprehensive text from cluster data for embedding
    */
-  private extractClusterText(clusterData: any): string {
+  private extractClusterText(clusterData: ClusterData): string {
     const textParts: string[] = [];
 
     // Basic cluster info
@@ -185,7 +210,7 @@ export class TransformersEmbeddingService {
   /**
    * Train the model with new cluster data (store for future fine-tuning)
    */
-  public trainOnClusterData(clusterData: any): void {
+  public trainOnClusterData(clusterData: ClusterData): void {
     const extractedText = this.extractClusterText(clusterData);
 
     if (extractedText.trim().length === 0) {
@@ -226,22 +251,37 @@ export class TransformersEmbeddingService {
 
     try {
       // Use the feature-extraction pipeline with proper pooling and normalization
-      const result = await this.pipeline(text, {
+      if (!this.pipeline) {
+        throw new Error('Pipeline not initialized');
+      }
+
+      const result = await (this.pipeline as any)(text, {
         pooling: 'mean',
         normalize: true,
       });
 
-      // Convert tensor to array - handle nested structure
+      // Convert tensor to array - handle nested structure with type safety
       let embedding: number[];
-      if (result.tolist) {
+
+      if (!isTensorLike(result)) {
+        throw new Error('Unexpected embedding result type');
+      }
+
+      if (result.tolist && typeof result.tolist === 'function') {
         const listResult = result.tolist();
         // Handle nested array structure [[embedding]]
-        embedding = Array.isArray(listResult[0]) ? listResult[0] : listResult;
+        if (Array.isArray(listResult) && Array.isArray(listResult[0])) {
+          embedding = listResult[0] as number[];
+        } else if (Array.isArray(listResult)) {
+          embedding = listResult as number[];
+        } else {
+          throw new Error('Unexpected tolist result format');
+        }
       } else if (Array.isArray(result)) {
         // Handle nested array structure [[embedding]]
-        embedding = Array.isArray(result[0]) ? result[0] : result;
+        embedding = Array.isArray(result[0]) ? (result[0] as number[]) : (result as number[]);
       } else if (result.data) {
-        embedding = Array.from(result.data);
+        embedding = Array.from(result.data as ArrayLike<number>);
       } else {
         throw new Error('Unexpected embedding format');
       }
@@ -262,7 +302,7 @@ export class TransformersEmbeddingService {
   /**
    * Generate embeddings for cluster data with semantic enhancement
    */
-  public async generateClusterEmbedding(clusterData: any): Promise<number[]> {
+  public async generateClusterEmbedding(clusterData: ClusterData): Promise<number[]> {
     const text = this.extractClusterText(clusterData);
     return this.generateEmbedding(text);
   }

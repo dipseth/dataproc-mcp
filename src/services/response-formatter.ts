@@ -4,6 +4,7 @@
  */
 
 import { ClusterSummary, ClusterDetails, ResponseFilterConfig } from '../types/response-filter.js';
+import { DataprocJob } from '../types/dataproc-responses.js';
 
 export class ResponseFormatter {
   private config: ResponseFilterConfig;
@@ -226,7 +227,7 @@ export class ResponseFormatter {
   /**
    * Format job summary for job-related responses
    */
-  formatJobSummary(jobs: any[], tokensSaved?: number): string {
+  formatJobSummary(jobs: DataprocJob[], tokensSaved?: number): string {
     if (!jobs.length) {
       return this.config.formatting.useEmojis ? '📭 No jobs found' : 'No jobs found';
     }
@@ -251,16 +252,16 @@ export class ResponseFormatter {
           acc[status].push(job);
           return acc;
         },
-        {} as Record<string, any[]>
+        {} as Record<string, DataprocJob[]>
       );
 
       Object.entries(groupedJobs).forEach(([status, statusJobs]) => {
         const statusEmoji = this.getStatusEmoji(status);
-        const jobsArray = statusJobs as any[];
+        const jobsArray = statusJobs;
         lines.push(`### ${statusEmoji} ${status} (${jobsArray.length})`);
         lines.push('');
 
-        jobsArray.forEach((job: any) => {
+        jobsArray.forEach((job) => {
           const jobType = job.hiveJob
             ? 'Hive'
             : job.sparkJob
@@ -329,7 +330,12 @@ export class ResponseFormatter {
   /**
    * Format query results with schema and statistics
    */
-  formatQueryResults(results: any, schema?: any, stats?: any, tokensSaved?: number): string {
+  formatQueryResults(
+    results: unknown,
+    schema?: unknown,
+    stats?: unknown,
+    tokensSaved?: number
+  ): string {
     const lines: string[] = [];
 
     // Header
@@ -379,10 +385,12 @@ export class ResponseFormatter {
 
     // Statistics
     if (stats && this.config.extractionRules.query_results.summaryStats) {
+      const statsObj = stats as any;
+      const resultsArray = results as any;
       lines.push('**Statistics:**');
-      lines.push(`- Total rows: ${stats.totalRows || results?.length || 0}`);
-      lines.push(`- Execution time: ${stats.executionTime || 'N/A'}`);
-      lines.push(`- Bytes processed: ${stats.bytesProcessed || 'N/A'}`);
+      lines.push(`- Total rows: ${statsObj?.totalRows || resultsArray?.length || 0}`);
+      lines.push(`- Execution time: ${statsObj?.executionTime || 'N/A'}`);
+      lines.push(`- Bytes processed: ${statsObj?.bytesProcessed || 'N/A'}`);
       lines.push('');
     }
 

@@ -4,7 +4,7 @@
  */
 
 export interface FilteredResponse {
-  type: 'filtered' | 'full' | 'summary';
+  type: 'filtered' | 'full' | 'summary' | 'semantic';
   content: string;
   summary?: string;
   resourceUri?: string;

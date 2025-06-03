@@ -88,6 +88,7 @@ npx @dataproc/mcp-server
 
 ### 🎯 **Core Capabilities**
 - **16 Production-Ready MCP Tools** - Complete Dataproc management suite
+- **🧠 Knowledge Base Semantic Search** - Natural language queries with optional Qdrant integration
 - **🚀 Response Optimization** - 60-96% token reduction with Qdrant storage
 - **60-80% Parameter Reduction** - Intelligent default injection
 - **Multi-Environment Support** - Dev/staging/production configurations
@@ -175,6 +176,7 @@ my-company-analytics-prod-1234:
 ## 📚 Documentation
 
 - **[Quick Start Guide](https://dipseth.github.io/dataproc-mcp/QUICK_START)** - Get started in 5 minutes
+- **[Knowledge Base Semantic Search](https://dipseth.github.io/dataproc-mcp/KNOWLEDGE_BASE_SEMANTIC_SEARCH)** - Natural language queries and setup
 - **[API Reference](https://dipseth.github.io/dataproc-mcp/api/)** - Complete tool documentation
 - **[Configuration Examples](https://dipseth.github.io/dataproc-mcp/CONFIGURATION_EXAMPLES)** - Real-world configurations
 - **[Security Guide](https://dipseth.github.io/dataproc-mcp/security/)** - Best practices and compliance

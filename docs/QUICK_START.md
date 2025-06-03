@@ -84,7 +84,26 @@ Edit `config/default-params.json`:
 }
 ```
 
-### Step 5: Start the Server
+### Step 5: Optional - Enable Semantic Search
+
+For enhanced natural language queries (optional):
+
+```bash
+# Install and start Qdrant vector database
+docker run -p 6334:6333 qdrant/qdrant
+
+# Verify Qdrant is running
+curl http://localhost:6334/health
+```
+
+**Benefits of Semantic Search:**
+- Natural language cluster queries: "show me clusters with pip packages"
+- Intelligent data extraction and filtering
+- Enhanced search capabilities with confidence scoring
+
+**Note:** This is completely optional - all core functionality works without Qdrant.
+
+### Step 6: Start the Server
 
 ```bash
 # Start the MCP server
@@ -163,6 +182,15 @@ Show me all my Dataproc clusters
 ### Submit a Spark Job
 ```
 Submit a Spark job to process data from gs://my-bucket/data.csv
+```
+
+### Try Semantic Search (if Qdrant enabled)
+```
+Show me clusters with machine learning packages installed
+```
+
+```
+Find clusters using high-memory configurations
 ```
 
 ## 📋 Example Cluster Profile
