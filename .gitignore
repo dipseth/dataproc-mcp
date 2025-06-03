@@ -112,3 +112,4 @@ SERVICE_ACCOUNT_AUTHENTICATION_GUIDE.md
 examples/web-apps/*
 
 state/*
+scripts/copy-config-to-desktop.sh

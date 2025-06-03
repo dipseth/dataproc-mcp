@@ -124,13 +124,30 @@ export class ResponseFilter {
    */
   private static async loadConfig(): Promise<ResponseFilterConfig> {
     try {
-      const configPath = path.join(process.cwd(), 'config', 'response-filter.json');
+      // Try to use the same directory as the main server config
+      let configPath: string;
+
+      // eslint-disable-next-line no-undef
+      if (global.DATAPROC_CONFIG_DIR) {
+        // Use the same directory as server_main.json
+        // eslint-disable-next-line no-undef
+        configPath = path.join(global.DATAPROC_CONFIG_DIR, 'response-filter.json');
+        console.log(
+          `[INFO] Looking for response-filter.json in server config directory: ${configPath}`
+        );
+      } else {
+        // Fallback to the old behavior
+        configPath = path.join(process.cwd(), 'config', 'response-filter.json');
+        console.log(`[INFO] Fallback: Looking for response-filter.json in: ${configPath}`);
+      }
+
       const configData = await fs.readFile(configPath, 'utf-8');
       const config = JSON.parse(configData) as ResponseFilterConfig;
 
       // Validate required fields
       ResponseFilter.validateConfig(config);
 
+      console.log(`[SUCCESS] Loaded response filter configuration from: ${configPath}`);
       return config;
     } catch (error) {
       console.warn('Failed to load response filter config, using defaults:', error);

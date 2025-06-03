@@ -49,7 +49,10 @@
     "url": "http://localhost:6334",
     "collectionName": "dataproc_knowledge",
     "vectorSize": 384,
-    "distance": "Cosine"
+    "distance": "Cosine",
+    "timeout": 30000,
+    "retryAttempts": 3,
+    "healthCheckInterval": 60000
   },
   "formatting": {
     "useEmojis": true,

@@ -126,7 +126,23 @@ try {
 // Initialize response filter and Qdrant manager (async initialization)
 async function initializeResponseOptimization() {
   try {
-    const responseFilterConfigPath = path.join(process.cwd(), 'config', 'response-filter.json');
+    // Try to use the same directory as the main server config
+    let responseFilterConfigPath: string;
+
+    if (global.DATAPROC_CONFIG_DIR) {
+      // Use the same directory as server_main.json
+      responseFilterConfigPath = path.join(global.DATAPROC_CONFIG_DIR, 'response-filter.json');
+      console.log(
+        `[INFO] Looking for response-filter.json in server config directory: ${responseFilterConfigPath}`
+      );
+    } else {
+      // Fallback to the old behavior
+      responseFilterConfigPath = path.join(process.cwd(), 'config', 'response-filter.json');
+      console.log(
+        `[INFO] Fallback: Looking for response-filter.json in: ${responseFilterConfigPath}`
+      );
+    }
+
     if (fs.existsSync(responseFilterConfigPath)) {
       const responseFilterConfig = JSON.parse(fs.readFileSync(responseFilterConfigPath, 'utf8'));
 

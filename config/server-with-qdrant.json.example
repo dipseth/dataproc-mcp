@@ -1,0 +1,67 @@
+{
+  "profileManager": {
+    "rootConfigPath": "/Users/srivers/Documents/Cline/MCP/dataproc-server/profiles",
+    "profileScanInterval": 300000
+  },
+  "clusterTracker": {
+    "stateFilePath": "./state/dataproc-state.json",
+    "stateSaveInterval": 60000
+  },
+  "authentication": {
+    "impersonateServiceAccount": "grpn-sa-terraform-data-science@prj-grp-central-sa-prod-0b25.iam.gserviceaccount.com",
+    "preferImpersonation": true,
+    "useApplicationDefaultFallback": false     
+  },
+  "defaultParameters": {
+    "defaultEnvironment": "production",
+    "parameters": [],
+    "environments": [
+      {
+        "environment": "production",
+        "parameters": {
+          "machineType": "n1-standard-8",
+          "numWorkers": 4,
+          "projectId": "prj-grp-data-sci-prod-b425",
+          "region": "us-central1"
+        }
+      }
+    ]
+  },
+  "semanticSearch": {
+    "enabled": true,
+    "qdrant": {
+      "url": "http://localhost:6334",
+      "collectionName": "dataproc_knowledge",
+      "vectorSize": 384,
+      "distance": "Cosine",
+      "timeout": 30000,
+      "retryAttempts": 3,
+      "healthCheckInterval": 60000
+    },
+    "knowledgeBase": {
+      "autoIndexing": true,
+      "indexingInterval": 300000,
+      "maxDocuments": 10000,
+      "confidenceThreshold": 0.7
+    }
+  },
+  "responseOptimization": {
+    "enabled": true,
+    "tokenLimits": {
+      "list_clusters": 500,
+      "get_cluster": 300,
+      "default": 400
+    },
+    "caching": {
+      "enabled": true,
+      "ttlSeconds": 300,
+      "maxCacheSize": 100
+    }
+  },
+  "logging": {
+    "level": "info",
+    "enableConsole": true,
+    "enableFile": false,
+    "semanticSearchLogs": true
+  }
+}
