@@ -49,7 +49,7 @@ Add this configuration to your Roo MCP settings:
       "args": ["@dipseth/dataproc-mcp-server@latest"],
       "env": {
         "LOG_LEVEL": "debug",
-        "DATAPROC_CONFIG_PATH": "/Users/yourname/.config/dataproc/server.json",
+        "DATAPROC_CONFIG_PATH": "/path/to/your/.config/dataproc/server.json",
         "GOOGLE_APPLICATION_CREDENTIALS": "/path/to/service-account.json"
       },
       "alwaysAllow": []

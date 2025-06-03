@@ -76,6 +76,14 @@ import { ClusterManager } from './services/cluster-manager.js';
 import { JobTracker } from './services/job-tracker.js';
 import { JobOutputHandler } from './services/job-output-handler.js';
 import { AsyncQueryPoller } from './services/async-query-poller.js';
+import { ResponseFilter } from './services/response-filter.js';
+import { QdrantManager } from './services/qdrant-manager.js';
+import { SemanticQueryService } from './services/semantic-query.js';
+import { KnowledgeIndexer } from './services/knowledge-indexer.js';
+
+// Semantic Search Services - Optional enhancement for natural language queries
+// These services provide intelligent data extraction and vector similarity search
+// with graceful degradation when Qdrant is unavailable
 
 // Parse command line arguments
 const args = process.argv.slice(2);
@@ -99,6 +107,10 @@ let jobTracker: JobTracker;
 let jobOutputHandler: JobOutputHandler;
 let asyncQueryPoller: AsyncQueryPoller;
 let defaultParamManager: DefaultParameterManager;
+let responseFilter: ResponseFilter;
+let qdrantManager: QdrantManager;
+let semanticQueryService: SemanticQueryService;
+let knowledgeIndexer: KnowledgeIndexer;
 
 // Initialize default parameter manager
 try {
@@ -110,6 +122,48 @@ try {
 } catch (error) {
   console.warn('Could not load default parameters:', error);
 }
+
+// Initialize response filter and Qdrant manager (async initialization)
+async function initializeResponseOptimization() {
+  try {
+    const responseFilterConfigPath = path.join(process.cwd(), 'config', 'response-filter.json');
+    if (fs.existsSync(responseFilterConfigPath)) {
+      const responseFilterConfig = JSON.parse(fs.readFileSync(responseFilterConfigPath, 'utf8'));
+
+      // Initialize ResponseFilter (it manages its own QdrantManager internally)
+      responseFilter = new ResponseFilter(responseFilterConfig);
+
+      // Initialize SemanticQueryService with same config
+      semanticQueryService = new SemanticQueryService({
+        url: responseFilterConfig.qdrant?.url || 'http://localhost:6333',
+        collectionName: responseFilterConfig.qdrant?.collection || 'dataproc_responses',
+        vectorSize: 384,
+        distance: 'Cosine',
+      });
+      await semanticQueryService.initialize();
+
+      // Initialize KnowledgeIndexer with separate collection
+      knowledgeIndexer = new KnowledgeIndexer({
+        url: responseFilterConfig.qdrant?.url || 'http://localhost:6333',
+        collectionName: 'dataproc_knowledge',
+        vectorSize: 384,
+        distance: 'Cosine',
+      });
+
+      // Initialize the knowledge indexer (creates collection if needed)
+      await knowledgeIndexer.initialize();
+
+      logger.info('Response optimization and knowledge indexing services initialized successfully');
+    } else {
+      logger.warn('Response filter configuration not found, response optimization disabled');
+    }
+  } catch (error) {
+    logger.warn('Could not initialize response optimization services:', error);
+  }
+}
+
+// Start async initialization
+initializeResponseOptimization();
 
 // Create the MCP server with full capabilities
 const server = new Server(
@@ -208,6 +262,15 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             filter: { type: 'string', description: 'Optional: Filter string' },
             pageSize: { type: 'number', description: 'Optional: Page size' },
             pageToken: { type: 'string', description: 'Optional: Page token for pagination' },
+            verbose: {
+              type: 'boolean',
+              description: 'Optional: Return full response without filtering (default: false)',
+            },
+            semanticQuery: {
+              type: 'string',
+              description:
+                'Optional: Semantic query to extract specific information (e.g., "pip packages", "machine types", "network config")',
+            },
           },
           required: [],
         },
@@ -262,6 +325,15 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             projectId: { type: 'string', description: 'GCP project ID' },
             region: { type: 'string', description: 'Dataproc region (e.g., us-central1)' },
             clusterName: { type: 'string', description: 'Name of the cluster' },
+            verbose: {
+              type: 'boolean',
+              description: 'Optional: Return full response without filtering (default: false)',
+            },
+            semanticQuery: {
+              type: 'string',
+              description:
+                'Optional: Semantic query to extract specific information (e.g., "pip packages", "machine types", "network config")',
+            },
           },
           required: ['projectId', 'region', 'clusterName'],
         },
@@ -282,6 +354,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: 'boolean',
               description:
                 'Optional: Whether to wait for query completion (false) or return immediately (true)',
+            },
+            verbose: {
+              type: 'boolean',
+              description: 'Optional: Return full response without filtering (default: false)',
             },
             queryOptions: {
               type: 'object',
@@ -388,6 +464,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               description: 'Dataproc region (optional if default configured, e.g., us-central1)',
             },
             jobId: { type: 'string', description: 'Job ID to check' },
+            verbose: {
+              type: 'boolean',
+              description: 'Optional: Return full response without filtering (default: false)',
+            },
           },
           required: ['jobId'],
         },
@@ -450,6 +530,99 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
           },
           required: [],
+        },
+      },
+
+      // New tool: semantic query for stored cluster data
+      {
+        name: 'query_cluster_data',
+        description:
+          'Query stored cluster data using natural language (e.g., "pip packages", "machine types", "network config")',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            query: {
+              type: 'string',
+              description:
+                'Natural language query (e.g., "pip packages", "machine configuration", "network settings")',
+            },
+            projectId: {
+              type: 'string',
+              description: 'Filter by GCP project ID (optional)',
+            },
+            region: {
+              type: 'string',
+              description: 'Filter by region (optional)',
+            },
+            clusterName: {
+              type: 'string',
+              description: 'Filter by specific cluster name (optional)',
+            },
+            limit: {
+              type: 'number',
+              description: 'Maximum number of results (default: 5)',
+            },
+          },
+          required: ['query'],
+        },
+      },
+
+      // New tool: get cluster discovery insights
+      {
+        name: 'get_cluster_insights',
+        description:
+          '📊 Get comprehensive insights about discovered clusters, machine types, components, and recent discoveries',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+          required: [],
+        },
+      },
+
+      // New tool: get job analytics
+      {
+        name: 'get_job_analytics',
+        description:
+          '📈 Get analytics about job submissions, success rates, error patterns, and performance metrics',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+          required: [],
+        },
+      },
+
+      // New tool: query knowledge base
+      {
+        name: 'query_knowledge',
+        description:
+          '🧠 Query the comprehensive knowledge base using natural language (clusters, jobs, errors, all)',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            query: {
+              type: 'string',
+              description: 'Natural language query about clusters, jobs, or errors',
+            },
+            type: {
+              type: 'string',
+              enum: ['clusters', 'cluster', 'jobs', 'job', 'errors', 'error', 'all'],
+              description:
+                'Type of knowledge to search (default: all). Supports both singular and plural forms.',
+            },
+            projectId: {
+              type: 'string',
+              description: 'Filter by GCP project ID (optional)',
+            },
+            region: {
+              type: 'string',
+              description: 'Filter by region (optional)',
+            },
+            limit: {
+              type: 'number',
+              description: 'Maximum number of results (default: 10)',
+            },
+          },
+          required: ['query'],
         },
       },
     ],
@@ -656,6 +829,40 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
           },
         ],
       };
+    }
+
+    if (uri.startsWith('qdrant://dataproc/')) {
+      // Handle Qdrant storage resource retrieval
+      if (responseFilter) {
+        try {
+          const resourceId = uri.replace('qdrant://dataproc/', '');
+          const qdrantData = await responseFilter.getStoredResponse(resourceId);
+
+          if (qdrantData) {
+            return {
+              contents: [
+                {
+                  uri,
+                  mimeType: 'application/json',
+                  text: JSON.stringify(qdrantData, null, 2),
+                },
+              ],
+            };
+          } else {
+            throw new McpError(
+              ErrorCode.InvalidRequest,
+              `Qdrant resource not found: ${resourceId}`
+            );
+          }
+        } catch (error) {
+          throw new McpError(
+            ErrorCode.InternalError,
+            `Failed to retrieve Qdrant resource: ${error}`
+          );
+        }
+      } else {
+        throw new McpError(ErrorCode.InvalidRequest, 'Qdrant storage not available');
+      }
     }
 
     throw new McpError(ErrorCode.InvalidRequest, `Unknown resource URI: ${uri}`);
@@ -868,6 +1075,155 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           clusterCount: Array.isArray(response?.clusters) ? response.clusters.length : 0,
         });
 
+        // Index cluster knowledge if available
+        if (knowledgeIndexer && response?.clusters) {
+          try {
+            for (const cluster of response.clusters) {
+              await knowledgeIndexer.indexClusterConfiguration(cluster as any);
+            }
+            logger.info(`Indexed ${response.clusters.length} clusters for knowledge base`);
+          } catch (indexError) {
+            logger.warn('Failed to index cluster knowledge:', indexError);
+          }
+        }
+
+        // Handle semantic query using KnowledgeIndexer if available
+        if (args.semanticQuery && knowledgeIndexer) {
+          try {
+            const queryResults = await knowledgeIndexer.queryKnowledge(String(args.semanticQuery), {
+              type: 'cluster',
+              projectId: projectId ? String(projectId) : undefined,
+              region: region ? String(region) : undefined,
+              limit: 5,
+            });
+
+            if (queryResults.length === 0) {
+              // Fall back to regular formatted response with semantic query note
+              let fallbackText = `🔍 **Semantic Query**: "${args.semanticQuery}"\n❌ **No semantic results found**\n\n`;
+
+              // Use the same response filtering logic as regular queries
+              if (responseFilter && !args.verbose) {
+                try {
+                  const filteredResponse = await responseFilter.filterResponse(
+                    'list_clusters',
+                    response,
+                    {
+                      toolName: 'list_clusters',
+                      timestamp: new Date().toISOString(),
+                      projectId,
+                      region,
+                      responseType: 'cluster_list',
+                      originalTokenCount: JSON.stringify(response).length,
+                      filteredTokenCount: 0,
+                      compressionRatio: 1.0,
+                    }
+                  );
+
+                  const formattedContent =
+                    filteredResponse.type === 'summary'
+                      ? filteredResponse.summary || filteredResponse.content
+                      : filteredResponse.content;
+
+                  fallbackText += formattedContent;
+                  fallbackText += `\n\n💡 **Note**: Semantic search requires Qdrant vector database. To enable:\n`;
+                  fallbackText += `- Start Qdrant: \`docker run -p 6334:6333 qdrant/qdrant\`\n`;
+                  fallbackText += `- Or use regular cluster operations without semantic queries`;
+                } catch (filterError) {
+                  logger.warn('Response filtering failed in semantic fallback:', filterError);
+                  fallbackText += `📋 **Regular cluster list**:\n${JSON.stringify(SecurityMiddleware.sanitizeForLogging(response), null, 2)}`;
+                }
+              } else {
+                fallbackText += `📋 **Regular cluster list**:\n${JSON.stringify(SecurityMiddleware.sanitizeForLogging(response), null, 2)}`;
+              }
+
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: fallbackText,
+                  },
+                ],
+              };
+            }
+
+            // Format semantic results
+            let semanticResponse = `🔍 **Semantic Query**: "${args.semanticQuery}"\n`;
+            semanticResponse += `📊 **Found**: ${queryResults.length} matching clusters\n\n`;
+
+            queryResults.forEach((result, index) => {
+              const data = result.data as any;
+              semanticResponse += `**${index + 1}. ${data.clusterName}** (${data.projectId}/${data.region})\n`;
+              semanticResponse += `   🎯 Confidence: ${(result.confidence * 100).toFixed(1)}%\n`;
+              semanticResponse += `   📅 Last seen: ${data.lastSeen}\n`;
+
+              // Show machine types if available
+              if (data.configurations?.machineTypes?.length > 0) {
+                semanticResponse += `   🖥️  Machine types: ${data.configurations.machineTypes.join(', ')}\n`;
+              }
+
+              // Show components if available
+              if (data.configurations?.components?.length > 0) {
+                semanticResponse += `   🔧 Components: ${data.configurations.components.join(', ')}\n`;
+              }
+
+              // Show pip packages if available
+              if (data.pipPackages?.length > 0) {
+                semanticResponse += `   📦 Pip packages: ${data.pipPackages.slice(0, 3).join(', ')}${data.pipPackages.length > 3 ? '...' : ''}\n`;
+              }
+
+              semanticResponse += `   📝 Summary: ${result.summary}\n\n`;
+            });
+
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: semanticResponse,
+                },
+              ],
+            };
+          } catch (semanticError) {
+            logger.warn('Semantic query failed, falling back to response filter:', semanticError);
+          }
+        }
+
+        // Apply response filtering if available (fallback for non-semantic queries or semantic query failures)
+        if (responseFilter && !args.verbose) {
+          try {
+            const filteredResponse = await responseFilter.filterResponse(
+              'list_clusters',
+              response,
+              {
+                toolName: 'list_clusters',
+                timestamp: new Date().toISOString(),
+                projectId,
+                region,
+                responseType: 'cluster_list',
+                originalTokenCount: JSON.stringify(response).length,
+                filteredTokenCount: 0,
+                compressionRatio: 1.0,
+              }
+            );
+
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text:
+                    filteredResponse.type === 'summary'
+                      ? filteredResponse.summary || filteredResponse.content
+                      : filteredResponse.content,
+                },
+              ],
+            };
+          } catch (filterError) {
+            logger.warn(
+              'Response filtering failed, falling back to original response:',
+              filterError
+            );
+          }
+        }
+
         return {
           content: [
             {
@@ -914,6 +1270,43 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             region: String(region),
             jobId: String(jobId),
           });
+
+          // Apply response filtering if available
+          if (responseFilter && !args.verbose) {
+            try {
+              const filteredResponse = await responseFilter.filterResponse(
+                'get_job_status',
+                status,
+                {
+                  toolName: 'get_job_status',
+                  timestamp: new Date().toISOString(),
+                  projectId: String(projectId),
+                  region: String(region),
+                  responseType: 'job_status',
+                  originalTokenCount: JSON.stringify(status).length,
+                  filteredTokenCount: 0,
+                  compressionRatio: 1.0,
+                }
+              );
+
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text:
+                      filteredResponse.type === 'summary'
+                        ? filteredResponse.summary || filteredResponse.content
+                        : filteredResponse.content,
+                  },
+                ],
+              };
+            } catch (filterError) {
+              logger.warn(
+                'Response filtering failed, falling back to original response:',
+                filterError
+              );
+            }
+          }
 
           return {
             content: [
@@ -1062,6 +1455,151 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         const response = await getCluster(String(projectId), String(region), String(clusterName));
 
+        // Index cluster configuration for knowledge base
+        if (knowledgeIndexer && response) {
+          try {
+            await knowledgeIndexer.indexClusterConfiguration(response as any);
+          } catch (indexError) {
+            logger.warn('Failed to index cluster configuration:', indexError);
+          }
+        }
+
+        // Handle semantic query using KnowledgeIndexer if available
+        if (args.semanticQuery && knowledgeIndexer) {
+          try {
+            const queryResults = await knowledgeIndexer.queryKnowledge(String(args.semanticQuery), {
+              type: 'cluster',
+              projectId: String(projectId),
+              region: String(region),
+              limit: 5,
+            });
+
+            if (queryResults.length === 0) {
+              // Fall back to regular formatted response with semantic query note
+              let fallbackText = `🔍 **Semantic Query**: "${args.semanticQuery}"\n❌ **No semantic results found for cluster ${clusterName}**\n\n`;
+
+              // Use the same response filtering logic as regular queries
+              if (responseFilter && !args.verbose) {
+                try {
+                  const filteredResponse = await responseFilter.filterResponse(
+                    'get_cluster',
+                    response,
+                    {
+                      toolName: 'get_cluster',
+                      timestamp: new Date().toISOString(),
+                      projectId: String(projectId),
+                      region: String(region),
+                      clusterName: String(clusterName),
+                      responseType: 'cluster_details',
+                      originalTokenCount: JSON.stringify(response).length,
+                      filteredTokenCount: 0,
+                      compressionRatio: 1.0,
+                    }
+                  );
+
+                  const formattedContent =
+                    filteredResponse.type === 'summary'
+                      ? filteredResponse.summary || filteredResponse.content
+                      : filteredResponse.content;
+
+                  fallbackText += `📋 **Regular cluster details**:\n${formattedContent}`;
+                  fallbackText += `\n\n💡 **Note**: Semantic search requires Qdrant vector database. To enable:\n`;
+                  fallbackText += `- Start Qdrant: \`docker run -p 6334:6333 qdrant/qdrant\`\n`;
+                  fallbackText += `- Or use regular cluster operations without semantic queries`;
+                } catch (filterError) {
+                  logger.warn('Response filtering failed in semantic fallback:', filterError);
+                  fallbackText += `📋 **Regular cluster details**:\n${JSON.stringify(response, null, 2)}`;
+                }
+              } else {
+                fallbackText += `📋 **Regular cluster details**:\n${JSON.stringify(response, null, 2)}`;
+              }
+
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: fallbackText,
+                  },
+                ],
+              };
+            }
+
+            // Format semantic results
+            let semanticResponse = `🔍 **Semantic Query**: "${args.semanticQuery}"\n`;
+            semanticResponse += `🎯 **Target Cluster**: ${clusterName} (${projectId}/${region})\n`;
+            semanticResponse += `📊 **Found**: ${queryResults.length} matching results\n\n`;
+
+            queryResults.forEach((result, index) => {
+              const data = result.data as any;
+              semanticResponse += `**${index + 1}. ${data.clusterName}** (${data.projectId}/${data.region})\n`;
+              semanticResponse += `   🎯 Confidence: ${(result.confidence * 100).toFixed(1)}%\n`;
+              semanticResponse += `   📅 Last seen: ${data.lastSeen}\n`;
+
+              // Show machine types if available
+              if (data.configurations?.machineTypes?.length > 0) {
+                semanticResponse += `   🖥️  Machine types: ${data.configurations.machineTypes.join(', ')}\n`;
+              }
+
+              // Show components if available
+              if (data.configurations?.components?.length > 0) {
+                semanticResponse += `   🔧 Components: ${data.configurations.components.join(', ')}\n`;
+              }
+
+              // Show pip packages if available
+              if (data.pipPackages?.length > 0) {
+                semanticResponse += `   📦 Pip packages: ${data.pipPackages.slice(0, 3).join(', ')}${data.pipPackages.length > 3 ? '...' : ''}\n`;
+              }
+
+              semanticResponse += `   📝 Summary: ${result.summary}\n\n`;
+            });
+
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: semanticResponse,
+                },
+              ],
+            };
+          } catch (semanticError) {
+            logger.warn('Semantic query failed, falling back to response filter:', semanticError);
+          }
+        }
+
+        // Apply response filtering if available (fallback for non-semantic queries or semantic query failures)
+        if (responseFilter && !args.verbose) {
+          try {
+            const filteredResponse = await responseFilter.filterResponse('get_cluster', response, {
+              toolName: 'get_cluster',
+              timestamp: new Date().toISOString(),
+              projectId: String(projectId),
+              region: String(region),
+              clusterName: String(clusterName),
+              responseType: 'cluster_details',
+              originalTokenCount: JSON.stringify(response).length,
+              filteredTokenCount: 0,
+              compressionRatio: 1.0,
+            });
+
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text:
+                    filteredResponse.type === 'summary'
+                      ? filteredResponse.summary || filteredResponse.content
+                      : filteredResponse.content,
+                },
+              ],
+            };
+          } catch (filterError) {
+            logger.warn(
+              'Response filtering failed, falling back to original response:',
+              filterError
+            );
+          }
+        }
+
         return {
           content: [
             {
@@ -1145,6 +1683,27 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           Boolean(async)
         );
 
+        // Index job knowledge if available
+        if (knowledgeIndexer && response.jobUuid) {
+          try {
+            await knowledgeIndexer.indexJobSubmission({
+              jobId: response.jobUuid,
+              jobType: 'hive',
+              clusterName: String(clusterName),
+              projectId: String(projectId),
+              region: String(region),
+              query: String(query),
+              status: String(response.status) || 'unknown',
+              submissionTime: new Date().toISOString(),
+              results: (response as any).results, // Results may be available later
+              error: (response as any).error, // Error may be available later
+            });
+            logger.info(`Indexed Hive job ${response.jobUuid} for knowledge base`);
+          } catch (indexError) {
+            logger.warn('Failed to index job knowledge:', indexError);
+          }
+        }
+
         // If async mode and we have a job ID, register with AsyncQueryPoller
         if (Boolean(async) && response.jobUuid) {
           asyncQueryPoller.registerQuery({
@@ -1155,6 +1714,46 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             submissionTime: new Date().toISOString(),
           });
 
+          // Apply response filtering if available for async response
+          if (responseFilter && !args.verbose) {
+            try {
+              const filteredResponse = await responseFilter.filterResponse(
+                'submit_hive_query',
+                response,
+                {
+                  toolName: 'submit_hive_query',
+                  timestamp: new Date().toISOString(),
+                  projectId: String(projectId),
+                  region: String(region),
+                  clusterName: String(clusterName),
+                  responseType: 'hive_query_async',
+                  originalTokenCount: JSON.stringify(response).length,
+                  filteredTokenCount: 0,
+                  compressionRatio: 1.0,
+                }
+              );
+
+              const asyncMessage = `\n\nQuery registered for automatic status updates. Use dataproc://query/${projectId}/${region}/${response.jobUuid} resource to monitor progress.`;
+
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text:
+                      (filteredResponse.type === 'summary'
+                        ? filteredResponse.summary || filteredResponse.content
+                        : filteredResponse.content) + asyncMessage,
+                  },
+                ],
+              };
+            } catch (filterError) {
+              logger.warn(
+                'Response filtering failed, falling back to original response:',
+                filterError
+              );
+            }
+          }
+
           return {
             content: [
               {
@@ -1163,6 +1762,44 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               },
             ],
           };
+        }
+
+        // Apply response filtering if available for sync response
+        if (responseFilter && !args.verbose) {
+          try {
+            const filteredResponse = await responseFilter.filterResponse(
+              'submit_hive_query',
+              response,
+              {
+                toolName: 'submit_hive_query',
+                timestamp: new Date().toISOString(),
+                projectId: String(projectId),
+                region: String(region),
+                clusterName: String(clusterName),
+                responseType: 'hive_query_sync',
+                originalTokenCount: JSON.stringify(response).length,
+                filteredTokenCount: 0,
+                compressionRatio: 1.0,
+              }
+            );
+
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text:
+                    filteredResponse.type === 'summary'
+                      ? filteredResponse.summary || filteredResponse.content
+                      : filteredResponse.content,
+                },
+              ],
+            };
+          } catch (filterError) {
+            logger.warn(
+              'Response filtering failed, falling back to original response:',
+              filterError
+            );
+          }
         }
 
         return {
@@ -1250,6 +1887,26 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             async: Boolean(async),
           });
 
+          // Index job knowledge if available
+          if (knowledgeIndexer && response.jobId) {
+            try {
+              await knowledgeIndexer.indexJobSubmission({
+                jobId: response.jobId,
+                jobType: String(jobType),
+                clusterName: String(clusterName),
+                projectId: String(projectId),
+                region: String(region),
+                status: String(response.status) || 'unknown',
+                submissionTime: new Date().toISOString(),
+                results: (response as any).results, // Results may be available later
+                error: (response as any).error, // Error may be available later
+              });
+              logger.info(`Indexed ${jobType} job ${response.jobId} for knowledge base`);
+            } catch (indexError) {
+              logger.warn('Failed to index job knowledge:', indexError);
+            }
+          }
+
           // If async mode and we have a job ID, register with AsyncQueryPoller
           if (Boolean(async) && response.jobId) {
             asyncQueryPoller.registerQuery({
@@ -1302,6 +1959,36 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             maxDisplayRows: maxResults ? Number(maxResults) : 10,
           });
 
+          // Index job results for knowledge base (update existing job with results)
+          if (knowledgeIndexer && response) {
+            try {
+              // We need to get job details to extract more information
+              const { getDataprocJobStatus } = await import('./services/job.js');
+              const jobDetails = await getDataprocJobStatus({
+                projectId: String(projectId),
+                region: String(region),
+                jobId: String(jobId),
+              });
+
+              await knowledgeIndexer.indexJobSubmission({
+                jobId: String(jobId),
+                jobType: 'unknown', // We'll extract this from job details if available
+                clusterName: (jobDetails as any)?.placement?.clusterName || 'unknown',
+                projectId: String(projectId),
+                region: String(region),
+                status: (jobDetails as any)?.status?.state || 'DONE',
+                submissionTime:
+                  (jobDetails as any)?.statusHistory?.[0]?.stateStartTime ||
+                  new Date().toISOString(),
+                results: response,
+                duration: undefined, // Duration calculation can be added later
+              });
+              logger.info(`Indexed job results for ${jobId} in knowledge base`);
+            } catch (indexError) {
+              logger.warn('Failed to index job results:', indexError);
+            }
+          }
+
           return {
             content: [
               {
@@ -1344,14 +2031,25 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           };
         }
 
-        // Construct Zeppelin URL (this is the standard format for Dataproc Zeppelin)
-        const zeppelinUrl = `https://${clusterName}-m:8080`;
+        // Extract Zeppelin URL from cluster endpoint configuration
+        const zeppelinUrl = cluster?.config?.endpointConfig?.httpPorts?.Zeppelin;
+
+        if (!zeppelinUrl) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Zeppelin URL not available for cluster ${clusterName}. The cluster may still be initializing or Zeppelin endpoint is not configured.`,
+              },
+            ],
+          };
+        }
 
         return {
           content: [
             {
               type: 'text',
-              text: `Zeppelin URL for cluster ${clusterName}: ${zeppelinUrl}\n\nNote: You may need to set up SSH tunneling or configure firewall rules to access this URL.`,
+              text: `Zeppelin URL for cluster ${clusterName}: ${zeppelinUrl}`,
             },
           ],
         };
@@ -1455,6 +2153,305 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
+      case 'query_cluster_data': {
+        const { query, projectId, region, clusterName, limit } = args;
+
+        if (!knowledgeIndexer) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: 'Knowledge indexer not available. Response optimization may not be enabled.',
+              },
+            ],
+          };
+        }
+
+        try {
+          const queryResults = await knowledgeIndexer.queryKnowledge(String(query), {
+            type: 'cluster', // Fixed: changed from 'clusters' to 'cluster' to match stored data
+            projectId: projectId ? String(projectId) : undefined,
+            region: region ? String(region) : undefined,
+            limit: limit ? Number(limit) : 5,
+          });
+
+          if (queryResults.length === 0) {
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: `🔍 **Query**: "${query}"\n\n❌ **No results found**\n\nTry:\n• Different search terms\n• Broader query (e.g., "configuration" instead of specific property)\n• Check if clusters have been stored (run list_clusters first)`,
+                },
+              ],
+            };
+          }
+
+          // Format results using knowledge indexer format
+          let response = `🔍 **Query**: "${query}"\n`;
+          response += `📊 **Found**: ${queryResults.length} results\n\n`;
+
+          queryResults.forEach((result, index) => {
+            const data = result.data as any;
+            response += `**${index + 1}. ${data.clusterName}** (${data.projectId}/${data.region})\n`;
+            response += `   🎯 Confidence: ${(result.confidence * 100).toFixed(1)}%\n`;
+            response += `   📅 Last seen: ${data.lastSeen}\n`;
+
+            // Show machine types if available
+            if (data.configurations?.machineTypes?.length > 0) {
+              response += `   🖥️  Machine types: ${data.configurations.machineTypes.join(', ')}\n`;
+            }
+
+            // Show components if available
+            if (data.configurations?.components?.length > 0) {
+              response += `   🔧 Components: ${data.configurations.components.join(', ')}\n`;
+            }
+
+            // Show pip packages if available
+            if (data.pipPackages?.length > 0) {
+              response += `   📦 Pip packages: ${data.pipPackages.slice(0, 3).join(', ')}${data.pipPackages.length > 3 ? '...' : ''}\n`;
+            }
+
+            response += `   📝 Summary: ${result.summary}\n\n`;
+          });
+
+          return {
+            content: [
+              {
+                type: 'text',
+                text: response,
+              },
+            ],
+          };
+        } catch (error) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Error querying cluster knowledge: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              },
+            ],
+          };
+        }
+      }
+
+      case 'get_cluster_insights': {
+        if (!knowledgeIndexer) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: 'Knowledge indexer not available. Response optimization may not be enabled.',
+              },
+            ],
+          };
+        }
+
+        try {
+          const insights = knowledgeIndexer.getClusterInsights();
+
+          let response = `📊 **Cluster Discovery Insights**\n\n`;
+          response += `🏗️ **Overview**:\n`;
+          response += `   • Total Clusters: ${insights.totalClusters}\n`;
+          response += `   • Unique Projects: ${insights.uniqueProjects}\n`;
+          response += `   • Unique Regions: ${insights.uniqueRegions}\n\n`;
+
+          if (insights.commonMachineTypes.length > 0) {
+            response += `🖥️ **Common Machine Types**:\n`;
+            insights.commonMachineTypes.forEach((type) => {
+              response += `   • ${type}\n`;
+            });
+            response += `\n`;
+          }
+
+          if (insights.commonComponents.length > 0) {
+            response += `🔧 **Common Components**:\n`;
+            insights.commonComponents.forEach((comp) => {
+              response += `   • ${comp}\n`;
+            });
+            response += `\n`;
+          }
+
+          if (insights.commonPipelines.length > 0) {
+            response += `🚀 **Common Pipelines**:\n`;
+            insights.commonPipelines.forEach((pipeline) => {
+              response += `   • ${pipeline}\n`;
+            });
+            response += `\n`;
+          }
+
+          if (insights.recentDiscoveries.length > 0) {
+            response += `🆕 **Recent Discoveries** (Last 24h):\n`;
+            insights.recentDiscoveries.forEach((cluster) => {
+              const timeSince = Math.round(
+                (Date.now() - new Date(cluster.firstSeen).getTime()) / (1000 * 60 * 60)
+              );
+              response += `   • ${cluster.clusterName} (${cluster.projectId}/${cluster.region}) - ${timeSince}h ago\n`;
+            });
+          } else {
+            response += `🆕 **Recent Discoveries**: None in the last 24 hours\n`;
+          }
+
+          response += `\n💡 **Tip**: Use \`query_knowledge\` to search for specific cluster configurations or patterns`;
+
+          return {
+            content: [
+              {
+                type: 'text',
+                text: response,
+              },
+            ],
+          };
+        } catch (error) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Error getting cluster insights: ${error instanceof Error ? error.message : String(error)}`,
+              },
+            ],
+          };
+        }
+      }
+
+      case 'get_job_analytics': {
+        if (!knowledgeIndexer) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: 'Knowledge indexer not available. Response optimization may not be enabled.',
+              },
+            ],
+          };
+        }
+
+        try {
+          const analytics = knowledgeIndexer.getJobTypeAnalytics();
+
+          let response = `📈 **Job Analytics Dashboard**\n\n`;
+          response += `📊 **Overview**:\n`;
+          response += `   • Total Jobs: ${analytics.totalJobs}\n`;
+          response += `   • Success Rate: ${analytics.successRate.toFixed(1)}%\n\n`;
+
+          if (Object.keys(analytics.jobTypeDistribution).length > 0) {
+            response += `🔧 **Job Type Distribution**:\n`;
+            Object.entries(analytics.jobTypeDistribution)
+              .sort(([, a], [, b]) => b - a)
+              .forEach(([type, count]) => {
+                const percentage =
+                  analytics.totalJobs > 0 ? ((count / analytics.totalJobs) * 100).toFixed(1) : '0';
+                response += `   • ${type.toUpperCase()}: ${count} jobs (${percentage}%)\n`;
+              });
+            response += `\n`;
+          }
+
+          if (Object.keys(analytics.avgDuration).length > 0) {
+            response += `⏱️ **Average Duration by Type**:\n`;
+            Object.entries(analytics.avgDuration).forEach(([type, duration]) => {
+              const durationSec = Math.round(duration / 1000);
+              response += `   • ${type.toUpperCase()}: ${durationSec}s\n`;
+            });
+            response += `\n`;
+          }
+
+          if (analytics.commonErrors.length > 0) {
+            response += `❌ **Top Error Patterns**:\n`;
+            analytics.commonErrors.slice(0, 5).forEach((error, index) => {
+              response += `   ${index + 1}. ${error.errorType} (${error.frequency}x)\n`;
+              if (error.suggestedFixes.length > 0) {
+                response += `      💡 Fix: ${error.suggestedFixes[0]}\n`;
+              }
+            });
+          } else {
+            response += `✅ **Error Patterns**: No errors recorded yet\n`;
+          }
+
+          response += `\n💡 **Tip**: Use \`query_knowledge --type errors\` to search for specific error solutions`;
+
+          return {
+            content: [
+              {
+                type: 'text',
+                text: response,
+              },
+            ],
+          };
+        } catch (error) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Error getting job analytics: ${error instanceof Error ? error.message : String(error)}`,
+              },
+            ],
+          };
+        }
+      }
+
+      case 'query_knowledge': {
+        const { query, type, projectId, region, limit } = args;
+
+        if (!knowledgeIndexer) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: 'Knowledge indexer not available. Response optimization may not be enabled.',
+              },
+            ],
+          };
+        }
+
+        try {
+          const results = await knowledgeIndexer.queryKnowledge(String(query), {
+            type: type ? (String(type) as any) : 'all',
+            projectId: projectId ? String(projectId) : undefined,
+            region: region ? String(region) : undefined,
+            limit: limit ? Number(limit) : 10,
+          });
+
+          if (results.length === 0) {
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: `🔍 **Query**: "${query}"\n\n❌ **No results found**\n\nTry:\n• Different search terms\n• Broader query scope\n• Check if data has been indexed (run operations first)`,
+                },
+              ],
+            };
+          }
+
+          let response = `🔍 **Knowledge Query**: "${query}"\n`;
+          if (type && type !== 'all') response += `📂 **Type Filter**: ${type}\n`;
+          response += `📊 **Found**: ${results.length} results\n\n`;
+
+          results.forEach((result, index) => {
+            response += `**${index + 1}. ${result.type?.toUpperCase() || 'UNKNOWN'}** (${(result.confidence * 100).toFixed(1)}% match)\n`;
+            response += `   📝 ${result.summary}\n\n`;
+          });
+
+          response += `💡 **Tip**: Use \`get_cluster_insights\` or \`get_job_analytics\` for structured overviews`;
+
+          return {
+            content: [
+              {
+                type: 'text',
+                text: response,
+              },
+            ],
+          };
+        } catch (error) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Error querying knowledge base: ${error instanceof Error ? error.message : String(error)}`,
+              },
+            ],
+          };
+        }
+      }
+
       default:
         throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${toolName}`);
     }
@@ -1505,6 +2502,60 @@ async function main() {
       if (process.env.LOG_LEVEL === 'debug')
         console.error('[DEBUG] MCP Server: Initializing AsyncQueryPoller');
       asyncQueryPoller = new AsyncQueryPoller(jobTracker);
+
+      // Set up automatic job indexing when jobs complete
+      if (knowledgeIndexer) {
+        asyncQueryPoller.on('jobCompleted', async (event) => {
+          try {
+            // Get job results for completed jobs
+            const { getDataprocJobResults, getDataprocJobStatus } = await import(
+              './services/job.js'
+            );
+
+            let jobResults: any = null;
+            let jobDetails: any = null;
+
+            try {
+              jobDetails = await getDataprocJobStatus({
+                projectId: event.projectId,
+                region: event.region,
+                jobId: event.jobId,
+              });
+
+              // Try to get results for completed jobs
+              if (['COMPLETED', 'DONE'].includes(event.finalStatus)) {
+                jobResults = await getDataprocJobResults({
+                  projectId: event.projectId,
+                  region: event.region,
+                  jobId: event.jobId,
+                  maxDisplayRows: 10,
+                });
+              }
+            } catch (resultError) {
+              logger.warn(`Failed to get results for completed job ${event.jobId}:`, resultError);
+            }
+
+            await knowledgeIndexer.indexJobSubmission({
+              jobId: event.jobId,
+              jobType: event.toolName?.includes('hive') ? 'hive' : 'unknown',
+              clusterName: (jobDetails as any)?.placement?.clusterName || 'unknown',
+              projectId: event.projectId,
+              region: event.region,
+              status: event.finalStatus,
+              submissionTime:
+                (jobDetails as any)?.statusHistory?.[0]?.stateStartTime || event.completedAt,
+              results: jobResults,
+              duration: event.duration,
+            });
+
+            logger.info(
+              `🎯 Auto-indexed completed job ${event.jobId} (${event.toolName}) with results`
+            );
+          } catch (indexError) {
+            logger.warn(`Failed to auto-index completed job ${event.jobId}:`, indexError);
+          }
+        });
+      }
 
       if (process.env.LOG_LEVEL === 'debug')
         console.error('[DEBUG] MCP Server: Initializing ClusterManager');
