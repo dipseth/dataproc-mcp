@@ -7,6 +7,12 @@ import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { ProfileManagerConfig, ClusterTrackerConfig } from '../types/profile.js';
 
+// Global type declaration for config directory
+declare global {
+  // eslint-disable-next-line no-var
+  var DATAPROC_CONFIG_DIR: string;
+}
+
 // Determine the application root directory
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -123,6 +129,12 @@ export async function getServerConfig(configPath?: string): Promise<ServerConfig
   // Log the current working directory and absolute config path for debugging
   console.error(`[DIAGNOSTIC] Server Config: Current working directory: ${process.cwd()}`);
   console.error(`[DIAGNOSTIC] Server Config: Absolute config path: ${filePath}`);
+
+  // Store the config directory for other modules to use
+  // eslint-disable-next-line no-undef
+  global.DATAPROC_CONFIG_DIR = path.dirname(filePath);
+  // eslint-disable-next-line no-undef
+  console.error(`[DIAGNOSTIC] Server Config: Config directory: ${global.DATAPROC_CONFIG_DIR}`);
 
   try {
     // Check if the config file exists
