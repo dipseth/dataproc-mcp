@@ -1,6 +1,6 @@
 # Dataproc MCP Server
 
-[![npm version](https://badge.fury.io/js/%40dipseth%2Fdataproc-mcp-server.svg)](https://badge.fury.io/js/%40dipseth%2Fdataproc-mcp-server)
+[![npm version](https://img.shields.io/npm/v/@dipseth/dataproc-mcp-server.svg)](https://www.npmjs.com/package/@dipseth/dataproc-mcp-server)
 [![npm downloads](https://img.shields.io/npm/dm/@dipseth/dataproc-mcp-server.svg)](https://npmjs.org/package/@dipseth/dataproc-mcp-server)
 [![Build Status](https://github.com/dipseth/dataproc-mcp/workflows/%F0%9F%94%84%20Continuous%20Integration/badge.svg)](https://github.com/dipseth/dataproc-mcp/actions)
 [![Coverage Status](https://coveralls.io/repos/github/dipseth/dataproc-mcp/badge.svg?branch=main)](https://coveralls.io/github/dipseth/dataproc-mcp?branch=main)
