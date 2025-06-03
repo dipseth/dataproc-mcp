@@ -1,6 +1,6 @@
 /**
  * Knowledge Indexer Service
- * 
+ *
  * Builds and maintains a comprehensive knowledge base of:
  * - Cluster configurations and names
  * - Hive query outputs (first few rows/columns)
@@ -90,9 +90,9 @@ export class KnowledgeIndexer {
       url: qdrantConfig?.url || 'http://localhost:6333',
       collectionName: qdrantConfig?.collectionName || 'dataproc_knowledge',
       vectorSize: qdrantConfig?.vectorSize || 384,
-      distance: qdrantConfig?.distance || 'Cosine' as const
+      distance: qdrantConfig?.distance || ('Cosine' as const),
     };
-    
+
     this.qdrantService = new QdrantStorageService(config);
   }
 
@@ -123,15 +123,15 @@ export class KnowledgeIndexer {
             components: [],
             pipelines: [],
             owners: [],
-            imageVersions: []
+            imageVersions: [],
           },
           pipPackages: [],
           initializationScripts: [],
           networkConfig: {
             zones: [],
             subnets: [],
-            serviceAccounts: []
-          }
+            serviceAccounts: [],
+          },
         };
 
         logger.info(`🆕 New cluster discovered: ${clusterName} in ${projectId}/${region}`);
@@ -145,7 +145,6 @@ export class KnowledgeIndexer {
       // Store in memory and Qdrant
       this.clusterKnowledge.set(key, knowledge);
       await this.storeClusterKnowledge(knowledge);
-
     } catch (error) {
       logger.error('Failed to index cluster configuration:', error);
     }
@@ -177,7 +176,7 @@ export class KnowledgeIndexer {
         submissionTime: jobData.submissionTime || new Date().toISOString(),
         query: jobData.query,
         status: jobData.status,
-        duration: jobData.duration
+        duration: jobData.duration,
       };
 
       // Extract output sample if available
@@ -196,7 +195,6 @@ export class KnowledgeIndexer {
       await this.storeJobKnowledge(jobKnowledge);
 
       logger.info(`📝 Indexed ${jobData.jobType} job: ${jobData.jobId} on ${jobData.clusterName}`);
-
     } catch (error) {
       logger.error('Failed to index job submission:', error);
     }
@@ -205,19 +203,22 @@ export class KnowledgeIndexer {
   /**
    * Query knowledge base using natural language
    */
-  async queryKnowledge(query: string, options: {
-    type?: 'clusters' | 'jobs' | 'errors' | 'all';
-    limit?: number;
-    projectId?: string;
-    region?: string;
-  } = {}): Promise<any[]> {
+  async queryKnowledge(
+    query: string,
+    options: {
+      type?: 'clusters' | 'jobs' | 'errors' | 'all';
+      limit?: number;
+      projectId?: string;
+      region?: string;
+    } = {}
+  ): Promise<any[]> {
     try {
       const searchResults = await this.qdrantService.searchSimilar(query, options.limit || 10);
-      
+
       // Filter by type if specified
       let filteredResults = searchResults;
       if (options.type && options.type !== 'all') {
-        filteredResults = searchResults.filter(result => {
+        filteredResults = searchResults.filter((result) => {
           // Extract type from the stored data or metadata
           const storedType = result.data?.type || (result.metadata as any)?.type;
           return storedType === options.type;
@@ -226,27 +227,26 @@ export class KnowledgeIndexer {
 
       // Filter by project/region if specified
       if (options.projectId) {
-        filteredResults = filteredResults.filter(result =>
-          result.metadata?.projectId === options.projectId
+        filteredResults = filteredResults.filter(
+          (result) => result.metadata?.projectId === options.projectId
         );
       }
 
       if (options.region) {
-        filteredResults = filteredResults.filter(result =>
-          result.metadata?.region === options.region
+        filteredResults = filteredResults.filter(
+          (result) => result.metadata?.region === options.region
         );
       }
 
-      return filteredResults.map(result => {
+      return filteredResults.map((result) => {
         const dataType = result.data?.type || (result.metadata as any)?.type || 'unknown';
         return {
           type: dataType,
           confidence: result.score,
           data: result.data,
-          summary: this.generateResultSummary(result.data, dataType)
+          summary: this.generateResultSummary(result.data, dataType),
         };
       });
-
     } catch (error) {
       logger.error('Failed to query knowledge base:', error);
       return [];
@@ -266,23 +266,23 @@ export class KnowledgeIndexer {
     recentDiscoveries: ClusterKnowledge[];
   } {
     const clusters = Array.from(this.clusterKnowledge.values());
-    
-    const uniqueProjects = new Set(clusters.map(c => c.projectId)).size;
-    const uniqueRegions = new Set(clusters.map(c => c.region)).size;
-    
+
+    const uniqueProjects = new Set(clusters.map((c) => c.projectId)).size;
+    const uniqueRegions = new Set(clusters.map((c) => c.region)).size;
+
     // Aggregate common configurations
-    const allMachineTypes = clusters.flatMap(c => c.configurations.machineTypes);
-    const allComponents = clusters.flatMap(c => c.configurations.components);
-    const allPipelines = clusters.flatMap(c => c.configurations.pipelines);
-    
+    const allMachineTypes = clusters.flatMap((c) => c.configurations.machineTypes);
+    const allComponents = clusters.flatMap((c) => c.configurations.components);
+    const allPipelines = clusters.flatMap((c) => c.configurations.pipelines);
+
     const commonMachineTypes = this.getTopItems(allMachineTypes, 5);
     const commonComponents = this.getTopItems(allComponents, 5);
     const commonPipelines = this.getTopItems(allPipelines, 5);
-    
+
     // Recent discoveries (last 24 hours)
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const recentDiscoveries = clusters
-      .filter(c => c.firstSeen > yesterday)
+      .filter((c) => c.firstSeen > yesterday)
       .sort((a, b) => b.firstSeen.localeCompare(a.firstSeen))
       .slice(0, 10);
 
@@ -293,7 +293,7 @@ export class KnowledgeIndexer {
       commonMachineTypes,
       commonComponents,
       commonPipelines,
-      recentDiscoveries
+      recentDiscoveries,
     };
   }
 
@@ -308,34 +308,34 @@ export class KnowledgeIndexer {
     avgDuration: Record<string, number>;
   } {
     const jobs = Array.from(this.jobKnowledge.values());
-    
+
     const jobTypeDistribution: Record<string, number> = {};
     const avgDuration: Record<string, number> = {};
     const durationCounts: Record<string, number> = {};
-    
+
     let successfulJobs = 0;
-    
-    jobs.forEach(job => {
+
+    jobs.forEach((job) => {
       // Job type distribution
       jobTypeDistribution[job.jobType] = (jobTypeDistribution[job.jobType] || 0) + 1;
-      
+
       // Success rate
       if (['DONE', 'COMPLETED', 'SUCCESS'].includes(job.status.toUpperCase())) {
         successfulJobs++;
       }
-      
+
       // Average duration
       if (job.duration) {
         avgDuration[job.jobType] = (avgDuration[job.jobType] || 0) + job.duration;
         durationCounts[job.jobType] = (durationCounts[job.jobType] || 0) + 1;
       }
     });
-    
+
     // Calculate averages
-    Object.keys(avgDuration).forEach(jobType => {
+    Object.keys(avgDuration).forEach((jobType) => {
       avgDuration[jobType] = avgDuration[jobType] / durationCounts[jobType];
     });
-    
+
     const commonErrors = Array.from(this.errorPatterns.values())
       .sort((a, b) => b.frequency - a.frequency)
       .slice(0, 10);
@@ -345,7 +345,7 @@ export class KnowledgeIndexer {
       jobTypeDistribution,
       successRate: jobs.length > 0 ? (successfulJobs / jobs.length) * 100 : 0,
       commonErrors,
-      avgDuration
+      avgDuration,
     };
   }
 
@@ -353,34 +353,34 @@ export class KnowledgeIndexer {
     // Extract machine types
     const masterMachine = this.extractMachineType(clusterData.config?.masterConfig?.machineTypeUri);
     const workerMachine = this.extractMachineType(clusterData.config?.workerConfig?.machineTypeUri);
-    
+
     if (masterMachine) this.addUnique(knowledge.configurations.machineTypes, masterMachine);
     if (workerMachine) this.addUnique(knowledge.configurations.machineTypes, workerMachine);
-    
+
     // Extract worker counts
     const workerCount = clusterData.config?.workerConfig?.numInstances;
     if (workerCount) this.addUnique(knowledge.configurations.workerCounts, workerCount);
-    
+
     // Extract components
     const components = clusterData.config?.softwareConfig?.optionalComponents || [];
     components.forEach((comp: string) => this.addUnique(knowledge.configurations.components, comp));
-    
+
     // Extract pipeline and owner from labels
     const labels = clusterData.labels || {};
     if (labels.pipeline) this.addUnique(knowledge.configurations.pipelines, labels.pipeline);
     if (labels.owner) this.addUnique(knowledge.configurations.owners, labels.owner);
-    
+
     // Extract image version
     const imageVersion = clusterData.config?.softwareConfig?.imageVersion;
     if (imageVersion) this.addUnique(knowledge.configurations.imageVersions, imageVersion);
-    
+
     // Extract pip packages
     const pipPackages = clusterData.config?.softwareConfig?.properties?.['dataproc:pip.packages'];
     if (pipPackages) {
       const packages = pipPackages.split(',').map((pkg: string) => pkg.trim());
-      packages.forEach(pkg => this.addUnique(knowledge.pipPackages, pkg));
+      packages.forEach((pkg) => this.addUnique(knowledge.pipPackages, pkg));
     }
-    
+
     // Extract initialization scripts
     const initActions = clusterData.config?.initializationActions || [];
     initActions.forEach((action: any) => {
@@ -388,7 +388,7 @@ export class KnowledgeIndexer {
         this.addUnique(knowledge.initializationScripts, action.executableFile);
       }
     });
-    
+
     // Extract network configuration
     const gceConfig = clusterData.config?.gceClusterConfig;
     if (gceConfig) {
@@ -396,40 +396,46 @@ export class KnowledgeIndexer {
         const zone = this.extractZone(gceConfig.zoneUri);
         if (zone) this.addUnique(knowledge.networkConfig.zones, zone);
       }
-      if (gceConfig.subnetworkUri) this.addUnique(knowledge.networkConfig.subnets, gceConfig.subnetworkUri);
-      if (gceConfig.serviceAccount) this.addUnique(knowledge.networkConfig.serviceAccounts, gceConfig.serviceAccount);
+      if (gceConfig.subnetworkUri)
+        this.addUnique(knowledge.networkConfig.subnets, gceConfig.subnetworkUri);
+      if (gceConfig.serviceAccount)
+        this.addUnique(knowledge.networkConfig.serviceAccounts, gceConfig.serviceAccount);
     }
   }
 
-  private extractOutputSample(results: any): { columns: string[]; rows: any[][]; totalRows?: number } {
+  private extractOutputSample(results: any): {
+    columns: string[];
+    rows: any[][];
+    totalRows?: number;
+  } {
     try {
       // Handle different result formats
       if (results.rows && Array.isArray(results.rows)) {
-        const columns = results.schema?.fields?.map((f: any) => f.name) || 
-                       Object.keys(results.rows[0] || {});
-        
+        const columns =
+          results.schema?.fields?.map((f: any) => f.name) || Object.keys(results.rows[0] || {});
+
         return {
           columns,
           rows: results.rows.slice(0, 5), // First 5 rows
-          totalRows: results.totalRows || results.rows.length
+          totalRows: results.totalRows || results.rows.length,
         };
       }
-      
+
       // Handle CSV-like results
       if (typeof results === 'string' && results.includes('\n')) {
-        const lines = results.split('\n').filter(line => line.trim());
+        const lines = results.split('\n').filter((line) => line.trim());
         if (lines.length > 0) {
-          const columns = lines[0].split(',').map(col => col.trim());
-          const rows = lines.slice(1, 6).map(line => line.split(',').map(cell => cell.trim()));
-          
+          const columns = lines[0].split(',').map((col) => col.trim());
+          const rows = lines.slice(1, 6).map((line) => line.split(',').map((cell) => cell.trim()));
+
           return {
             columns,
             rows,
-            totalRows: lines.length - 1
+            totalRows: lines.length - 1,
           };
         }
       }
-      
+
       return { columns: [], rows: [] };
     } catch (error) {
       logger.warn('Failed to extract output sample:', error);
@@ -446,20 +452,20 @@ export class KnowledgeIndexer {
   } {
     const errorMessage = error.message || error.toString();
     const errorType = this.classifyError(errorMessage);
-    
+
     return {
       errorType,
       errorMessage,
       stackTrace: error.stack,
       commonCause: this.getCommonCause(errorType),
-      suggestedFix: this.getSuggestedFix(errorType)
+      suggestedFix: this.getSuggestedFix(errorType),
     };
   }
 
   private async indexErrorPattern(errorInfo: any, jobKnowledge: JobKnowledge): Promise<void> {
     const key = errorInfo.errorType;
     let pattern = this.errorPatterns.get(key);
-    
+
     if (!pattern) {
       pattern = {
         errorType: errorInfo.errorType,
@@ -469,27 +475,27 @@ export class KnowledgeIndexer {
         suggestedFixes: [],
         relatedClusters: [],
         relatedJobTypes: [],
-        examples: []
+        examples: [],
       };
     }
-    
+
     pattern.frequency++;
     this.addUnique(pattern.relatedClusters, jobKnowledge.clusterName);
     this.addUnique(pattern.relatedJobTypes, jobKnowledge.jobType);
-    
+
     if (errorInfo.commonCause) this.addUnique(pattern.commonCauses, errorInfo.commonCause);
     if (errorInfo.suggestedFix) this.addUnique(pattern.suggestedFixes, errorInfo.suggestedFix);
-    
+
     pattern.examples.push({
       jobId: jobKnowledge.jobId,
       clusterName: jobKnowledge.clusterName,
       timestamp: jobKnowledge.submissionTime,
-      context: errorInfo.errorMessage.substring(0, 200)
+      context: errorInfo.errorMessage.substring(0, 200),
     });
-    
+
     // Keep only recent examples
     pattern.examples = pattern.examples.slice(-10);
-    
+
     this.errorPatterns.set(key, pattern);
   }
 
@@ -504,46 +510,48 @@ export class KnowledgeIndexer {
 
   private classifyError(errorMessage: string): string {
     const message = errorMessage.toLowerCase();
-    
+
     if (message.includes('out of memory') || message.includes('oom')) return 'OutOfMemoryError';
     if (message.includes('connection') && message.includes('timeout')) return 'ConnectionTimeout';
-    if (message.includes('permission') || message.includes('access denied')) return 'PermissionError';
-    if (message.includes('file not found') || message.includes('no such file')) return 'FileNotFound';
+    if (message.includes('permission') || message.includes('access denied'))
+      return 'PermissionError';
+    if (message.includes('file not found') || message.includes('no such file'))
+      return 'FileNotFound';
     if (message.includes('syntax error') || message.includes('parse error')) return 'SyntaxError';
     if (message.includes('table') && message.includes('not found')) return 'TableNotFound';
     if (message.includes('column') && message.includes('not found')) return 'ColumnNotFound';
     if (message.includes('quota') || message.includes('limit exceeded')) return 'QuotaExceeded';
-    
+
     return 'UnknownError';
   }
 
   private getCommonCause(errorType: string): string {
     const causes: Record<string, string> = {
-      'OutOfMemoryError': 'Insufficient memory allocation for job or cluster',
-      'ConnectionTimeout': 'Network connectivity issues or overloaded cluster',
-      'PermissionError': 'Insufficient IAM permissions or service account issues',
-      'FileNotFound': 'Missing input files or incorrect file paths',
-      'SyntaxError': 'Invalid SQL syntax or unsupported operations',
-      'TableNotFound': 'Table does not exist or incorrect database/schema',
-      'ColumnNotFound': 'Column name typo or schema mismatch',
-      'QuotaExceeded': 'GCP resource quotas or limits reached'
+      OutOfMemoryError: 'Insufficient memory allocation for job or cluster',
+      ConnectionTimeout: 'Network connectivity issues or overloaded cluster',
+      PermissionError: 'Insufficient IAM permissions or service account issues',
+      FileNotFound: 'Missing input files or incorrect file paths',
+      SyntaxError: 'Invalid SQL syntax or unsupported operations',
+      TableNotFound: 'Table does not exist or incorrect database/schema',
+      ColumnNotFound: 'Column name typo or schema mismatch',
+      QuotaExceeded: 'GCP resource quotas or limits reached',
     };
-    
+
     return causes[errorType] || 'Unknown cause - requires investigation';
   }
 
   private getSuggestedFix(errorType: string): string {
     const fixes: Record<string, string> = {
-      'OutOfMemoryError': 'Increase cluster memory, reduce data size, or optimize query',
-      'ConnectionTimeout': 'Check network connectivity, increase timeout, or scale cluster',
-      'PermissionError': 'Verify IAM roles, service account permissions, or resource access',
-      'FileNotFound': 'Check file paths, verify file existence, or update data sources',
-      'SyntaxError': 'Review SQL syntax, check function compatibility, or validate query',
-      'TableNotFound': 'Verify table name, check database connection, or create missing table',
-      'ColumnNotFound': 'Check column names, verify schema, or update query references',
-      'QuotaExceeded': 'Request quota increase, optimize resource usage, or use different region'
+      OutOfMemoryError: 'Increase cluster memory, reduce data size, or optimize query',
+      ConnectionTimeout: 'Check network connectivity, increase timeout, or scale cluster',
+      PermissionError: 'Verify IAM roles, service account permissions, or resource access',
+      FileNotFound: 'Check file paths, verify file existence, or update data sources',
+      SyntaxError: 'Review SQL syntax, check function compatibility, or validate query',
+      TableNotFound: 'Verify table name, check database connection, or create missing table',
+      ColumnNotFound: 'Check column names, verify schema, or update query references',
+      QuotaExceeded: 'Request quota increase, optimize resource usage, or use different region',
     };
-    
+
     return fixes[errorType] || 'Contact support or check logs for more details';
   }
 
@@ -551,9 +559,9 @@ export class KnowledgeIndexer {
     // Add type information to the data itself for easier retrieval
     const dataWithType = {
       ...knowledge,
-      type: 'cluster'
+      type: 'cluster',
     };
-    
+
     const metadata = {
       toolName: 'knowledge-indexer',
       timestamp: knowledge.lastSeen,
@@ -564,9 +572,9 @@ export class KnowledgeIndexer {
       originalTokenCount: 0,
       filteredTokenCount: 0,
       compressionRatio: 1,
-      type: 'cluster'
+      type: 'cluster',
     };
-    
+
     await this.qdrantService.storeClusterData(dataWithType, metadata);
   }
 
@@ -574,9 +582,9 @@ export class KnowledgeIndexer {
     // Add type information to the data itself for easier retrieval
     const dataWithType = {
       ...knowledge,
-      type: 'job'
+      type: 'job',
     };
-    
+
     const metadata = {
       toolName: 'knowledge-indexer',
       timestamp: knowledge.submissionTime,
@@ -587,9 +595,9 @@ export class KnowledgeIndexer {
       originalTokenCount: 0,
       filteredTokenCount: 0,
       compressionRatio: 1,
-      type: 'job'
+      type: 'job',
     };
-    
+
     await this.qdrantService.storeClusterData(dataWithType, metadata);
   }
 
@@ -597,11 +605,11 @@ export class KnowledgeIndexer {
     // Simple hash-based embedding for prototype
     const hash = this.hashCode(text);
     const embedding = new Array(384).fill(0);
-    
+
     for (let i = 0; i < 384; i++) {
       embedding[i] = Math.sin(hash * (i + 1)) * 0.5;
     }
-    
+
     return Promise.resolve(embedding);
   }
 
@@ -609,7 +617,7 @@ export class KnowledgeIndexer {
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
       const char = str.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
+      hash = (hash << 5) - hash + char;
       hash = hash & hash;
     }
     return hash;
@@ -632,7 +640,7 @@ export class KnowledgeIndexer {
     // Extract region from various possible locations
     const zoneUri = clusterData.config?.gceClusterConfig?.zoneUri;
     if (zoneUri) {
-      const match = zoneUri.match(/zones\/([^\/]+)/);
+      const match = zoneUri.match(/zones\/([^/]+)/);
       if (match) {
         const zone = match[1];
         return zone.substring(0, zone.lastIndexOf('-')); // Remove zone suffix
@@ -649,7 +657,7 @@ export class KnowledgeIndexer {
 
   private extractZone(zoneUri: string): string | null {
     if (!zoneUri) return null;
-    const match = zoneUri.match(/zones\/([^\/]+)/);
+    const match = zoneUri.match(/zones\/([^/]+)/);
     return match ? match[1] : null;
   }
 
@@ -661,10 +669,10 @@ export class KnowledgeIndexer {
 
   private getTopItems(items: string[], limit: number): string[] {
     const counts: Record<string, number> = {};
-    items.forEach(item => {
+    items.forEach((item) => {
       counts[item] = (counts[item] || 0) + 1;
     });
-    
+
     return Object.entries(counts)
       .sort(([, a], [, b]) => b - a)
       .slice(0, limit)

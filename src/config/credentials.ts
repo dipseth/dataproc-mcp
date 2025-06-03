@@ -141,9 +141,11 @@ export async function createImpersonatedAuth(
 
   try {
     // Use provided source credentials or default to ADC
-    const sourceAuth = sourceCredentials || new GoogleAuth({
-      scopes: ['https://www.googleapis.com/auth/cloud-platform'],
-    });
+    const sourceAuth =
+      sourceCredentials ||
+      new GoogleAuth({
+        scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+      });
 
     // Get source credentials
     const sourceAuthClient = await sourceAuth.getClient();

@@ -5,12 +5,12 @@
 
 import { promises as fs } from 'fs';
 import path from 'path';
-import { 
-  FilteredResponse, 
-  ClusterSummary, 
-  ClusterDetails, 
+import {
+  FilteredResponse,
+  ClusterSummary,
+  ClusterDetails,
   ResponseFilterConfig,
-  QdrantStorageMetadata 
+  QdrantStorageMetadata,
 } from '../types/response-filter.js';
 import { ResponseFormatter } from './response-formatter.js';
 import { QdrantStorageService } from './qdrant-storage.js';
@@ -30,9 +30,9 @@ export class ResponseFilter {
     this.storage = null;
     this.qdrantManager = new QdrantManager({
       autoStart: true,
-      preferredPort: 6333
+      preferredPort: 6333,
     });
-    
+
     // Initialize Qdrant storage asynchronously with error handling
     this.initializeStorage(config.qdrant);
   }
@@ -42,20 +42,20 @@ export class ResponseFilter {
    */
   private async initializeStorage(qdrantConfig: any): Promise<void> {
     if (this.storageInitialized) return;
-    
+
     try {
       // Try to auto-start Qdrant if not running
       const qdrantUrl = await this.qdrantManager.autoStart();
-      
+
       if (qdrantUrl) {
         // Update config with actual URL
         const actualConfig = {
           ...qdrantConfig,
-          url: qdrantUrl
+          url: qdrantUrl,
         };
-        
+
         this.storage = new QdrantStorageService(actualConfig);
-        
+
         // Test connection
         const isHealthy = await this.storage.healthCheck();
         if (!isHealthy) {
@@ -67,7 +67,7 @@ export class ResponseFilter {
       } else {
         // Try with original config (maybe user has Qdrant running elsewhere)
         this.storage = new QdrantStorageService(qdrantConfig);
-        
+
         const isHealthy = await this.storage.healthCheck();
         if (!isHealthy) {
           console.warn('Qdrant not available and auto-start failed, disabling storage');
@@ -80,7 +80,7 @@ export class ResponseFilter {
       console.warn('Qdrant storage unavailable, continuing without storage:', error);
       this.storage = null;
     }
-    
+
     this.storageInitialized = true;
   }
 
@@ -103,10 +103,10 @@ export class ResponseFilter {
       const configPath = path.join(process.cwd(), 'config', 'response-filter.json');
       const configData = await fs.readFile(configPath, 'utf-8');
       const config = JSON.parse(configData) as ResponseFilterConfig;
-      
+
       // Validate required fields
       ResponseFilter.validateConfig(config);
-      
+
       return config;
     } catch (error) {
       console.warn('Failed to load response filter config, using defaults:', error);
@@ -138,47 +138,47 @@ export class ResponseFilter {
         get_query_results: 600,
         list_tracked_clusters: 350,
         check_active_jobs: 450,
-        default: 400
+        default: 400,
       },
       extractionRules: {
         list_clusters: {
           maxClusters: 10,
           essentialFields: ['clusterName', 'status', 'createTime', 'projectId', 'region'],
-          summaryFormat: 'table'
+          summaryFormat: 'table',
         },
         get_cluster: {
           essentialSections: ['clusterName', 'status', 'config'],
           includeMetrics: false,
-          includeHistory: false
+          includeHistory: false,
         },
         query_results: {
           maxRows: 20,
           includeSchema: true,
-          summaryStats: true
+          summaryStats: true,
         },
         job_tracking: {
           maxJobs: 15,
           includeMetrics: true,
-          groupByStatus: true
-        }
+          groupByStatus: true,
+        },
       },
       qdrant: {
         url: 'http://localhost:6333',
         collectionName: 'dataproc_responses',
         vectorSize: 384,
-        distance: 'Cosine'
+        distance: 'Cosine',
       },
       formatting: {
         useEmojis: true,
         compactTables: true,
         includeResourceLinks: true,
-        maxLineLength: 120
+        maxLineLength: 120,
       },
       caching: {
         enabled: true,
         ttlSeconds: 300,
-        maxCacheSize: 100
-      }
+        maxCacheSize: 100,
+      },
     };
   }
 
@@ -189,7 +189,7 @@ export class ResponseFilter {
     if (!this.storage) {
       throw new Error('Qdrant storage not available');
     }
-    
+
     try {
       return await this.storage.retrieveById(resourceId);
     } catch (error) {
@@ -208,8 +208,9 @@ export class ResponseFilter {
   ): Promise<FilteredResponse> {
     try {
       const originalTokens = this.estimateTokens(JSON.stringify(originalResponse));
-      const tokenLimit = this.config.tokenLimits[toolName as keyof typeof this.config.tokenLimits] 
-        || this.config.tokenLimits.default;
+      const tokenLimit =
+        this.config.tokenLimits[toolName as keyof typeof this.config.tokenLimits] ||
+        this.config.tokenLimits.default;
 
       // If response is already within limits, return as-is
       if (originalTokens <= tokenLimit) {
@@ -217,7 +218,7 @@ export class ResponseFilter {
           type: 'full',
           content: JSON.stringify(originalResponse, null, 2),
           fullDataAvailable: false,
-          tokensSaved: 0
+          tokensSaved: 0,
         };
       }
 
@@ -230,7 +231,7 @@ export class ResponseFilter {
         case 'list_tracked_clusters':
           extractedData = this.extractClusterEssentials(originalResponse);
           formattedContent = this.formatter.formatClusterSummary(
-            extractedData, 
+            extractedData,
             originalTokens - this.estimateTokens(JSON.stringify(extractedData))
           );
           break;
@@ -283,13 +284,10 @@ export class ResponseFilter {
             originalTokenCount: originalTokens,
             filteredTokenCount: filteredTokens,
             compressionRatio: tokensSaved / originalTokens,
-            ...metadata
+            ...metadata,
           };
 
-          resourceUri = await this.storage.storeClusterData(
-            originalResponse,
-            storageMetadata
-          );
+          resourceUri = await this.storage.storeClusterData(originalResponse, storageMetadata);
         } catch (error) {
           console.warn('Failed to store data in Qdrant, continuing without storage:', error);
           // Continue without storage - don't fail the entire operation
@@ -302,19 +300,18 @@ export class ResponseFilter {
         summary: this.generateSummary(extractedData, toolName),
         resourceUri,
         fullDataAvailable: !!resourceUri,
-        tokensSaved
+        tokensSaved,
       };
-
     } catch (error) {
       console.error('Error filtering response:', error);
-      
+
       // Fallback to truncated original
       const truncated = JSON.stringify(originalResponse, null, 2).substring(0, 2000) + '...';
       return {
         type: 'summary',
         content: truncated,
         fullDataAvailable: false,
-        tokensSaved: 0
+        tokensSaved: 0,
       };
     }
   }
@@ -338,7 +335,8 @@ export class ResponseFilter {
       const summary: ClusterSummary = {
         clusterName: cluster.clusterName || cluster.name || 'unknown',
         status: cluster.status?.state || cluster.status || 'unknown',
-        createTime: cluster.status?.stateStartTime || cluster.createTime || new Date().toISOString(),
+        createTime:
+          cluster.status?.stateStartTime || cluster.createTime || new Date().toISOString(),
         projectId: cluster.projectId || 'unknown',
         region: this.extractRegion(cluster),
       };
@@ -347,7 +345,7 @@ export class ResponseFilter {
       if (essentialFields.includes('machineType')) {
         summary.machineType = this.extractMachineTypeFromCluster(cluster);
       }
-      
+
       if (essentialFields.includes('numWorkers')) {
         summary.numWorkers = cluster.config?.workerConfig?.numInstances || 0;
       }
@@ -373,7 +371,7 @@ export class ResponseFilter {
       region: this.extractRegion(cluster),
       status: cluster.status?.state || cluster.status || 'unknown',
       createTime: cluster.status?.stateStartTime || cluster.createTime || new Date().toISOString(),
-      config: {}
+      config: {},
     };
 
     // Extract configuration sections
@@ -381,7 +379,7 @@ export class ResponseFilter {
       details.config.masterConfig = {
         numInstances: cluster.config.masterConfig.numInstances,
         machineTypeUri: cluster.config.masterConfig.machineTypeUri,
-        diskConfig: cluster.config.masterConfig.diskConfig
+        diskConfig: cluster.config.masterConfig.diskConfig,
       };
     }
 
@@ -389,14 +387,14 @@ export class ResponseFilter {
       details.config.workerConfig = {
         numInstances: cluster.config.workerConfig.numInstances,
         machineTypeUri: cluster.config.workerConfig.machineTypeUri,
-        diskConfig: cluster.config.workerConfig.diskConfig
+        diskConfig: cluster.config.workerConfig.diskConfig,
       };
     }
 
     if (essentialSections.includes('config.softwareConfig') && cluster.config?.softwareConfig) {
       details.config.softwareConfig = {
         imageVersion: cluster.config.softwareConfig.imageVersion,
-        optionalComponents: cluster.config.softwareConfig.optionalComponents
+        optionalComponents: cluster.config.softwareConfig.optionalComponents,
       };
     }
 
@@ -445,7 +443,7 @@ export class ResponseFilter {
         totalRows: response.totalRows || response.numRows,
         executionTime: response.executionTime || response.elapsedTime,
         bytesProcessed: response.bytesProcessed || response.totalBytesProcessed,
-        jobId: response.jobId || response.reference?.jobId
+        jobId: response.jobId || response.reference?.jobId,
       };
     }
 
@@ -466,7 +464,9 @@ export class ResponseFilter {
       statusHistory: job.statusHistory?.slice(0, 2), // Recent history only
       hiveJob: job.hiveJob ? { query: job.hiveJob.queryList?.queries?.[0] } : undefined,
       sparkJob: job.sparkJob ? { mainClass: job.sparkJob.mainClass } : undefined,
-      pysparkJob: job.pysparkJob ? { mainPythonFileUri: job.pysparkJob.mainPythonFileUri } : undefined
+      pysparkJob: job.pysparkJob
+        ? { mainPythonFileUri: job.pysparkJob.mainPythonFileUri }
+        : undefined,
     }));
   }
 
@@ -484,7 +484,7 @@ export class ResponseFilter {
     // Try to preserve structure while truncating
     if (Array.isArray(response)) {
       const itemSize = Math.floor(maxLength / response.length);
-      return response.map(item => {
+      return response.map((item) => {
         const itemStr = JSON.stringify(item);
         if (itemStr.length <= itemSize) return item;
         return JSON.parse(itemStr.substring(0, itemSize - 10) + '"}');
@@ -512,8 +512,9 @@ export class ResponseFilter {
    * Helper: Extract machine type from cluster configuration
    */
   private extractMachineTypeFromCluster(cluster: any): string | undefined {
-    return cluster.config?.masterConfig?.machineTypeUri || 
-           cluster.config?.workerConfig?.machineTypeUri;
+    return (
+      cluster.config?.masterConfig?.machineTypeUri || cluster.config?.workerConfig?.machineTypeUri
+    );
   }
 
   /**
@@ -524,13 +525,13 @@ export class ResponseFilter {
       case 'list_clusters':
       case 'list_tracked_clusters':
         return `Found ${Array.isArray(data) ? data.length : 0} clusters`;
-      
+
       case 'get_cluster':
         return `Cluster ${data.clusterName} (${data.status})`;
-      
+
       case 'check_active_jobs':
         return `Found ${Array.isArray(data) ? data.length : 0} jobs`;
-      
+
       default:
         return 'Response filtered and optimized';
     }

@@ -721,4 +721,3 @@ export async function getDataprocJobResults<T>(
 }
 
 // Removed deprecated processHiveOutput function - use JobOutputHandler.getJobOutput instead
-

@@ -125,27 +125,27 @@ async function initializeResponseOptimization() {
     const responseFilterConfigPath = path.join(process.cwd(), 'config', 'response-filter.json');
     if (fs.existsSync(responseFilterConfigPath)) {
       const responseFilterConfig = JSON.parse(fs.readFileSync(responseFilterConfigPath, 'utf8'));
-      
+
       // Initialize ResponseFilter (it manages its own QdrantManager internally)
       responseFilter = new ResponseFilter(responseFilterConfig);
-      
+
       // Initialize SemanticQueryService with same config
       semanticQueryService = new SemanticQueryService({
         url: responseFilterConfig.qdrant?.url || 'http://localhost:6333',
         collectionName: responseFilterConfig.qdrant?.collection || 'dataproc_responses',
         vectorSize: 384,
-        distance: 'Cosine'
+        distance: 'Cosine',
       });
       await semanticQueryService.initialize();
-      
+
       // Initialize KnowledgeIndexer with separate collection
       knowledgeIndexer = new KnowledgeIndexer({
         url: responseFilterConfig.qdrant?.url || 'http://localhost:6333',
         collectionName: 'dataproc_knowledge',
         vectorSize: 384,
-        distance: 'Cosine'
+        distance: 'Cosine',
       });
-      
+
       logger.info('Response optimization and knowledge indexing services initialized successfully');
     } else {
       logger.warn('Response filter configuration not found, response optimization disabled');
@@ -255,7 +255,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             filter: { type: 'string', description: 'Optional: Filter string' },
             pageSize: { type: 'number', description: 'Optional: Page size' },
             pageToken: { type: 'string', description: 'Optional: Page token for pagination' },
-            verbose: { type: 'boolean', description: 'Optional: Return full response without filtering (default: false)' },
+            verbose: {
+              type: 'boolean',
+              description: 'Optional: Return full response without filtering (default: false)',
+            },
           },
           required: [],
         },
@@ -310,7 +313,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             projectId: { type: 'string', description: 'GCP project ID' },
             region: { type: 'string', description: 'Dataproc region (e.g., us-central1)' },
             clusterName: { type: 'string', description: 'Name of the cluster' },
-            verbose: { type: 'boolean', description: 'Optional: Return full response without filtering (default: false)' },
+            verbose: {
+              type: 'boolean',
+              description: 'Optional: Return full response without filtering (default: false)',
+            },
           },
           required: ['projectId', 'region', 'clusterName'],
         },
@@ -332,7 +338,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               description:
                 'Optional: Whether to wait for query completion (false) or return immediately (true)',
             },
-            verbose: { type: 'boolean', description: 'Optional: Return full response without filtering (default: false)' },
+            verbose: {
+              type: 'boolean',
+              description: 'Optional: Return full response without filtering (default: false)',
+            },
             queryOptions: {
               type: 'object',
               description: 'Optional: Query configuration options',
@@ -438,7 +447,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               description: 'Dataproc region (optional if default configured, e.g., us-central1)',
             },
             jobId: { type: 'string', description: 'Job ID to check' },
-            verbose: { type: 'boolean', description: 'Optional: Return full response without filtering (default: false)' },
+            verbose: {
+              type: 'boolean',
+              description: 'Optional: Return full response without filtering (default: false)',
+            },
           },
           required: ['jobId'],
         },
@@ -507,13 +519,15 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       // New tool: semantic query for stored cluster data
       {
         name: 'query_cluster_data',
-        description: 'Query stored cluster data using natural language (e.g., "pip packages", "machine types", "network config")',
+        description:
+          'Query stored cluster data using natural language (e.g., "pip packages", "machine types", "network config")',
         inputSchema: {
           type: 'object',
           properties: {
             query: {
               type: 'string',
-              description: 'Natural language query (e.g., "pip packages", "machine configuration", "network settings")',
+              description:
+                'Natural language query (e.g., "pip packages", "machine configuration", "network settings")',
             },
             projectId: {
               type: 'string',
@@ -539,7 +553,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       // New tool: get cluster discovery insights
       {
         name: 'get_cluster_insights',
-        description: '📊 Get comprehensive insights about discovered clusters, machine types, components, and recent discoveries',
+        description:
+          '📊 Get comprehensive insights about discovered clusters, machine types, components, and recent discoveries',
         inputSchema: {
           type: 'object',
           properties: {},
@@ -550,7 +565,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       // New tool: get job analytics
       {
         name: 'get_job_analytics',
-        description: '📈 Get analytics about job submissions, success rates, error patterns, and performance metrics',
+        description:
+          '📈 Get analytics about job submissions, success rates, error patterns, and performance metrics',
         inputSchema: {
           type: 'object',
           properties: {},
@@ -561,7 +577,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       // New tool: query knowledge base
       {
         name: 'query_knowledge',
-        description: '🧠 Query the comprehensive knowledge base using natural language (clusters, jobs, errors, all)',
+        description:
+          '🧠 Query the comprehensive knowledge base using natural language (clusters, jobs, errors, all)',
         inputSchema: {
           type: 'object',
           properties: {
@@ -802,7 +819,7 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
         try {
           const resourceId = uri.replace('qdrant://dataproc/', '');
           const qdrantData = await responseFilter.getStoredResponse(resourceId);
-          
+
           if (qdrantData) {
             return {
               contents: [
@@ -814,10 +831,16 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
               ],
             };
           } else {
-            throw new McpError(ErrorCode.InvalidRequest, `Qdrant resource not found: ${resourceId}`);
+            throw new McpError(
+              ErrorCode.InvalidRequest,
+              `Qdrant resource not found: ${resourceId}`
+            );
           }
         } catch (error) {
-          throw new McpError(ErrorCode.InternalError, `Failed to retrieve Qdrant resource: ${error}`);
+          throw new McpError(
+            ErrorCode.InternalError,
+            `Failed to retrieve Qdrant resource: ${error}`
+          );
         }
       } else {
         throw new McpError(ErrorCode.InvalidRequest, 'Qdrant storage not available');
@@ -1049,29 +1072,37 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         // Apply response filtering if available
         if (responseFilter && !args.verbose) {
           try {
-            const filteredResponse = await responseFilter.filterResponse('list_clusters', response, {
-              toolName: 'list_clusters',
-              timestamp: new Date().toISOString(),
-              projectId,
-              region,
-              responseType: 'cluster_list',
-              originalTokenCount: JSON.stringify(response).length,
-              filteredTokenCount: 0,
-              compressionRatio: 1.0
-            });
+            const filteredResponse = await responseFilter.filterResponse(
+              'list_clusters',
+              response,
+              {
+                toolName: 'list_clusters',
+                timestamp: new Date().toISOString(),
+                projectId,
+                region,
+                responseType: 'cluster_list',
+                originalTokenCount: JSON.stringify(response).length,
+                filteredTokenCount: 0,
+                compressionRatio: 1.0,
+              }
+            );
 
             return {
               content: [
                 {
                   type: 'text',
-                  text: filteredResponse.type === 'summary'
-                    ? filteredResponse.summary || filteredResponse.content
-                    : filteredResponse.content,
+                  text:
+                    filteredResponse.type === 'summary'
+                      ? filteredResponse.summary || filteredResponse.content
+                      : filteredResponse.content,
                 },
               ],
             };
           } catch (filterError) {
-            logger.warn('Response filtering failed, falling back to original response:', filterError);
+            logger.warn(
+              'Response filtering failed, falling back to original response:',
+              filterError
+            );
           }
         }
 
@@ -1125,29 +1156,37 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           // Apply response filtering if available
           if (responseFilter && !args.verbose) {
             try {
-              const filteredResponse = await responseFilter.filterResponse('get_job_status', status, {
-                toolName: 'get_job_status',
-                timestamp: new Date().toISOString(),
-                projectId: String(projectId),
-                region: String(region),
-                responseType: 'job_status',
-                originalTokenCount: JSON.stringify(status).length,
-                filteredTokenCount: 0,
-                compressionRatio: 1.0
-              });
+              const filteredResponse = await responseFilter.filterResponse(
+                'get_job_status',
+                status,
+                {
+                  toolName: 'get_job_status',
+                  timestamp: new Date().toISOString(),
+                  projectId: String(projectId),
+                  region: String(region),
+                  responseType: 'job_status',
+                  originalTokenCount: JSON.stringify(status).length,
+                  filteredTokenCount: 0,
+                  compressionRatio: 1.0,
+                }
+              );
 
               return {
                 content: [
                   {
                     type: 'text',
-                    text: filteredResponse.type === 'summary'
-                      ? filteredResponse.summary || filteredResponse.content
-                      : filteredResponse.content,
+                    text:
+                      filteredResponse.type === 'summary'
+                        ? filteredResponse.summary || filteredResponse.content
+                        : filteredResponse.content,
                   },
                 ],
               };
             } catch (filterError) {
-              logger.warn('Response filtering failed, falling back to original response:', filterError);
+              logger.warn(
+                'Response filtering failed, falling back to original response:',
+                filterError
+              );
             }
           }
 
@@ -1310,21 +1349,25 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               responseType: 'cluster_details',
               originalTokenCount: JSON.stringify(response).length,
               filteredTokenCount: 0,
-              compressionRatio: 1.0
+              compressionRatio: 1.0,
             });
 
             return {
               content: [
                 {
                   type: 'text',
-                  text: filteredResponse.type === 'summary'
-                    ? filteredResponse.summary || filteredResponse.content
-                    : filteredResponse.content,
+                  text:
+                    filteredResponse.type === 'summary'
+                      ? filteredResponse.summary || filteredResponse.content
+                      : filteredResponse.content,
                 },
               ],
             };
           } catch (filterError) {
-            logger.warn('Response filtering failed, falling back to original response:', filterError);
+            logger.warn(
+              'Response filtering failed, falling back to original response:',
+              filterError
+            );
           }
         }
 
@@ -1424,7 +1467,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               status: String(response.status) || 'unknown',
               submissionTime: new Date().toISOString(),
               results: (response as any).results, // Results may be available later
-              error: (response as any).error // Error may be available later
+              error: (response as any).error, // Error may be available later
             });
             logger.info(`Indexed Hive job ${response.jobUuid} for knowledge base`);
           } catch (indexError) {
@@ -1445,32 +1488,40 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           // Apply response filtering if available for async response
           if (responseFilter && !args.verbose) {
             try {
-              const filteredResponse = await responseFilter.filterResponse('submit_hive_query', response, {
-                toolName: 'submit_hive_query',
-                timestamp: new Date().toISOString(),
-                projectId: String(projectId),
-                region: String(region),
-                clusterName: String(clusterName),
-                responseType: 'hive_query_async',
-                originalTokenCount: JSON.stringify(response).length,
-                filteredTokenCount: 0,
-                compressionRatio: 1.0
-              });
+              const filteredResponse = await responseFilter.filterResponse(
+                'submit_hive_query',
+                response,
+                {
+                  toolName: 'submit_hive_query',
+                  timestamp: new Date().toISOString(),
+                  projectId: String(projectId),
+                  region: String(region),
+                  clusterName: String(clusterName),
+                  responseType: 'hive_query_async',
+                  originalTokenCount: JSON.stringify(response).length,
+                  filteredTokenCount: 0,
+                  compressionRatio: 1.0,
+                }
+              );
 
               const asyncMessage = `\n\nQuery registered for automatic status updates. Use dataproc://query/${projectId}/${region}/${response.jobUuid} resource to monitor progress.`;
-              
+
               return {
                 content: [
                   {
                     type: 'text',
-                    text: (filteredResponse.type === 'summary'
-                      ? filteredResponse.summary || filteredResponse.content
-                      : filteredResponse.content) + asyncMessage,
+                    text:
+                      (filteredResponse.type === 'summary'
+                        ? filteredResponse.summary || filteredResponse.content
+                        : filteredResponse.content) + asyncMessage,
                   },
                 ],
               };
             } catch (filterError) {
-              logger.warn('Response filtering failed, falling back to original response:', filterError);
+              logger.warn(
+                'Response filtering failed, falling back to original response:',
+                filterError
+              );
             }
           }
 
@@ -1487,30 +1538,38 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         // Apply response filtering if available for sync response
         if (responseFilter && !args.verbose) {
           try {
-            const filteredResponse = await responseFilter.filterResponse('submit_hive_query', response, {
-              toolName: 'submit_hive_query',
-              timestamp: new Date().toISOString(),
-              projectId: String(projectId),
-              region: String(region),
-              clusterName: String(clusterName),
-              responseType: 'hive_query_sync',
-              originalTokenCount: JSON.stringify(response).length,
-              filteredTokenCount: 0,
-              compressionRatio: 1.0
-            });
+            const filteredResponse = await responseFilter.filterResponse(
+              'submit_hive_query',
+              response,
+              {
+                toolName: 'submit_hive_query',
+                timestamp: new Date().toISOString(),
+                projectId: String(projectId),
+                region: String(region),
+                clusterName: String(clusterName),
+                responseType: 'hive_query_sync',
+                originalTokenCount: JSON.stringify(response).length,
+                filteredTokenCount: 0,
+                compressionRatio: 1.0,
+              }
+            );
 
             return {
               content: [
                 {
                   type: 'text',
-                  text: filteredResponse.type === 'summary'
-                    ? filteredResponse.summary || filteredResponse.content
-                    : filteredResponse.content,
+                  text:
+                    filteredResponse.type === 'summary'
+                      ? filteredResponse.summary || filteredResponse.content
+                      : filteredResponse.content,
                 },
               ],
             };
           } catch (filterError) {
-            logger.warn('Response filtering failed, falling back to original response:', filterError);
+            logger.warn(
+              'Response filtering failed, falling back to original response:',
+              filterError
+            );
           }
         }
 
@@ -1695,7 +1754,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         // Extract Zeppelin URL from cluster endpoint configuration
         const zeppelinUrl = cluster?.config?.endpointConfig?.httpPorts?.Zeppelin;
-        
+
         if (!zeppelinUrl) {
           return {
             content: [
@@ -1834,7 +1893,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             projectId: projectId ? String(projectId) : undefined,
             region: region ? String(region) : undefined,
             clusterName: clusterName ? String(clusterName) : undefined,
-            limit: limit ? Number(limit) : 5
+            limit: limit ? Number(limit) : 5,
           });
 
           if (queryResult.results.length === 0) {
@@ -1855,9 +1914,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           queryResult.results.forEach((result, index) => {
             response += `**${index + 1}. ${result.clusterName}** (${result.projectId}/${result.region})\n`;
             response += `   🎯 Confidence: ${(result.confidence * 100).toFixed(1)}%\n`;
-            
+
             // Format extracted info based on type
-            if (result.extractedInfo.type === 'pip_packages' && result.extractedInfo.packages.length > 0) {
+            if (
+              result.extractedInfo.type === 'pip_packages' &&
+              result.extractedInfo.packages.length > 0
+            ) {
               response += `   📦 **Pip Packages** (${result.extractedInfo.count}):\n`;
               result.extractedInfo.packages.slice(0, 10).forEach((pkg: string) => {
                 response += `      • ${pkg}\n`;
@@ -1884,7 +1946,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 response += `      • Components: ${result.extractedInfo.optionalComponents.join(', ')}\n`;
               }
             }
-            
+
             response += `\n`;
           });
 
@@ -1933,7 +1995,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
           if (insights.commonMachineTypes.length > 0) {
             response += `🖥️ **Common Machine Types**:\n`;
-            insights.commonMachineTypes.forEach(type => {
+            insights.commonMachineTypes.forEach((type) => {
               response += `   • ${type}\n`;
             });
             response += `\n`;
@@ -1941,7 +2003,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
           if (insights.commonComponents.length > 0) {
             response += `🔧 **Common Components**:\n`;
-            insights.commonComponents.forEach(comp => {
+            insights.commonComponents.forEach((comp) => {
               response += `   • ${comp}\n`;
             });
             response += `\n`;
@@ -1949,7 +2011,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
           if (insights.commonPipelines.length > 0) {
             response += `🚀 **Common Pipelines**:\n`;
-            insights.commonPipelines.forEach(pipeline => {
+            insights.commonPipelines.forEach((pipeline) => {
               response += `   • ${pipeline}\n`;
             });
             response += `\n`;
@@ -1957,8 +2019,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
           if (insights.recentDiscoveries.length > 0) {
             response += `🆕 **Recent Discoveries** (Last 24h):\n`;
-            insights.recentDiscoveries.forEach(cluster => {
-              const timeSince = Math.round((Date.now() - new Date(cluster.firstSeen).getTime()) / (1000 * 60 * 60));
+            insights.recentDiscoveries.forEach((cluster) => {
+              const timeSince = Math.round(
+                (Date.now() - new Date(cluster.firstSeen).getTime()) / (1000 * 60 * 60)
+              );
               response += `   • ${cluster.clusterName} (${cluster.projectId}/${cluster.region}) - ${timeSince}h ago\n`;
             });
           } else {
@@ -2012,7 +2076,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             Object.entries(analytics.jobTypeDistribution)
               .sort(([, a], [, b]) => b - a)
               .forEach(([type, count]) => {
-                const percentage = analytics.totalJobs > 0 ? ((count / analytics.totalJobs) * 100).toFixed(1) : '0';
+                const percentage =
+                  analytics.totalJobs > 0 ? ((count / analytics.totalJobs) * 100).toFixed(1) : '0';
                 response += `   • ${type.toUpperCase()}: ${count} jobs (${percentage}%)\n`;
               });
             response += `\n`;
@@ -2077,10 +2142,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         try {
           const results = await knowledgeIndexer.queryKnowledge(String(query), {
-            type: type ? String(type) as any : 'all',
+            type: type ? (String(type) as any) : 'all',
             projectId: projectId ? String(projectId) : undefined,
             region: region ? String(region) : undefined,
-            limit: limit ? Number(limit) : 10
+            limit: limit ? Number(limit) : 10,
           });
 
           if (results.length === 0) {

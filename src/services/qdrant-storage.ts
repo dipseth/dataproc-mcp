@@ -5,6 +5,8 @@
 
 import { QdrantClient } from '@qdrant/js-client-rest';
 import { QdrantStorageMetadata } from '../types/response-filter.js';
+import { TransformersEmbeddingService } from './transformers-embeddings.js';
+import { logger } from '../utils/logger.js';
 
 export interface QdrantConfig {
   url: string;
@@ -18,6 +20,7 @@ export class QdrantStorageService {
   private client: QdrantClient;
   private config: QdrantConfig;
   private collectionInitialized = false;
+  private embeddingService: TransformersEmbeddingService;
 
   constructor(config: QdrantConfig) {
     this.config = config;
@@ -25,6 +28,7 @@ export class QdrantStorageService {
       url: config.url,
       apiKey: config.apiKey,
     });
+    this.embeddingService = new TransformersEmbeddingService();
   }
 
   /**
@@ -37,7 +41,7 @@ export class QdrantStorageService {
       // Check if collection exists
       const collections = await this.client.getCollections();
       const exists = collections.collections?.some(
-        col => col.name === this.config.collectionName
+        (col) => col.name === this.config.collectionName
       );
 
       if (!exists) {
@@ -61,18 +65,18 @@ export class QdrantStorageService {
   /**
    * Store cluster data with metadata and return resource URI
    */
-  async storeClusterData(
-    data: any,
-    metadata: QdrantStorageMetadata
-  ): Promise<string> {
+  async storeClusterData(data: any, metadata: QdrantStorageMetadata): Promise<string> {
     try {
       await this.ensureCollection();
 
+      // Train the embedding model with this cluster data
+      this.embeddingService.trainOnClusterData(data);
+
       // Generate a unique ID for this storage
       const id = this.generateId(metadata);
-      
-      // Generate embedding vector from data
-      const vector = this.generateEmbedding(data);
+
+      // Generate embedding vector using the trained model
+      const vector = await this.embeddingService.generateClusterEmbedding(data);
 
       // Prepare payload with metadata and data
       const payload = {
@@ -93,10 +97,15 @@ export class QdrantStorageService {
         ],
       });
 
+      const stats = this.embeddingService.getStats();
+      logger.info(
+        `📊 Stored cluster ${metadata.clusterName} | Model: ${stats.modelName}, ${stats.documentsProcessed} docs processed`
+      );
+
       // Return resource URI for MCP access
       return this.formatResourceUri(id, metadata);
     } catch (error) {
-      console.error('Failed to store data in Qdrant:', error);
+      logger.error('Failed to store data in Qdrant:', error);
       throw new Error(`Qdrant storage failed: ${error}`);
     }
   }
@@ -135,12 +144,14 @@ export class QdrantStorageService {
   async searchSimilar(
     queryData: any,
     limit: number = 5,
-    scoreThreshold: number = 0.7
+    scoreThreshold: number = 0.0
   ): Promise<Array<{ id: string; score: number; metadata: QdrantStorageMetadata; data: any }>> {
     try {
       await this.ensureCollection();
 
-      const queryVector = this.generateEmbedding(queryData);
+      const queryVector = await this.embeddingService.generateEmbedding(
+        typeof queryData === 'string' ? queryData : JSON.stringify(queryData)
+      );
 
       const searchResult = await this.client.search(this.config.collectionName, {
         vector: queryVector,
@@ -149,7 +160,7 @@ export class QdrantStorageService {
         with_payload: true,
       });
 
-      return searchResult.map(point => ({
+      return searchResult.map((point) => ({
         id: String(point.id),
         score: point.score || 0,
         metadata: point.payload as unknown as QdrantStorageMetadata,
@@ -230,7 +241,7 @@ export class QdrantStorageService {
       }
 
       // Delete old entries
-      const idsToDelete = oldEntries.points.map(point => String(point.id));
+      const idsToDelete = oldEntries.points.map((point) => String(point.id));
       await this.client.delete(this.config.collectionName, {
         wait: true,
         points: idsToDelete,
@@ -247,9 +258,9 @@ export class QdrantStorageService {
   /**
    * Generate a unique ID for storage
    */
-  private generateId(metadata: QdrantStorageMetadata): string {
+  private generateId(_metadata: QdrantStorageMetadata): string {
     // Generate a proper UUID for Qdrant
-    return crypto.randomUUID();
+    return globalThis.crypto.randomUUID();
   }
 
   /**
@@ -259,14 +270,14 @@ export class QdrantStorageService {
   private generateEmbedding(data: any): number[] {
     const text = JSON.stringify(data);
     const vector = new Array(this.config.vectorSize).fill(0);
-    
+
     // Simple hash-based embedding generation
     for (let i = 0; i < text.length; i++) {
       const charCode = text.charCodeAt(i);
       const index = charCode % this.config.vectorSize;
       vector[index] += Math.sin(charCode * 0.1) * 0.1;
     }
-    
+
     // Normalize vector
     const magnitude = Math.sqrt(vector.reduce((sum, val) => sum + val * val, 0));
     if (magnitude > 0) {
@@ -274,7 +285,7 @@ export class QdrantStorageService {
         vector[i] /= magnitude;
       }
     }
-    
+
     return vector;
   }
 
@@ -283,13 +294,13 @@ export class QdrantStorageService {
    */
   private formatResourceUri(id: string, metadata: QdrantStorageMetadata): string {
     const parts = ['dataproc', 'stored', metadata.toolName];
-    
+
     if (metadata.projectId) parts.push(metadata.projectId);
     if (metadata.region) parts.push(metadata.region);
     if (metadata.clusterName) parts.push(metadata.clusterName);
-    
+
     parts.push(id);
-    
+
     return parts.join('/');
   }
 
@@ -299,20 +310,20 @@ export class QdrantStorageService {
   parseResourceUri(uri: string): { id: string; metadata: Partial<QdrantStorageMetadata> } | null {
     try {
       const parts = uri.split('/');
-      
+
       if (parts.length < 4 || parts[0] !== 'dataproc' || parts[1] !== 'stored') {
         return null;
       }
-      
+
       const id = parts[parts.length - 1];
       const toolName = parts[2];
-      
+
       const metadata: Partial<QdrantStorageMetadata> = { toolName };
-      
+
       if (parts.length > 4) metadata.projectId = parts[3];
       if (parts.length > 5) metadata.region = parts[4];
       if (parts.length > 6) metadata.clusterName = parts[5];
-      
+
       return { id, metadata };
     } catch (error) {
       console.error('Failed to parse resource URI:', error);

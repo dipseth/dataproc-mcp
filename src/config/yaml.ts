@@ -76,10 +76,10 @@ function convertSnakeToCamel(obj: unknown, isMetadata = false): unknown {
   for (const key in obj) {
     if (Object.prototype.hasOwnProperty.call(obj, key)) {
       const value = (obj as Record<string, unknown>)[key];
-      
+
       // Check if this is the metadata section
       const isMetadataSection = key === 'metadata';
-      
+
       if (isMetadata || isMetadataSection) {
         // Preserve original key format for metadata
         resultObj[key] = convertSnakeToCamel(value, true);

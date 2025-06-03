@@ -31,7 +31,7 @@ export class QdrantManager {
       dockerImage: 'qdrant/qdrant:latest',
       maxStartupTime: 30000, // 30 seconds
       healthCheckInterval: 1000, // 1 second
-      ...config
+      ...config,
     };
   }
 
@@ -65,7 +65,7 @@ export class QdrantManager {
    */
   private async healthCheck(url: string): Promise<boolean> {
     try {
-      const response = await fetch(`${url}/collections`);
+      const response = await globalThis.fetch(`${url}/collections`);
       return response.ok;
     } catch {
       return false;
@@ -104,8 +104,8 @@ export class QdrantManager {
       await fs.mkdir(dataPath, { recursive: true });
 
       // Try Docker first, then fallback to binary
-      const qdrantProcess = await this.tryStartWithDocker(dataPath) || 
-                           await this.tryStartWithBinary(dataPath);
+      const qdrantProcess =
+        (await this.tryStartWithDocker(dataPath)) || (await this.tryStartWithBinary(dataPath));
 
       if (!qdrantProcess) {
         throw new Error('Failed to start Qdrant with both Docker and binary methods');
@@ -121,11 +121,10 @@ export class QdrantManager {
           this.isRunning = true;
           return qdrantUrl;
         }
-        await new Promise(resolve => setTimeout(resolve, this.config.healthCheckInterval));
+        await new Promise((resolve) => setTimeout(resolve, this.config.healthCheckInterval));
       }
 
       throw new Error(`Qdrant failed to start within ${this.config.maxStartupTime}ms`);
-
     } catch (error) {
       console.error('❌ Failed to start Qdrant:', error);
       this.cleanup();
@@ -139,24 +138,27 @@ export class QdrantManager {
   private async tryStartWithDocker(dataPath: string): Promise<ChildProcess | null> {
     try {
       console.log(`🐳 Attempting to start Qdrant with Docker on port ${this.actualPort}...`);
-      
+
       const dockerArgs = [
         'run',
         '--rm',
         '-d',
-        '-p', `${this.actualPort}:6333`,
-        '-v', `${dataPath}:/qdrant/storage`,
-        '--name', `qdrant-mcp-${this.actualPort}`,
-        this.config.dockerImage
+        '-p',
+        `${this.actualPort}:6333`,
+        '-v',
+        `${dataPath}:/qdrant/storage`,
+        '--name',
+        `qdrant-mcp-${this.actualPort}`,
+        this.config.dockerImage,
       ];
 
       const process = spawn('docker', dockerArgs, {
         stdio: ['ignore', 'pipe', 'pipe'],
-        detached: false
+        detached: false,
       });
 
       // Wait a bit to see if Docker command succeeds
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
       if (process.killed || process.exitCode !== null) {
         throw new Error('Docker process exited early');
@@ -164,7 +166,6 @@ export class QdrantManager {
 
       console.log(`🐳 Qdrant Docker container started with ID: ${process.pid}`);
       return process;
-
     } catch (error) {
       console.warn('🐳 Docker start failed:', error);
       return null;
@@ -177,13 +178,13 @@ export class QdrantManager {
   private async tryStartWithBinary(dataPath: string): Promise<ChildProcess | null> {
     try {
       console.log(`📦 Attempting to start Qdrant binary on port ${this.actualPort}...`);
-      
+
       // Try common binary locations
       const binaryPaths = [
         'qdrant',
         '/usr/local/bin/qdrant',
         '/opt/homebrew/bin/qdrant',
-        path.join(process.cwd(), 'bin', 'qdrant')
+        path.join(process.cwd(), 'bin', 'qdrant'),
       ];
 
       let binaryPath: string | null = null;
@@ -201,17 +202,22 @@ export class QdrantManager {
         throw new Error('Qdrant binary not found');
       }
 
-      const qdrantProcess = spawn(binaryPath, [
-        '--storage-path', dataPath,
-        '--http-port', this.actualPort!.toString()
-      ], {
-        stdio: ['ignore', 'pipe', 'pipe'],
-        detached: false
-      });
+      const qdrantProcess = spawn(
+        binaryPath,
+        [
+          '--storage-path',
+          dataPath,
+          '--http-port',
+          String(this.actualPort || this.config.preferredPort),
+        ],
+        {
+          stdio: ['ignore', 'pipe', 'pipe'],
+          detached: false,
+        }
+      );
 
       console.log(`📦 Qdrant binary started with PID: ${qdrantProcess.pid}`);
       return qdrantProcess;
-
     } catch (error) {
       console.warn('📦 Binary start failed:', error);
       return null;
@@ -231,10 +237,10 @@ export class QdrantManager {
     try {
       // Try graceful shutdown first
       this.process.kill('SIGTERM');
-      
+
       // Wait for graceful shutdown
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
       // Force kill if still running
       if (!this.process.killed) {
         this.process.kill('SIGKILL');
@@ -248,7 +254,6 @@ export class QdrantManager {
           // Ignore Docker errors
         }
       }
-
     } catch (error) {
       console.warn('Warning during Qdrant shutdown:', error);
     }

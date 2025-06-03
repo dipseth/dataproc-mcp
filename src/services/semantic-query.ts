@@ -1,6 +1,6 @@
 /**
  * Semantic Query Service for Qdrant-stored cluster data
- * 
+ *
  * Enables natural language queries against stored cluster configurations
  * without requiring verbose responses.
  */
@@ -38,9 +38,9 @@ export class SemanticQueryService {
       url: qdrantConfig?.url || 'http://localhost:6334',
       collectionName: qdrantConfig?.collectionName || 'dataproc_knowledge',
       vectorSize: qdrantConfig?.vectorSize || 384,
-      distance: qdrantConfig?.distance || 'Cosine' as const
+      distance: qdrantConfig?.distance || ('Cosine' as const),
     };
-    
+
     this.qdrantService = new QdrantStorageService(config);
   }
 
@@ -52,29 +52,32 @@ export class SemanticQueryService {
   /**
    * Query stored cluster data using natural language
    */
-  async queryClusterData(query: string, options: {
-    limit?: number;
-    projectId?: string;
-    region?: string;
-    clusterName?: string;
-  } = {}): Promise<QueryResponse> {
+  async queryClusterData(
+    query: string,
+    options: {
+      limit?: number;
+      projectId?: string;
+      region?: string;
+      clusterName?: string;
+    } = {}
+  ): Promise<QueryResponse> {
     const startTime = Date.now();
-    
+
     try {
       // Search for relevant stored data
       const searchResults = await this.qdrantService.searchSimilar(query, options.limit || 5);
-      
+
       // Filter by project/region/cluster if specified
       const filteredResults = this.filterResults(searchResults, options);
-      
+
       // Extract relevant information based on query type
       const processedResults = await this.processQueryResults(query, filteredResults);
-      
+
       return {
         query,
         results: processedResults,
         totalFound: processedResults.length,
-        processingTime: Date.now() - startTime
+        processingTime: Date.now() - startTime,
       };
     } catch (error) {
       logger.error('Semantic query failed:', error);
@@ -82,7 +85,7 @@ export class SemanticQueryService {
         query,
         results: [],
         totalFound: 0,
-        processingTime: Date.now() - startTime
+        processingTime: Date.now() - startTime,
       };
     }
   }
@@ -90,94 +93,105 @@ export class SemanticQueryService {
   /**
    * Specialized query for pip packages
    */
-  async queryPipPackages(options: {
-    projectId?: string;
-    region?: string;
-    clusterName?: string;
-  } = {}): Promise<QueryResponse> {
+  async queryPipPackages(
+    options: {
+      projectId?: string;
+      region?: string;
+      clusterName?: string;
+    } = {}
+  ): Promise<QueryResponse> {
     return this.queryClusterData('pip packages python dependencies dataproc:pip.packages', {
       ...options,
-      limit: 10
+      limit: 10,
     });
   }
 
   /**
    * Specialized query for machine types and hardware configuration
    */
-  async queryHardwareConfig(options: {
-    projectId?: string;
-    region?: string;
-    clusterName?: string;
-  } = {}): Promise<QueryResponse> {
+  async queryHardwareConfig(
+    options: {
+      projectId?: string;
+      region?: string;
+      clusterName?: string;
+    } = {}
+  ): Promise<QueryResponse> {
     return this.queryClusterData('machine type hardware configuration cpu memory disk', {
       ...options,
-      limit: 10
+      limit: 10,
     });
   }
 
   /**
    * Specialized query for network and security configuration
    */
-  async queryNetworkConfig(options: {
-    projectId?: string;
-    region?: string;
-    clusterName?: string;
-  } = {}): Promise<QueryResponse> {
+  async queryNetworkConfig(
+    options: {
+      projectId?: string;
+      region?: string;
+      clusterName?: string;
+    } = {}
+  ): Promise<QueryResponse> {
     return this.queryClusterData('network subnet security firewall vpc', {
       ...options,
-      limit: 10
+      limit: 10,
     });
   }
 
   /**
    * Specialized query for software and initialization actions
    */
-  async querySoftwareConfig(options: {
-    projectId?: string;
-    region?: string;
-    clusterName?: string;
-  } = {}): Promise<QueryResponse> {
+  async querySoftwareConfig(
+    options: {
+      projectId?: string;
+      region?: string;
+      clusterName?: string;
+    } = {}
+  ): Promise<QueryResponse> {
     return this.queryClusterData('software initialization actions scripts properties', {
       ...options,
-      limit: 10
+      limit: 10,
     });
   }
 
-  private filterResults(results: any[], options: {
-    projectId?: string;
-    region?: string;
-    clusterName?: string;
-  }): any[] {
-    return results.filter(result => {
+  private filterResults(
+    results: any[],
+    options: {
+      projectId?: string;
+      region?: string;
+      clusterName?: string;
+    }
+  ): any[] {
+    return results.filter((result) => {
       const metadata = result.metadata || {};
-      
+
       if (options.projectId && metadata.projectId !== options.projectId) {
         return false;
       }
-      
+
       if (options.region && metadata.region !== options.region) {
         return false;
       }
-      
+
       if (options.clusterName && metadata.clusterName !== options.clusterName) {
         return false;
       }
-      
+
       return true;
     });
   }
 
   private async processQueryResults(query: string, results: any[]): Promise<SemanticQueryResult[]> {
     const processedResults: SemanticQueryResult[] = [];
-    
+
     for (const result of results) {
       try {
         const metadata = result.metadata || {};
         const data = result.data || {};
-        
+
         // Extract relevant information based on query type
         const extractedInfo = this.extractRelevantInfo(query, data);
-        
+
         processedResults.push({
           clusterId: metadata.clusterId || 'unknown',
           clusterName: metadata.clusterName || 'unknown',
@@ -185,39 +199,55 @@ export class SemanticQueryService {
           region: metadata.region || 'unknown',
           matchedContent: this.getMatchedContent(query, data),
           confidence: result.score || 0,
-          extractedInfo
+          extractedInfo,
         });
       } catch (error) {
         logger.warn('Failed to process query result:', error);
       }
     }
-    
+
     return processedResults.sort((a, b) => b.confidence - a.confidence);
   }
 
   private extractRelevantInfo(query: string, data: any): any {
     const lowerQuery = query.toLowerCase();
-    
+
     // Pip packages extraction
-    if (lowerQuery.includes('pip') || lowerQuery.includes('package') || lowerQuery.includes('python')) {
+    if (
+      lowerQuery.includes('pip') ||
+      lowerQuery.includes('package') ||
+      lowerQuery.includes('python')
+    ) {
       return this.extractPipPackages(data);
     }
-    
+
     // Machine type extraction
-    if (lowerQuery.includes('machine') || lowerQuery.includes('hardware') || lowerQuery.includes('cpu')) {
+    if (
+      lowerQuery.includes('machine') ||
+      lowerQuery.includes('hardware') ||
+      lowerQuery.includes('cpu')
+    ) {
       return this.extractMachineConfig(data);
     }
-    
+
     // Network configuration extraction
-    if (lowerQuery.includes('network') || lowerQuery.includes('subnet') || lowerQuery.includes('vpc')) {
+    if (
+      lowerQuery.includes('network') ||
+      lowerQuery.includes('subnet') ||
+      lowerQuery.includes('vpc')
+    ) {
       return this.extractNetworkConfig(data);
     }
-    
+
     // Software configuration extraction
-    if (lowerQuery.includes('software') || lowerQuery.includes('initialization') || lowerQuery.includes('script')) {
+    if (
+      lowerQuery.includes('software') ||
+      lowerQuery.includes('initialization') ||
+      lowerQuery.includes('script')
+    ) {
       return this.extractSoftwareConfig(data);
     }
-    
+
     // Default: return summary
     return this.extractSummary(data);
   }
@@ -231,7 +261,7 @@ export class SemanticQueryService {
           type: 'pip_packages',
           packages,
           count: packages.length,
-          rawValue: pipPackages
+          rawValue: pipPackages,
         };
       }
     } catch (error) {
@@ -249,19 +279,21 @@ export class SemanticQueryService {
           instances: config?.masterConfig?.numInstances,
           machineType: this.extractMachineType(config?.masterConfig?.machineTypeUri),
           diskSize: config?.masterConfig?.diskConfig?.bootDiskSizeGb,
-          diskType: config?.masterConfig?.diskConfig?.bootDiskType
+          diskType: config?.masterConfig?.diskConfig?.bootDiskType,
         },
         workers: {
           instances: config?.workerConfig?.numInstances,
           machineType: this.extractMachineType(config?.workerConfig?.machineTypeUri),
           diskSize: config?.workerConfig?.diskConfig?.bootDiskSizeGb,
-          diskType: config?.workerConfig?.diskConfig?.bootDiskType
+          diskType: config?.workerConfig?.diskConfig?.bootDiskType,
         },
-        secondaryWorkers: config?.secondaryWorkerConfig ? {
-          instances: config.secondaryWorkerConfig.numInstances,
-          machineType: this.extractMachineType(config.secondaryWorkerConfig.machineTypeUri),
-          preemptible: config.secondaryWorkerConfig.isPreemptible
-        } : null
+        secondaryWorkers: config?.secondaryWorkerConfig
+          ? {
+              instances: config.secondaryWorkerConfig.numInstances,
+              machineType: this.extractMachineType(config.secondaryWorkerConfig.machineTypeUri),
+              preemptible: config.secondaryWorkerConfig.isPreemptible,
+            }
+          : null,
       };
     } catch (error) {
       logger.warn('Failed to extract machine config:', error);
@@ -279,7 +311,7 @@ export class SemanticQueryService {
         internalIpOnly: gceConfig?.internalIpOnly,
         serviceAccount: gceConfig?.serviceAccount,
         tags: gceConfig?.tags || [],
-        shieldedInstance: gceConfig?.shieldedInstanceConfig
+        shieldedInstance: gceConfig?.shieldedInstanceConfig,
       };
     } catch (error) {
       logger.warn('Failed to extract network config:', error);
@@ -291,16 +323,16 @@ export class SemanticQueryService {
     try {
       const softwareConfig = data?.config?.softwareConfig;
       const initActions = data?.config?.initializationActions || [];
-      
+
       return {
         type: 'software_config',
         imageVersion: softwareConfig?.imageVersion,
         optionalComponents: softwareConfig?.optionalComponents || [],
         initializationActions: initActions.map((action: any) => ({
           script: action.executableFile,
-          timeout: action.executionTimeout
+          timeout: action.executionTimeout,
         })),
-        keyProperties: this.extractKeyProperties(softwareConfig?.properties || {})
+        keyProperties: this.extractKeyProperties(softwareConfig?.properties || {}),
       };
     } catch (error) {
       logger.warn('Failed to extract software config:', error);
@@ -316,7 +348,7 @@ export class SemanticQueryService {
         status: data?.status?.state,
         created: data?.status?.stateStartTime,
         workers: data?.config?.workerConfig?.numInstances,
-        machineType: this.extractMachineType(data?.config?.workerConfig?.machineTypeUri)
+        machineType: this.extractMachineType(data?.config?.workerConfig?.machineTypeUri),
       };
     } catch (error) {
       logger.warn('Failed to extract summary:', error);
@@ -332,22 +364,22 @@ export class SemanticQueryService {
 
   private extractKeyProperties(properties: Record<string, string>): Record<string, string> {
     const keyProps: Record<string, string> = {};
-    
+
     // Extract important properties
     const importantKeys = [
       'dataproc:pip.packages',
       'spark:spark.executor.memory',
       'spark:spark.executor.cores',
       'yarn:yarn.nodemanager.resource.memory-mb',
-      'yarn:yarn.nodemanager.resource.cpu-vcores'
+      'yarn:yarn.nodemanager.resource.cpu-vcores',
     ];
-    
+
     for (const key of importantKeys) {
       if (properties[key]) {
         keyProps[key] = properties[key];
       }
     }
-    
+
     return keyProps;
   }
 
@@ -357,26 +389,27 @@ export class SemanticQueryService {
       const dataStr = JSON.stringify(data, null, 2);
       const lowerQuery = query.toLowerCase();
       const lowerData = dataStr.toLowerCase();
-      
+
       // Find the position of query terms in the data
-      const queryTerms = lowerQuery.split(' ').filter(term => term.length > 2);
+      const queryTerms = lowerQuery.split(' ').filter((term) => term.length > 2);
       let bestMatch = '';
-      let bestScore = 0;
-      
+      // Track best score for potential future use
+      // let bestScore = 0;
+
       for (const term of queryTerms) {
         const index = lowerData.indexOf(term);
         if (index !== -1) {
           const start = Math.max(0, index - 100);
           const end = Math.min(dataStr.length, index + 200);
           const snippet = dataStr.substring(start, end);
-          
+
           if (snippet.length > bestMatch.length) {
             bestMatch = snippet;
-            bestScore++;
+            // bestScore++;
           }
         }
       }
-      
+
       return bestMatch || dataStr.substring(0, 200) + '...';
     } catch (error) {
       return 'Content extraction failed';
