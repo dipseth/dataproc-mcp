@@ -114,6 +114,7 @@ export const ListClustersSchema = z.object({
   projectId: ProjectIdSchema.optional(),
   region: RegionSchema.optional(),
   filter: z.string().max(500, 'Filter string too long').optional().describe('Filter expression'),
+  verbose: z.boolean().optional().default(false).describe('Return full response without filtering'),
   ...PaginationSchema.shape,
 });
 
@@ -121,6 +122,7 @@ export const GetClusterSchema = z.object({
   projectId: ProjectIdSchema,
   region: RegionSchema,
   clusterName: ClusterNameSchema,
+  verbose: z.boolean().optional().default(false).describe('Return full response without filtering'),
 });
 
 export const DeleteClusterSchema = z.object({
@@ -139,6 +141,7 @@ export const SubmitHiveQuerySchema = z.object({
     .max(10000, 'Query too long (max 10,000 characters)')
     .describe('Hive query to execute'),
   async: z.boolean().optional().describe('Whether to run asynchronously'),
+  verbose: z.boolean().optional().default(false).describe('Return full response without filtering'),
   queryOptions: z
     .object({
       timeoutMs: z
@@ -159,6 +162,7 @@ export const GetJobStatusSchema = z.object({
   projectId: ProjectIdSchema.optional(),
   region: RegionSchema.optional(),
   jobId: JobIdSchema,
+  verbose: z.boolean().optional().default(false).describe('Return full response without filtering'),
 });
 
 export const GetQueryResultsSchema = z.object({

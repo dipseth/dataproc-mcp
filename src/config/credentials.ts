@@ -140,13 +140,10 @@ export async function createImpersonatedAuth(
   );
 
   try {
-    // Use provided source credentials or fail if none provided
-    if (!sourceCredentials) {
-      throw new Error(
-        'Source credentials are required for impersonation. No fallback to ADC to avoid environment dependencies.'
-      );
-    }
-    const sourceAuth = sourceCredentials;
+    // Use provided source credentials or default to ADC
+    const sourceAuth = sourceCredentials || new GoogleAuth({
+      scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+    });
 
     // Get source credentials
     const sourceAuthClient = await sourceAuth.getClient();
@@ -228,25 +225,36 @@ export async function createAuth(options: DataprocClientOptions = {}): Promise<A
         `[TIMING] createAuth: Attempting service account impersonation: ${targetServiceAccount}`
       );
 
-      // Create source credentials for impersonation - REQUIRE fallback key path
-      if (!serverConfig.authentication.fallbackKeyPath) {
-        throw new Error(
-          `Service account impersonation requires fallbackKeyPath in server configuration. No environment fallback to ensure independence.`
-        );
-      }
+      // Create source credentials for impersonation
+      // Try ADC first, then fallback to fallbackKeyPath if provided
+      let sourceAuth: GoogleAuth;
+      let sourceDescription: string;
 
-      console.error(
-        `[DEBUG] createAuth: Using fallback key path for impersonation source: ${serverConfig.authentication.fallbackKeyPath}`
-      );
-      const sourceAuth = new GoogleAuth({
-        keyFilename: serverConfig.authentication.fallbackKeyPath,
-        scopes: ['https://www.googleapis.com/auth/cloud-platform'],
-      });
+      if (serverConfig.authentication.fallbackKeyPath) {
+        // Use fallbackKeyPath if provided
+        console.error(
+          `[DEBUG] createAuth: Using fallback key path for impersonation source: ${serverConfig.authentication.fallbackKeyPath}`
+        );
+        sourceAuth = new GoogleAuth({
+          keyFilename: serverConfig.authentication.fallbackKeyPath,
+          scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+        });
+        sourceDescription = 'fallback key path';
+      } else {
+        // Use Application Default Credentials as source for impersonation
+        console.error(
+          `[DEBUG] createAuth: Using Application Default Credentials for impersonation source`
+        );
+        sourceAuth = new GoogleAuth({
+          scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+        });
+        sourceDescription = 'Application Default Credentials';
+      }
 
       // Test the source auth
       await sourceAuth.getAccessToken();
       console.error(
-        `[DEBUG] createAuth: Fallback key path authentication successful for impersonation`
+        `[DEBUG] createAuth: ${sourceDescription} authentication successful for impersonation`
       );
 
       const impersonatedClient = await createImpersonatedAuth(targetServiceAccount, sourceAuth);

@@ -1,0 +1,65 @@
+{
+  "tokenLimits": {
+    "list_clusters": 500,
+    "get_cluster": 300,
+    "submit_hive_query": 400,
+    "get_query_results": 600,
+    "list_tracked_clusters": 350,
+    "check_active_jobs": 450,
+    "default": 400
+  },
+  "extractionRules": {
+    "list_clusters": {
+      "maxClusters": 10,
+      "essentialFields": [
+        "clusterName",
+        "status",
+        "createTime",
+        "projectId",
+        "region",
+        "machineType",
+        "numWorkers"
+      ],
+      "summaryFormat": "table"
+    },
+    "get_cluster": {
+      "essentialSections": [
+        "clusterName",
+        "status",
+        "config.masterConfig",
+        "config.workerConfig",
+        "config.softwareConfig",
+        "labels"
+      ],
+      "includeMetrics": false,
+      "includeHistory": false
+    },
+    "query_results": {
+      "maxRows": 20,
+      "includeSchema": true,
+      "summaryStats": true
+    },
+    "job_tracking": {
+      "maxJobs": 15,
+      "includeMetrics": true,
+      "groupByStatus": true
+    }
+  },
+  "qdrant": {
+    "url": "http://localhost:6334",
+    "collectionName": "dataproc_responses",
+    "vectorSize": 384,
+    "distance": "Cosine"
+  },
+  "formatting": {
+    "useEmojis": true,
+    "compactTables": true,
+    "includeResourceLinks": true,
+    "maxLineLength": 120
+  },
+  "caching": {
+    "enabled": true,
+    "ttlSeconds": 300,
+    "maxCacheSize": 100
+  }
+}

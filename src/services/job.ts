@@ -722,10 +722,3 @@ export async function getDataprocJobResults<T>(
 
 // Removed deprecated processHiveOutput function - use JobOutputHandler.getJobOutput instead
 
-/**
- * Get Zeppelin notebook URL for a Dataproc cluster (if enabled)
- */
-export function getZeppelinUrl(projectId: string, region: string, clusterName: string): string {
-  // Standard Dataproc Zeppelin URL pattern
-  return `https://${region}.dataproc.cloud.google.com/zeppelin/${projectId}/${region}/${clusterName}`;
-}
