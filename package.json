@@ -1,6 +1,6 @@
 {
   "name": "@dipseth/dataproc-mcp-server",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "A production-ready Model Context Protocol (MCP) server for Google Cloud Dataproc operations. Provides intelligent defaults, comprehensive tooling, and seamless integration with Roo (VS Code) for big data workflows.",
   "type": "module",
   "keywords": [

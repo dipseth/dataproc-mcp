@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- semantic-release-changelog -->
 
+## [2.1.1](https://github.com/dipseth/dataproc-mcp/compare/v2.1.0...v2.1.1) (2025-06-03)
+
+
+### 🐛 Bug Fixes
+
+* smart configuration path resolution for response-filter.json ([4eda469](https://github.com/dipseth/dataproc-mcp/commit/4eda469bb8ec691baa070549adb9c79cfaa21061))
+
 ## [2.1.0](https://github.com/dipseth/dataproc-mcp/compare/v2.0.3...v2.1.0) (2025-06-03)
 
 
