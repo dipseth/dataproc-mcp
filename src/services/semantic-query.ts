@@ -35,8 +35,8 @@ export class SemanticQueryService {
     distance?: 'Cosine' | 'Euclidean' | 'Dot';
   }) {
     const config = {
-      url: qdrantConfig?.url || 'http://localhost:6333',
-      collectionName: qdrantConfig?.collectionName || 'dataproc_responses',
+      url: qdrantConfig?.url || 'http://localhost:6334',
+      collectionName: qdrantConfig?.collectionName || 'dataproc_knowledge',
       vectorSize: qdrantConfig?.vectorSize || 384,
       distance: qdrantConfig?.distance || 'Cosine' as const
     };

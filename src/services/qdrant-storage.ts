@@ -248,15 +248,8 @@ export class QdrantStorageService {
    * Generate a unique ID for storage
    */
   private generateId(metadata: QdrantStorageMetadata): string {
-    const components = [
-      metadata.toolName,
-      metadata.projectId || 'default',
-      metadata.region || 'default',
-      metadata.clusterName || 'default',
-      Date.now().toString(),
-    ];
-    
-    return components.join('-').replace(/[^a-zA-Z0-9-]/g, '');
+    // Generate a proper UUID for Qdrant
+    return crypto.randomUUID();
   }
 
   /**
