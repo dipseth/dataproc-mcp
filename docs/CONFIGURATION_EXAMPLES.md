@@ -296,7 +296,7 @@ my-company-analytics-prod-1a2b:
         dataproc:jobs.file-backed-output.enable: "true"
         dataproc:dataproc.logging.stackdriver.job.yarn.container.enable: "true"
         hive:hive.server2.materializedviews.cache.at.startup: "false"
-      image_version: 1.5-debian10
+      image_version: 2.1.1-debian10
     metastore_config:
       dataproc_metastore_service: projects/my-company-datalake-prod-7g8h/locations/us-central1/services/analytics-metastore-prod
     endpoint_config:
@@ -356,7 +356,7 @@ my-company-analytics-staging-9i0j:
         dataproc:jobs.file-backed-output.enable: "true"
         dataproc:dataproc.logging.stackdriver.job.yarn.container.enable: "true"
         hive:hive.server2.materializedviews.cache.at.startup: "false"
-      image_version: 1.5-debian10
+      image_version: 2.1.1-debian10
     metastore_config:
       dataproc_metastore_service: projects/my-company-datalake-staging-4m5n/locations/us-central1/services/analytics-metastore-staging
     endpoint_config:
@@ -420,7 +420,7 @@ my-company-analytics-dev-6o7p:
         dataproc:dataproc.logging.stackdriver.job.yarn.container.enable: "true"
         hive:hive.server2.materializedviews.cache.at.startup: "false"
         dataproc:dataproc.allow.zero.workers: "true"  # Allow zero workers for cost optimization
-      image_version: 1.5-debian10
+      image_version: 2.1.1-debian10
     metastore_config:
       dataproc_metastore_service: projects/my-company-datalake-dev-0s1t/locations/us-west1/services/analytics-metastore-dev
     endpoint_config:

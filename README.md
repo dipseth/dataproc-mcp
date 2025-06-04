@@ -65,7 +65,7 @@ npx @dataproc/mcp-server
 
 1. **Install the package:**
    ```bash
-   npm install -g @dataproc/mcp-server
+   npm install -g @dipseth/dataproc-mcp-server@2.1.1
    ```
 
 2. **Run the setup:**
@@ -175,12 +175,12 @@ my-company-analytics-prod-1234:
 
 ## 📚 Documentation
 
-- **[Quick Start Guide](https://dipseth.github.io/dataproc-mcp/QUICK_START)** - Get started in 5 minutes
-- **[Knowledge Base Semantic Search](https://dipseth.github.io/dataproc-mcp/KNOWLEDGE_BASE_SEMANTIC_SEARCH)** - Natural language queries and setup
+- **[Quick Start Guide](https://dipseth.github.io/dataproc-mcp/QUICK_START.html)** - Get started in 5 minutes
+- **[Knowledge Base Semantic Search](https://dipseth.github.io/dataproc-mcp/KNOWLEDGE_BASE_SEMANTIC_SEARCH.html)** - Natural language queries and setup
 - **[API Reference](https://dipseth.github.io/dataproc-mcp/api/)** - Complete tool documentation
-- **[Configuration Examples](https://dipseth.github.io/dataproc-mcp/CONFIGURATION_EXAMPLES)** - Real-world configurations
+- **[Configuration Examples](https://dipseth.github.io/dataproc-mcp/CONFIGURATION_EXAMPLES.html)** - Real-world configurations
 - **[Security Guide](https://dipseth.github.io/dataproc-mcp/security/)** - Best practices and compliance
-- **[Installation Guide](https://dipseth.github.io/dataproc-mcp/INSTALLATION_GUIDE)** - Detailed setup instructions
+- **[Installation Guide](https://dipseth.github.io/dataproc-mcp/INSTALLATION_GUIDE.html)** - Detailed setup instructions
 
 ## 🔧 MCP Client Integration
 

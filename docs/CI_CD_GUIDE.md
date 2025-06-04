@@ -252,6 +252,9 @@ npm audit --audit-level moderate
 npm run docs:generate
 npm run docs:api
 
+# Update documentation with current version
+npm run docs:update
+
 # Test links
 npm run docs:test-links
 
@@ -274,7 +277,46 @@ tar -tzf *.tgz
 
 ## 🚀 Enhanced Automatic Release Process
 
-### ✨ **NEW: Automatic PR Merge Publishing**
+### ✨ **NEW: Automated Documentation Updates**
+
+The release workflow now **automatically updates all documentation** when a new version is published:
+
+#### **📚 What Gets Updated Automatically:**
+- ✅ **README.md** - Version badges and installation commands
+- ✅ **Documentation files** - All `.md` files with package references
+- ✅ **Configuration files** - `docs/_config.yml` and package metadata
+- ✅ **Package info** - Creates `docs/package-info.json` with release details
+- ✅ **NPM metadata** - Homepage, repository URLs, and keywords
+
+#### **🔄 Documentation Update Flow:**
+```mermaid
+graph LR
+    A[🚀 Semantic Release] --> B[📚 Update Documentation]
+    B --> C[💾 Commit Changes]
+    C --> D[✅ Post-Release Validation]
+```
+
+#### **🛠️ Local Documentation Updates:**
+You can also update documentation locally:
+```bash
+# Update all documentation with current version
+npm run docs:update
+
+# What it updates:
+# - README.md version badges and installation commands
+# - All documentation files with package references
+# - Configuration files and metadata
+# - Package information JSON file
+```
+
+#### **📝 Documentation Update Script Features:**
+- **Smart version detection** - Reads current version from package.json
+- **Comprehensive updates** - Updates all references across the project
+- **Safe operations** - Only updates when changes are detected
+- **Detailed logging** - Shows exactly what was updated
+- **Git integration** - Commits changes with `[skip ci]` to prevent loops
+
+### ✨ **Automatic PR Merge Publishing**
 
 The CI/CD pipeline now **automatically publishes new versions when PRs are merged to main branch**. Here's how it works:
 

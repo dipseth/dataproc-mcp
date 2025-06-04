@@ -224,12 +224,162 @@ jobs:
           fi
 
   # ============================================================================
+  # DOCUMENTATION UPDATE
+  # ============================================================================
+  update-documentation:
+    name: 📚 Update Documentation
+    runs-on: ubuntu-latest
+    needs: semantic-release
+    if: needs.semantic-release.outputs.released == 'true'
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: 📦 Install Dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: 📝 Update README Version Badges
+        run: |
+          echo "📝 Updating README version badges..."
+          NEW_VERSION="${{ needs.semantic-release.outputs.version }}"
+          
+          # Update npm version badge
+          sed -i "s|npm/v/@dipseth/dataproc-mcp-server\.svg|npm/v/@dipseth/dataproc-mcp-server.svg|g" README.md
+          
+          # Update package references in README
+          sed -i "s|@dipseth/dataproc-mcp-server@[0-9]\+\.[0-9]\+\.[0-9]\+|@dipseth/dataproc-mcp-server@$NEW_VERSION|g" README.md
+          
+          # Update installation commands
+          sed -i "s|npm install -g @dataproc/mcp-server|npm install -g @dipseth/dataproc-mcp-server@$NEW_VERSION|g" README.md
+          
+          echo "✅ README version badges updated to v$NEW_VERSION"
+
+      - name: 📚 Update Documentation Links
+        run: |
+          echo "📚 Updating documentation links..."
+          NEW_VERSION="${{ needs.semantic-release.outputs.version }}"
+          
+          # Update package.json version references in docs
+          find docs/ -name "*.md" -type f -exec sed -i "s|@dipseth/dataproc-mcp-server@[0-9]\+\.[0-9]\+\.[0-9]\+|@dipseth/dataproc-mcp-server@$NEW_VERSION|g" {} \;
+          
+          # Update docs/index.md with latest version
+          if [ -f "docs/index.md" ]; then
+            sed -i "s|version: [0-9]\+\.[0-9]\+\.[0-9]\+|version: $NEW_VERSION|g" docs/index.md
+          fi
+          
+          echo "✅ Documentation links updated"
+
+      - name: 🔄 Regenerate Documentation
+        run: |
+          echo "🔄 Regenerating documentation..."
+          
+          # Regenerate API documentation with new version
+          npm run docs:generate
+          
+          # Update GitHub Pages if needed
+          if [ -f "docs/_config.yml" ]; then
+            sed -i "s|version: [0-9]\+\.[0-9]\+\.[0-9]\+|version: ${{ needs.semantic-release.outputs.version }}|g" docs/_config.yml
+          fi
+          
+          echo "✅ Documentation regenerated"
+
+      - name: 📊 Update Package Metrics
+        run: |
+          echo "📊 Updating package metrics..."
+          NEW_VERSION="${{ needs.semantic-release.outputs.version }}"
+          
+          # Create or update package info file
+          cat > docs/package-info.json << EOF
+          {
+            "name": "@dipseth/dataproc-mcp-server",
+            "version": "$NEW_VERSION",
+            "released": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "npmUrl": "https://www.npmjs.com/package/@dipseth/dataproc-mcp-server/v/$NEW_VERSION",
+            "githubRelease": "https://github.com/${{ github.repository }}/releases/tag/v$NEW_VERSION",
+            "installCommand": "npm install @dipseth/dataproc-mcp-server@$NEW_VERSION"
+          }
+          EOF
+          
+          echo "✅ Package metrics updated"
+
+      - name: 🚀 Update NPM Documentation
+        run: |
+          echo "🚀 Updating NPM package documentation..."
+          
+          # Ensure package.json has correct repository and homepage URLs
+          npm pkg set homepage="https://dipseth.github.io/dataproc-mcp/"
+          npm pkg set repository.url="git+https://github.com/${{ github.repository }}.git"
+          npm pkg set bugs.url="https://github.com/${{ github.repository }}/issues"
+          
+          # Update package keywords for better discoverability
+          npm pkg set keywords='["mcp", "dataproc", "google-cloud", "model-context-protocol", "typescript", "nodejs"]'
+          
+          echo "✅ NPM documentation metadata updated"
+
+      - name: 📝 Create Documentation Update Summary
+        run: |
+          echo "## 📚 Documentation Update Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Updated documentation for version **v${{ needs.semantic-release.outputs.version }}**:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ✅ Updated Components" >> $GITHUB_STEP_SUMMARY
+          echo "- 📝 README.md version badges and installation commands" >> $GITHUB_STEP_SUMMARY
+          echo "- 📚 Documentation links and version references" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔄 Regenerated API documentation" >> $GITHUB_STEP_SUMMARY
+          echo "- 📊 Package metrics and metadata" >> $GITHUB_STEP_SUMMARY
+          echo "- 🚀 NPM package documentation" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔗 Updated Links" >> $GITHUB_STEP_SUMMARY
+          echo "- **NPM Package**: [v${{ needs.semantic-release.outputs.version }}](https://www.npmjs.com/package/@dipseth/dataproc-mcp-server/v/${{ needs.semantic-release.outputs.version }})" >> $GITHUB_STEP_SUMMARY
+          echo "- **GitHub Pages**: [Documentation](https://dipseth.github.io/dataproc-mcp/)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Installation**: \`npm install @dipseth/dataproc-mcp-server@${{ needs.semantic-release.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: 💾 Commit Documentation Updates
+        run: |
+          # Configure git
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          
+          # Check if there are changes to commit
+          if git diff --quiet && git diff --staged --quiet; then
+            echo "ℹ️ No documentation changes to commit"
+          else
+            echo "📝 Committing documentation updates..."
+            git add .
+            git commit -m "docs: update documentation for v${{ needs.semantic-release.outputs.version }}
+
+            - Update README version badges and installation commands
+            - Update documentation links and version references
+            - Regenerate API documentation
+            - Update package metrics and NPM metadata
+            
+            [skip ci]"
+            
+            git push origin main
+            echo "✅ Documentation updates committed and pushed"
+          fi
+
+  # ============================================================================
   # POST-RELEASE VALIDATION
   # ============================================================================
   post-release-validation:
     name: ✅ Post-Release Validation
     runs-on: ubuntu-latest
-    needs: semantic-release
+    needs: [semantic-release, update-documentation]
     if: needs.semantic-release.outputs.released == 'true'
     timeout-minutes: 10
     steps:

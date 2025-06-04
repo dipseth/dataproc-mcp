@@ -8,12 +8,14 @@
 </head>
 <body>
     <header>
-        <h1><a href="{{ '/' | relative_url }}">{{ site.title }}</a></h1>
+        <h1>🔧 <a href="{{ '/' | relative_url }}">{{ site.title }} Documentation</a></h1>
+        <p>Production-ready Model Context Protocol server for Google Cloud Dataproc operations.</p>
         <nav>
             <ul>
-                {% for page in site.header_pages %}
-                <li><a href="{{ page.url | relative_url }}">{{ page.title }}</a></li>
-                {% endfor %}
+                <li>📚 <a href="{{ '/API_REFERENCE' | relative_url }}">API Reference</a></li>
+                <li>🚀 <a href="{{ '/QUICK_START' | relative_url }}">Quick Start</a></li>
+                <li>⚙️ <a href="{{ '/CONFIGURATION_EXAMPLES' | relative_url }}">Configuration</a></li>
+                <li>🔒 <a href="{{ '/security/' | relative_url }}">Security Guide</a></li>
             </ul>
         </nav>
     </header>
