@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- semantic-release-changelog -->
 
+## [3.0.0](https://github.com/dipseth/dataproc-mcp/compare/v2.1.1...v3.0.0) (2025-06-04)
+
+
+### ⚠ BREAKING CHANGES
+
+* Enhanced release detection may trigger releases for previously undetected conventional commits
+
+### 🚀 Features
+
+* enhance CI/CD pipeline with automatic PR merge publishing ([59ffe57](https://github.com/dipseth/dataproc-mcp/commit/59ffe57af5bc0d1a7900bef55147007b0642f65b))
+
+
+### 📚 Documentation
+
+* update npm version badge to use shields.io for better cache management ([a95db42](https://github.com/dipseth/dataproc-mcp/commit/a95db42624390c647a508c8fd9939924b5f50c13))
+
 ## [2.1.1](https://github.com/dipseth/dataproc-mcp/compare/v2.1.0...v2.1.1) (2025-06-03)
 
 
