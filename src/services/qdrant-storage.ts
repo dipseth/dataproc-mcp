@@ -76,6 +76,9 @@ export class QdrantStorageService {
     if (this.collectionInitialized) return;
 
     try {
+      // Test basic connectivity first
+      await this.client.getCollections();
+
       // Check if collection exists
       const collections = await this.client.getCollections();
       const exists = collections.collections?.some(
@@ -90,14 +93,23 @@ export class QdrantStorageService {
             distance: this.config.distance === 'Euclidean' ? 'Euclid' : this.config.distance,
           },
         });
-        console.log(`Created Qdrant collection: ${this.config.collectionName}`);
+        logger.info(`✅ Created Qdrant collection: ${this.config.collectionName}`);
+      } else {
+        logger.info(`✅ Qdrant collection exists: ${this.config.collectionName}`);
       }
 
       this.collectionInitialized = true;
     } catch (error) {
-      console.error('Failed to initialize Qdrant collection:', error);
+      logger.error('Failed to initialize Qdrant collection:', error);
       throw new Error(`Qdrant collection initialization failed: ${error}`);
     }
+  }
+
+  /**
+   * Initialize the service and ensure collection is ready
+   */
+  async initialize(): Promise<void> {
+    await this.ensureCollection();
   }
 
   /**
@@ -187,9 +199,15 @@ export class QdrantStorageService {
     try {
       await this.ensureCollection();
 
-      const queryVector = await this.embeddingService.generateEmbedding(
-        typeof queryData === 'string' ? queryData : JSON.stringify(queryData)
-      );
+      // Use generateClusterEmbedding for consistency with storage
+      // If queryData is a string, convert to cluster-like format for consistent embedding
+      let queryVector: number[];
+      if (typeof queryData === 'string') {
+        queryVector = await this.embeddingService.generateEmbedding(queryData);
+      } else {
+        // For object data, use generateClusterEmbedding to match storage method
+        queryVector = await this.embeddingService.generateClusterEmbedding(queryData as any);
+      }
 
       const searchResult = await this.client.search(this.config.collectionName, {
         vector: queryVector,

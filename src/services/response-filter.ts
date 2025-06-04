@@ -39,7 +39,7 @@ export class ResponseFilter {
     this.formatter = new ResponseFormatter(config);
     this.storage = null;
     this.qdrantManager = new QdrantManager({
-      autoStart: true,
+      autoStart: false, // DISABLED: Use centralized Qdrant discovery instead
       preferredPort: 6333,
     });
 
@@ -54,11 +54,13 @@ export class ResponseFilter {
     if (this.storageInitialized) return;
 
     try {
-      // Try to auto-start Qdrant if not running
-      const qdrantUrl = await this.qdrantManager.autoStart();
+      // Use centralized Qdrant URL discovery instead of auto-start
+      const { QdrantConnectionManager } = await import('./qdrant-connection-manager.js');
+      const connectionManager = QdrantConnectionManager.getInstance();
+      const qdrantUrl = await connectionManager.discoverQdrantUrl();
 
       if (qdrantUrl) {
-        // Update config with actual URL and validate
+        // Update config with discovered URL and validate
         const actualConfig = {
           ...qdrantConfig,
           url: qdrantUrl,
@@ -90,7 +92,7 @@ export class ResponseFilter {
 
           const isHealthy = await this.storage.healthCheck();
           if (!isHealthy) {
-            console.warn('Qdrant not available and auto-start failed, disabling storage');
+            console.warn('Qdrant not available via centralized discovery, disabling storage');
             this.storage = null;
           } else {
             console.log('Qdrant storage connected to existing instance');
@@ -205,7 +207,7 @@ export class ResponseFilter {
       },
       qdrant: {
         url: 'http://localhost:6333',
-        collectionName: 'dataproc_responses',
+        collectionName: 'dataproc_knowledge', // Unified collection for all Dataproc data
         vectorSize: 384,
         distance: 'Cosine',
       },

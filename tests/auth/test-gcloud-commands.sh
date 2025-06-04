@@ -6,7 +6,7 @@
 set -e
 
 # Configuration - UPDATED VALUES
-PROJECT_ID="prj-grp-data-sci-prod-b425"
+PROJECT_ID="test-project-1234"
 REGION="us-central1"
 CLUSTER_NAME="test-cool-idea-cluster-fixed"
 JOB_ID="your-job-id"              # UPDATE WITH ACTUAL JOB ID WHEN AVAILABLE

@@ -128,7 +128,8 @@ export interface QueryResponse {
 }
 
 export class SemanticQueryService {
-  private qdrantService: QdrantStorageService;
+  private qdrantService: QdrantStorageService | null = null;
+  private initializationPromise: Promise<void>;
 
   constructor(qdrantConfig?: {
     url?: string;
@@ -136,19 +137,55 @@ export class SemanticQueryService {
     vectorSize?: number;
     distance?: 'Cosine' | 'Euclidean' | 'Dot';
   }) {
-    const config = {
-      url: qdrantConfig?.url || 'http://localhost:6334',
-      collectionName: qdrantConfig?.collectionName || 'dataproc_knowledge',
-      vectorSize: qdrantConfig?.vectorSize || 384,
-      distance: qdrantConfig?.distance || ('Cosine' as const),
-    };
+    // Use centralized connection manager to discover working Qdrant URL
+    this.initializationPromise = this.initializeWithConnectionManager(qdrantConfig);
+  }
 
-    this.qdrantService = new QdrantStorageService(config);
+  private async initializeWithConnectionManager(qdrantConfig?: {
+    url?: string;
+    collectionName?: string;
+    vectorSize?: number;
+    distance?: 'Cosine' | 'Euclidean' | 'Dot';
+  }): Promise<void> {
+    try {
+      const { getQdrantUrl } = await import('./qdrant-connection-manager.js');
 
-    // DEBUG: Log configuration for diagnosis
-    console.log(
-      `🔍 [DEBUG] SemanticQueryService initialized with collection: ${config.collectionName}`
-    );
+      // Discover working Qdrant URL
+      const discoveredUrl = await getQdrantUrl({ url: qdrantConfig?.url });
+
+      if (!discoveredUrl) {
+        throw new Error(
+          'No working Qdrant URL discovered. Cannot initialize SemanticQueryService.'
+        );
+      }
+
+      const config = {
+        url: discoveredUrl, // ONLY use verified URL - NO FALLBACKS
+        collectionName: qdrantConfig?.collectionName || 'dataproc_knowledge',
+        vectorSize: qdrantConfig?.vectorSize || 384,
+        distance: qdrantConfig?.distance || ('Cosine' as const),
+      };
+
+      this.qdrantService = new QdrantStorageService(config);
+
+      // Initialize the Qdrant service and ensure collection is ready
+      await this.qdrantService.initialize();
+
+      // Log successful initialization
+      logger.info(`🔍 [SEMANTIC-QUERY] SemanticQueryService initialized with URL: ${config.url}`);
+    } catch (error) {
+      console.error('Failed to initialize SemanticQueryService with connection manager:', error);
+      // Keep qdrantService as null to indicate initialization failure
+    }
+  }
+
+  /**
+   * Ensure the service is initialized before use
+   */
+  private async ensureInitialized(): Promise<void> {
+    if (this.initializationPromise) {
+      await this.initializationPromise;
+    }
   }
 
   async initialize(): Promise<void> {
@@ -171,6 +208,20 @@ export class SemanticQueryService {
     const startTime = Date.now();
 
     try {
+      // Ensure service is initialized
+      await this.ensureInitialized();
+
+      // Check if Qdrant service is available
+      if (!this.qdrantService) {
+        logger.warn('Qdrant service not available, returning empty results');
+        return {
+          query,
+          results: [],
+          totalFound: 0,
+          processingTime: Date.now() - startTime,
+        };
+      }
+
       // Search for relevant stored data
       const searchResults = await this.qdrantService.searchSimilar(query, options.limit || 5);
 
