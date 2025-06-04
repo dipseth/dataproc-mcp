@@ -3,7 +3,7 @@
 # This script runs the integration test for the getDataprocJobResults function fix
 
 # Set environment variables for testing
-export TEST_PROJECT_ID="prj-grp-data-sci-prod-b425"
+export TEST_PROJECT_ID="test-project-1234"
 export TEST_REGION="us-central1"
 export TEST_CLUSTER="cool-idea-api-v202504002"
 

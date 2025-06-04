@@ -1,8 +1,8 @@
 /**
  * Google Cloud Storage service for handling file operations
+ * Uses REST API with service account impersonation for consistent authentication
  */
 
-import { Storage } from '@google-cloud/storage';
 import { createHash } from 'crypto';
 import {
   GCSDownloadOptions,
@@ -16,13 +16,9 @@ import {
 } from '../types/gcs-types.js';
 import { getGcloudAccessTokenWithConfig } from '../config/credentials.js';
 export class GCSService {
-  private storage: Storage;
-
   constructor() {
-    // Initialize with application default credentials
-    // Note: We'll use getGcloudAccessTokenWithConfig before each operation
-    // to ensure we're using the right service account
-    this.storage = new Storage();
+    // GCS operations now use REST API with impersonated tokens
+    // No need to initialize Storage client with potentially incorrect credentials
   }
 
   /**
@@ -59,34 +55,143 @@ export class GCSService {
   }
 
   /**
-   * Get file metadata from GCS
+   * Get file metadata from GCS using REST API with impersonated token
    */
   async getFileMetadata(uri: string): Promise<GCSFileMetadata> {
     const { bucket, path } = this.parseUri(uri);
 
-    // Use the service account from the server configuration
-    await getGcloudAccessTokenWithConfig();
+    console.log(`[DEBUG] GCSService.getFileMetadata: Getting metadata for ${uri}`);
+
+    // Get token for the service account from the server configuration
+    let token: string;
+    try {
+      token = await getGcloudAccessTokenWithConfig();
+      console.log(`[DEBUG] GCSService.getFileMetadata: Successfully obtained token for ${uri}`);
+    } catch (error) {
+      console.error(`[DEBUG] GCSService.getFileMetadata: Failed to get token for ${uri}:`, error);
+      throw error;
+    }
+
+    // Use fetch API directly with the token
+    const fetch = (await import('node-fetch')).default;
+
+    // Convert GCS URI to HTTP URL for metadata
+    // Format: gs://bucket/path -> https://storage.googleapis.com/storage/v1/b/bucket/o/path
+    const encodedPath = encodeURIComponent(path);
+    const url = `https://storage.googleapis.com/storage/v1/b/${bucket}/o/${encodedPath}`;
+
+    console.log(`[DEBUG] GCSService.getFileMetadata: Fetching metadata from URL: ${url}`);
 
     try {
-      const [metadata] = await this.storage.bucket(bucket).file(path).getMetadata();
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+
+        // If we get a 404 Not Found, it might be a prefix for multiple files
+        if (response.status === 404) {
+          console.log(
+            `[DEBUG] GCSService.getFileMetadata: File not found at ${uri}, checking if it's a prefix...`
+          );
+
+          // Try to list objects with this prefix to see if there are multiple files
+          const objectUris = await this.listObjectsWithPrefix(uri);
+
+          if (objectUris.length > 0) {
+            console.log(
+              `[DEBUG] GCSService.getFileMetadata: Found ${objectUris.length} objects with prefix ${uri}, using first object for metadata`
+            );
+
+            // Get metadata from the first object
+            const firstObjectUri = objectUris[0];
+            const { bucket: firstBucket, path: firstPath } = this.parseUri(firstObjectUri);
+            const encodedFirstPath = encodeURIComponent(firstPath);
+            const firstUrl = `https://storage.googleapis.com/storage/v1/b/${firstBucket}/o/${encodedFirstPath}`;
+
+            const firstResponse = await fetch(firstUrl, {
+              method: 'GET',
+              headers: {
+                Authorization: `Bearer ${token}`,
+                Accept: 'application/json',
+              },
+            });
+
+            if (!firstResponse.ok) {
+              const firstErrorText = await firstResponse.text();
+              throw new Error(
+                `HTTP error ${firstResponse.status} getting metadata for ${firstObjectUri}: ${firstErrorText}`
+              );
+            }
+
+            const firstMetadata = (await firstResponse.json()) as GCSRawMetadata;
+
+            // Calculate total size from all objects
+            let totalSize = 0;
+            for (const objectUri of objectUris) {
+              const { bucket: objBucket, path: objPath } = this.parseUri(objectUri);
+              const encodedObjPath = encodeURIComponent(objPath);
+              const objUrl = `https://storage.googleapis.com/storage/v1/b/${objBucket}/o/${encodedObjPath}`;
+
+              const objResponse = await fetch(objUrl, {
+                method: 'GET',
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  Accept: 'application/json',
+                },
+              });
+
+              if (objResponse.ok) {
+                const objMetadata = (await objResponse.json()) as GCSRawMetadata;
+                const objSize =
+                  typeof objMetadata.size === 'string'
+                    ? parseInt(objMetadata.size, 10)
+                    : objMetadata.size;
+                totalSize += objSize || 0;
+              }
+            }
+
+            // Return metadata with combined size
+            return {
+              name: firstMetadata.name || path,
+              size: totalSize,
+              contentType: firstMetadata.contentType,
+              updated: new Date(firstMetadata.updated || new Date()),
+              md5Hash: firstMetadata.md5Hash,
+            };
+          } else {
+            // No objects found with this prefix, so it's a genuine 404
+            throw new GCSError(
+              GCSErrorTypes.NOT_FOUND,
+              `File not found: ${uri}`,
+              new Error(`HTTP error ${response.status}: ${errorText}`)
+            );
+          }
+        } else {
+          // Some other error
+          throw new Error(`HTTP error ${response.status}: ${errorText}`);
+        }
+      }
+
+      const metadata = (await response.json()) as GCSRawMetadata;
+      console.log(`[DEBUG] GCSService.getFileMetadata: Successfully got metadata for ${uri}`);
 
       return this.convertMetadata(metadata);
     } catch (error: unknown) {
-      if (
-        typeof error === 'object' &&
-        error !== null &&
-        'code' in error &&
-        (error as { code?: number }).code === 404
-      ) {
-        throw new GCSError(
-          GCSErrorTypes.NOT_FOUND,
-          `File not found: ${uri}`,
-          error instanceof Error ? error : new Error(String(error))
-        );
-      }
+      console.error(
+        `[DEBUG] GCSService.getFileMetadata: Error getting metadata for ${uri}:`,
+        error
+      );
+
       if (error instanceof GCSError) {
         throw error;
       }
+
       throw new GCSError(
         GCSErrorTypes.PERMISSION_DENIED,
         `Failed to get metadata for ${uri}`,
@@ -361,44 +466,51 @@ export class GCSService {
    * Detect output format from file metadata/content
    */
   async detectOutputFormat(uri: string): Promise<OutputFormat> {
-    // Use the service account from the server configuration
-    await getGcloudAccessTokenWithConfig();
+    console.log(`[DEBUG] GCSService.detectOutputFormat: Detecting format for ${uri}`);
 
-    const metadata = await this.getFileMetadata(uri);
+    try {
+      const metadata = await this.getFileMetadata(uri);
 
-    // Check content type first
-    if (metadata.contentType) {
-      if (metadata.contentType.includes('csv')) return 'csv';
-      if (metadata.contentType.includes('json')) return 'json';
-      if (metadata.contentType.includes('text')) return 'text';
-    }
+      // Check content type first
+      if (metadata.contentType) {
+        if (metadata.contentType.includes('csv')) return 'csv';
+        if (metadata.contentType.includes('json')) return 'json';
+        if (metadata.contentType.includes('text')) return 'text';
+      }
 
-    // Check file extension
-    if (metadata.name.endsWith('.csv')) return 'csv';
-    if (metadata.name.endsWith('.json')) return 'json';
-    if (metadata.name.endsWith('.txt')) return 'text';
+      // Check file extension
+      if (metadata.name.endsWith('.csv')) return 'csv';
+      if (metadata.name.endsWith('.json')) return 'json';
+      if (metadata.name.endsWith('.txt')) return 'text';
 
-    // If small enough, peek at content
-    if (metadata.size < 1024) {
-      const content = await this.downloadFile(uri);
-      const text = content.toString().trim();
+      // If small enough, peek at content
+      if (metadata.size < 1024) {
+        const content = await this.downloadFile(uri);
+        const text = content.toString().trim();
 
-      // Check for JSON structure
-      if (text.startsWith('{') || text.startsWith('[')) {
-        try {
-          JSON.parse(text);
-          return 'json';
-        } catch {
-          // Not valid JSON
+        // Check for JSON structure
+        if (text.startsWith('{') || text.startsWith('[')) {
+          try {
+            JSON.parse(text);
+            return 'json';
+          } catch {
+            // Not valid JSON
+          }
+        }
+
+        // Check for CSV structure (contains commas and newlines)
+        if (text.includes(',') && text.includes('\n')) {
+          return 'csv';
         }
       }
 
-      // Check for CSV structure (contains commas and newlines)
-      if (text.includes(',') && text.includes('\n')) {
-        return 'csv';
-      }
+      return 'text';
+    } catch (error) {
+      console.warn(
+        `[WARN] GCSService.detectOutputFormat: Failed to detect format for ${uri}, defaulting to text:`,
+        error
+      );
+      return 'text';
     }
-
-    return 'text';
   }
 }

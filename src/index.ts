@@ -66,20 +66,13 @@ import {
   getJobStatus,
   getJobStatusWithRest,
   getQueryResults,
+  getQueryResultsWithRest,
 } from './services/query.js';
 import { JobState } from './types/query.js';
 import { getCredentialsConfig } from './config/credentials.js';
 import { getServerConfig } from './config/server.js';
-import { ProfileManager } from './services/profile.js';
-import { ClusterTracker } from './services/tracker.js';
-import { ClusterManager } from './services/cluster-manager.js';
-import { JobTracker } from './services/job-tracker.js';
-import { JobOutputHandler } from './services/job-output-handler.js';
-import { AsyncQueryPoller } from './services/async-query-poller.js';
-import { ResponseFilter } from './services/response-filter.js';
-import { QdrantManager } from './services/qdrant-manager.js';
-import { SemanticQueryService } from './services/semantic-query.js';
-import { KnowledgeIndexer } from './services/knowledge-indexer.js';
+import { InitializationManager } from './services/initialization-manager.js';
+import { getStartupStatus } from './services/startup-status.js';
 
 // Semantic Search Services - Optional enhancement for natural language queries
 // These services provide intelligent data extraction and vector similarity search
@@ -100,6 +93,19 @@ if (!credentials.keyFilename && !credentials.useApplicationDefault) {
 }
 
 // Initialize services
+import { ProfileManager } from './services/profile.js';
+import { ClusterTracker } from './services/tracker.js';
+import { ClusterManager } from './services/cluster-manager.js';
+import { JobTracker } from './services/job-tracker.js';
+import { JobOutputHandler } from './services/job-output-handler.js';
+import { AsyncQueryPoller } from './services/async-query-poller.js';
+import { ResponseFilter } from './services/response-filter.js';
+import { QdrantManager } from './services/qdrant-manager.js';
+import { SemanticQueryService } from './services/semantic-query.js';
+import { KnowledgeIndexer } from './services/knowledge-indexer.js';
+import { MockDataLoader } from './services/mock-data-loader.js';
+
+let initManager: InitializationManager;
 let profileManager: ProfileManager;
 let clusterTracker: ClusterTracker;
 let clusterManager: ClusterManager;
@@ -112,6 +118,14 @@ let qdrantManager: QdrantManager;
 let semanticQueryService: SemanticQueryService;
 let knowledgeIndexer: KnowledgeIndexer;
 
+/**
+ * Get the global KnowledgeIndexer instance
+ * Used to ensure consistency between storage and retrieval operations
+ */
+export function getGlobalKnowledgeIndexer(): KnowledgeIndexer | null {
+  return knowledgeIndexer || null;
+}
+
 // Initialize default parameter manager
 try {
   const defaultParamsPath = path.join(process.cwd(), 'config', 'default-params.json');
@@ -123,63 +137,45 @@ try {
   console.warn('Could not load default parameters:', error);
 }
 
-// Initialize response filter and Qdrant manager (async initialization)
+// Initialize response filter and Qdrant manager using InitializationManager
 async function initializeResponseOptimization() {
-  try {
-    // Try to use the same directory as the main server config
-    let responseFilterConfigPath: string;
+  initManager = new InitializationManager();
 
-    if (global.DATAPROC_CONFIG_DIR) {
-      // Use the same directory as server_main.json
-      responseFilterConfigPath = path.join(global.DATAPROC_CONFIG_DIR, 'response-filter.json');
-      console.log(
-        `[INFO] Looking for response-filter.json in server config directory: ${responseFilterConfigPath}`
-      );
-    } else {
-      // Fallback to the old behavior
-      responseFilterConfigPath = path.join(process.cwd(), 'config', 'response-filter.json');
-      console.log(
-        `[INFO] Fallback: Looking for response-filter.json in: ${responseFilterConfigPath}`
-      );
-    }
+  // Initialize default parameters first
+  const defaultParams = await initManager.initializeDefaultParams();
+  if (defaultParams) {
+    defaultParamManager = defaultParams;
+  }
 
-    if (fs.existsSync(responseFilterConfigPath)) {
-      const responseFilterConfig = JSON.parse(fs.readFileSync(responseFilterConfigPath, 'utf8'));
+  // Initialize core services
+  await initManager.initializeCoreServices();
 
-      // Initialize ResponseFilter (it manages its own QdrantManager internally)
-      responseFilter = new ResponseFilter(responseFilterConfig);
+  // Initialize response optimization services (Qdrant-dependent)
+  await initManager.initializeResponseOptimization();
 
-      // Initialize SemanticQueryService with same config
-      semanticQueryService = new SemanticQueryService({
-        url: responseFilterConfig.qdrant?.url || 'http://localhost:6333',
-        collectionName: responseFilterConfig.qdrant?.collection || 'dataproc_responses',
-        vectorSize: 384,
-        distance: 'Cosine',
-      });
-      await semanticQueryService.initialize();
+  // Get initialized services
+  const services = initManager.getServices();
+  profileManager = services.profileManager;
+  clusterTracker = services.clusterTracker;
+  clusterManager = services.clusterManager;
+  jobTracker = services.jobTracker;
+  jobOutputHandler = services.jobOutputHandler;
+  asyncQueryPoller = services.asyncQueryPoller;
 
-      // Initialize KnowledgeIndexer with separate collection
-      knowledgeIndexer = new KnowledgeIndexer({
-        url: responseFilterConfig.qdrant?.url || 'http://localhost:6333',
-        collectionName: 'dataproc_knowledge',
-        vectorSize: 384,
-        distance: 'Cosine',
-      });
-
-      // Initialize the knowledge indexer (creates collection if needed)
-      await knowledgeIndexer.initialize();
-
-      logger.info('Response optimization and knowledge indexing services initialized successfully');
-    } else {
-      logger.warn('Response filter configuration not found, response optimization disabled');
-    }
-  } catch (error) {
-    logger.warn('Could not initialize response optimization services:', error);
+  // Handle optional services
+  if (services.responseFilter) {
+    responseFilter = services.responseFilter;
+  }
+  if (services.qdrantManager) {
+    qdrantManager = services.qdrantManager;
+  }
+  if (services.semanticQueryService) {
+    semanticQueryService = services.semanticQueryService;
+  }
+  if (services.knowledgeIndexer) {
+    knowledgeIndexer = services.knowledgeIndexer;
   }
 }
-
-// Start async initialization
-initializeResponseOptimization();
 
 // Create the MCP server with full capabilities
 const server = new Server(
@@ -404,10 +400,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
 
-      // New tool: get query results
+      // Enhanced tool: get query results with async support and semantic search
       {
         name: 'get_query_results',
-        description: 'Get the results of a completed Hive query',
+        description:
+          'Get the results of a completed Hive query with enhanced async support and semantic search integration',
         inputSchema: {
           type: 'object',
           properties: {
@@ -416,7 +413,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             jobId: { type: 'string', description: 'Job ID to get results for' },
             maxResults: {
               type: 'number',
-              description: 'Optional: Maximum number of results to return',
+              description:
+                'Optional: Maximum number of rows to display in the response (default: 10)',
             },
             pageToken: { type: 'string', description: 'Optional: Page token for pagination' },
           },
@@ -2490,33 +2488,27 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
  * This allows the server to communicate via standard input/output streams.
  */
 async function main() {
-  if (process.env.LOG_LEVEL === 'debug')
-    console.error('[DEBUG] MCP Server: Starting initialization');
+  const startupStatus = getStartupStatus();
 
   try {
+    // Initialize response optimization services before starting the server
+    await initializeResponseOptimization();
+
+    // Perform health check for Qdrant connection
+    await startupStatus.performHealthCheck();
+
     // Initialize services if not already done
     if (!profileManager) {
       const serverConfig = await getServerConfig();
-      if (process.env.LOG_LEVEL === 'debug')
-        console.error('[DEBUG] MCP Server: Initializing ProfileManager');
+
       profileManager = new ProfileManager(serverConfig.profileManager);
       await profileManager.initialize();
 
-      if (process.env.LOG_LEVEL === 'debug')
-        console.error('[DEBUG] MCP Server: Initializing ClusterTracker');
       clusterTracker = new ClusterTracker(serverConfig.clusterTracker);
       await clusterTracker.initialize();
 
-      if (process.env.LOG_LEVEL === 'debug')
-        console.error('[DEBUG] MCP Server: Initializing JobOutputHandler');
       jobOutputHandler = new JobOutputHandler();
-
-      if (process.env.LOG_LEVEL === 'debug')
-        console.error('[DEBUG] MCP Server: Initializing JobTracker');
       jobTracker = new JobTracker();
-
-      if (process.env.LOG_LEVEL === 'debug')
-        console.error('[DEBUG] MCP Server: Initializing AsyncQueryPoller');
       asyncQueryPoller = new AsyncQueryPoller(jobTracker);
 
       // Set up automatic job indexing when jobs complete
@@ -2573,14 +2565,10 @@ async function main() {
         });
       }
 
-      if (process.env.LOG_LEVEL === 'debug')
-        console.error('[DEBUG] MCP Server: Initializing ClusterManager');
       clusterManager = new ClusterManager(profileManager, clusterTracker);
     }
 
     // Create and configure transport - for now, always use stdio
-    if (process.env.LOG_LEVEL === 'debug')
-      console.error('[DEBUG] MCP Server: Creating StdioServerTransport');
     const transport = new StdioServerTransport();
 
     if (httpMode) {
@@ -2591,19 +2579,15 @@ async function main() {
     }
 
     // Connect server to transport
-    if (process.env.LOG_LEVEL === 'debug')
-      console.error('[DEBUG] MCP Server: Connecting server to transport');
     await server.connect(transport);
 
     // Start AsyncQueryPoller for automatic query tracking
     if (asyncQueryPoller) {
-      if (process.env.LOG_LEVEL === 'debug')
-        console.error('[DEBUG] MCP Server: Starting AsyncQueryPoller');
       asyncQueryPoller.startPolling();
     }
 
-    if (process.env.LOG_LEVEL === 'debug')
-      console.error('[DEBUG] MCP Server: Successfully connected and ready to receive requests');
+    // Display clean startup summary
+    startupStatus.displayStartupSummary();
   } catch (error) {
     console.error('[DEBUG] MCP Server: Initialization error:', error);
     throw error;

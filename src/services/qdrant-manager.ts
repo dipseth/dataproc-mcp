@@ -7,6 +7,7 @@ import { spawn, ChildProcess } from 'child_process';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { createServer } from 'net';
+import { logger } from '../utils/logger.js';
 
 export interface QdrantManagerConfig {
   autoStart: boolean;
@@ -137,8 +138,6 @@ export class QdrantManager {
    */
   private async tryStartWithDocker(dataPath: string): Promise<ChildProcess | null> {
     try {
-      console.log(`🐳 Attempting to start Qdrant with Docker on port ${this.actualPort}...`);
-
       const dockerArgs = [
         'run',
         '--rm',
@@ -164,10 +163,10 @@ export class QdrantManager {
         throw new Error('Docker process exited early');
       }
 
-      console.log(`🐳 Qdrant Docker container started with ID: ${process.pid}`);
+      logger.debug(`🐳 Qdrant Docker container started with ID: ${process.pid}`);
       return process;
     } catch (error) {
-      console.warn('🐳 Docker start failed:', error);
+      logger.debug('🐳 Docker start failed:', error);
       return null;
     }
   }
@@ -177,8 +176,6 @@ export class QdrantManager {
    */
   private async tryStartWithBinary(dataPath: string): Promise<ChildProcess | null> {
     try {
-      console.log(`📦 Attempting to start Qdrant binary on port ${this.actualPort}...`);
-
       // Try common binary locations
       const binaryPaths = [
         'qdrant',
@@ -216,10 +213,10 @@ export class QdrantManager {
         }
       );
 
-      console.log(`📦 Qdrant binary started with PID: ${qdrantProcess.pid}`);
+      logger.debug(`📦 Qdrant binary started with PID: ${qdrantProcess.pid}`);
       return qdrantProcess;
     } catch (error) {
-      console.warn('📦 Binary start failed:', error);
+      logger.debug('📦 Binary start failed:', error);
       return null;
     }
   }
