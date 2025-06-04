@@ -1,8 +1,8 @@
-# 🚀 CI/CD Pipeline Status & Setup Complete
+# 🚀 CI/CD Pipeline Status & Enhanced Automatic Release
 
-## ✅ **NPM Publishing Pipeline Successfully Configured!**
+## ✅ **Enhanced NPM Publishing Pipeline - Automatic PR Merge Publishing!**
 
-The Dataproc MCP Server now has a complete, production-ready CI/CD pipeline with automated npm publishing to the public registry.
+The Dataproc MCP Server now has an **enhanced, production-ready CI/CD pipeline** with **automatic version publishing when PRs are merged to main branch**.
 
 ---
 
@@ -38,17 +38,25 @@ The Dataproc MCP Server now has a complete, production-ready CI/CD pipeline with
 - ✅ Pre-flight system checks
 - ✅ Comprehensive CI status reporting
 
-### 2. **🚀 Release & Publish** (`.github/workflows/release.yml`)
-**Triggers**: Push to main, Manual dispatch
-**Features**:
-- ✅ Release readiness validation
-- ✅ Semantic release with conventional commits
-- ✅ Automated npm publishing
-- ✅ GitHub release creation with assets
+### 2. **🚀 Enhanced Release & Publish** (`.github/workflows/release.yml`)
+**Triggers**: Push to main (including PR merges), Manual dispatch
+**✨ NEW FEATURES**:
+- ✅ **Automatic PR merge publishing** - Detects when PRs are merged to main
+- ✅ **Enhanced commit analysis** - Improved conventional commit detection
+- ✅ **Squashed merge support** - Handles GitHub's squash and merge commits
+- ✅ **Breaking change detection** - Analyzes commit bodies for BREAKING CHANGE
+- ✅ **Intelligent version bumping** - Automatic semantic versioning
+- ✅ **Enhanced pre-push validation** - Now includes `npm run release:dry`
+
+**Core Features**:
+- ✅ Release readiness validation with enhanced commit analysis
+- ✅ Semantic release with improved conventional commit parsing
+- ✅ Automated npm publishing triggered by PR merges
+- ✅ GitHub release creation with comprehensive assets
 - ✅ Post-release validation (npm availability check)
-- ✅ Installation testing
-- ✅ Success/failure notifications
-- ✅ Dry-run capability for testing
+- ✅ Installation testing and verification
+- ✅ Success/failure notifications with detailed summaries
+- ✅ Dry-run capability for testing release configurations
 
 ### 3. **🔄 Dependency Updates** (`.github/workflows/dependency-update.yml`)
 **Triggers**: Weekly schedule (Mondays 9 AM UTC), Manual dispatch
@@ -90,36 +98,79 @@ The Dataproc MCP Server now has a complete, production-ready CI/CD pipeline with
 
 ---
 
-## 🎯 **Release Process**
+## 🎯 **Enhanced Automatic Release Process**
 
-### **Automated Release (Recommended)**
+### ✨ **NEW: Automatic PR Merge Publishing**
 
-1. **Commit with Conventional Format**:
-   ```bash
-   # Patch release (bug fixes)
-   git commit -m "fix: resolve authentication issue"
-   
-   # Minor release (new features)
-   git commit -m "feat: add cluster scaling feature"
-   
-   # Major release (breaking changes)
-   git commit -m "feat!: redesign API structure
-   
-   BREAKING CHANGE: API endpoints restructured"
-   ```
+The CI/CD pipeline now **automatically publishes new versions when PRs are merged to main branch**:
 
-2. **Push to Main**:
-   ```bash
-   git push origin main
-   ```
+#### **1. Enhanced PR Development Workflow:**
+```bash
+# Create feature branch
+git checkout -b feat/new-feature
 
-3. **Automatic Process**:
-   - ✅ CI pipeline validates changes
-   - ✅ Semantic-release analyzes commits
-   - ✅ Version bumped automatically
-   - ✅ Package published to npm
-   - ✅ GitHub release created
-   - ✅ Changelog updated
+# Always run enhanced golden command (now includes release validation)
+npm run pre-push
+
+# Use conventional commits
+git commit -m "feat: add cluster scaling feature"
+
+# Push and create PR
+git push origin feat/new-feature
+# Create PR via GitHub UI or CLI
+```
+
+#### **2. Automatic Release on PR Merge:**
+When a PR is merged to `main`, the enhanced workflow:
+- 🔍 **Enhanced commit analysis** - Detects conventional commits in merge
+- 📊 **Intelligent version calculation** - Determines appropriate version bump
+- 🚀 **Automatic publishing** - Publishes to NPM if changes warrant release
+- 📝 **Comprehensive changelog** - Updates with detailed release notes
+- ✅ **Post-release validation** - Verifies NPM availability and installation
+
+#### **3. Conventional Commit Examples:**
+```bash
+# Patch release (bug fixes)
+git commit -m "fix: resolve authentication issue"
+
+# Minor release (new features)
+git commit -m "feat: add cluster scaling feature"
+
+# Major release (breaking changes)
+git commit -m "feat!: redesign API structure
+
+BREAKING CHANGE: API endpoints restructured"
+
+# Performance improvements (patch)
+git commit -m "perf: optimize query response time"
+
+# No release (documentation/chores)
+git commit -m "docs: update installation guide"
+git commit -m "ci: enhance release workflow"
+```
+
+#### **4. Enhanced Golden Command:**
+```bash
+# Now includes release validation
+npm run pre-push
+# Runs: build + lint + format + type-check + tests + security +
+#       package validation + docs + release:dry validation
+```
+
+#### **5. Automatic Process Flow:**
+```mermaid
+graph LR
+    A[🔄 PR Merged] --> B[🔍 Enhanced Analysis]
+    B --> C[📊 Version Calc]
+    C --> D[🚀 Auto Publish]
+    D --> E[📝 Release Notes]
+    E --> F[✅ Validation]
+```
+
+### **Manual Release (Emergency)**
+- GitHub Actions → "🚀 Release & Publish" → "Run workflow"
+- Select release type or use "auto"
+- Enable "dry run" for testing
 
 ### **Manual Release**
 - GitHub Actions → "🚀 Release & Publish" → "Run workflow"

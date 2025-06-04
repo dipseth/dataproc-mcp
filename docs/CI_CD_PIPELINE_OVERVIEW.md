@@ -1,8 +1,8 @@
-# 🔄 CI/CD Pipeline Overview
+# 🔄 Enhanced CI/CD Pipeline Overview
 
-## Complete GitHub Actions Workflow Analysis
+## Complete GitHub Actions Workflow Analysis with Automatic PR Merge Publishing
 
-The Dataproc MCP Server has a **comprehensive CI/CD pipeline** that includes extensive testing, quality gates, security scanning, documentation generation, and automated npm publishing. Here's the complete breakdown:
+The Dataproc MCP Server has an **enhanced, comprehensive CI/CD pipeline** that includes extensive testing, quality gates, security scanning, documentation generation, and **automatic npm publishing when PRs are merged to main branch**. Here's the complete breakdown:
 
 ## 🏗️ Pipeline Architecture
 
@@ -107,43 +107,69 @@ graph TD
   - 📝 **Create GitHub step summary**
   - 🎯 **Report success/failure status**
 
-## 🚀 Release Pipeline (Separate Workflow)
+## 🚀 Enhanced Release Pipeline (Automatic PR Merge Publishing)
 
-### 8. 🔍 **Release Validation** (`validate-release`)
-- **Purpose**: Pre-release checks and validation
-- **Actions**:
-  - 🔍 **Conventional commit validation**
-  - 📋 **Release readiness check**
-  - 🎯 **Determine release type** (patch/minor/major)
+### ✨ **NEW: Automatic PR Merge Detection**
+The release pipeline now **automatically triggers when PRs are merged to main branch** with enhanced commit analysis.
 
-### 9. 📦 **Semantic Release** (`semantic-release`)
-- **Purpose**: Automated versioning and changelog
+### 8. 🔍 **Enhanced Release Validation** (`validate-release`)
+- **Purpose**: Pre-release checks with improved commit detection
+- **✨ NEW FEATURES**:
+  - 🔍 **Enhanced conventional commit analysis** - Detects commits in PR merges
+  - 📊 **Squashed merge support** - Handles GitHub's squash and merge commits
+  - 💥 **Breaking change detection** - Analyzes commit bodies for BREAKING CHANGE
+  - 📋 **Intelligent commit range analysis** - Improved commit history parsing
 - **Actions**:
-  - 🏷️ **Version calculation** based on conventional commits
-  - 📝 **Changelog generation**
-  - 🎯 **Git tag creation**
-  - 📦 **Package preparation**
+  - 🔍 **Multi-pattern commit validation** (feat, fix, perf, revert, BREAKING)
+  - 📋 **Release readiness check** with enhanced logic
+  - 🎯 **Automatic release type determination** (patch/minor/major)
+  - 📝 **Detailed commit logging** for debugging
 
-### 10. 📤 **NPM Publishing** (`npm-publish`)
-- **Purpose**: Public package distribution
+### 9. 📦 **Enhanced Semantic Release** (`semantic-release`)
+- **Purpose**: Automated versioning with improved commit parsing
+- **✨ NEW FEATURES**:
+  - 🎯 **Improved version calculation** based on enhanced commit analysis
+  - 📝 **Better changelog generation** with conventional commit categorization
+  - 🔄 **PR merge commit handling** for accurate version bumping
 - **Actions**:
-  - 📤 **Publish to npm registry** (`@dataproc/mcp-server`)
-  - 🔍 **Publication verification**
-  - 📊 **Download statistics tracking**
+  - 🏷️ **Smart version calculation** based on conventional commits
+  - 📝 **Comprehensive changelog generation** with emoji categorization
+  - 🎯 **Git tag creation** with proper versioning
+  - 📦 **Production package preparation**
 
-### 11. 🎉 **GitHub Release** (`github-release`)
-- **Purpose**: GitHub release creation with assets
+### 10. 📤 **Automatic NPM Publishing** (`npm-publish`)
+- **Purpose**: Seamless public package distribution on PR merge
+- **✨ NEW FEATURES**:
+  - 🚀 **Automatic publishing** triggered by PR merges
+  - 🔍 **Enhanced publication verification** with retry logic
+  - 📊 **Improved error handling** and notifications
 - **Actions**:
-  - 🎉 **Create GitHub release**
-  - 📎 **Attach build artifacts**
-  - 📝 **Release notes generation**
+  - 📤 **Publish to npm registry** (`@dipseth/dataproc-mcp-server`)
+  - 🔍 **Publication verification** with availability checks
+  - 📊 **Download statistics tracking** and monitoring
 
-### 12. ✅ **Post-Release Validation** (`post-release-validation`)
-- **Purpose**: Release verification and monitoring
+### 11. 🎉 **Enhanced GitHub Release** (`github-release`)
+- **Purpose**: Comprehensive GitHub release creation with assets
+- **✨ NEW FEATURES**:
+  - 📝 **Improved release notes** with conventional commit categorization
+  - 📎 **Enhanced asset management** with build artifacts
+  - 🔗 **Better cross-referencing** between NPM and GitHub releases
 - **Actions**:
-  - 🔍 **NPM package availability check**
-  - 📦 **Installation testing**
-  - 📊 **Release metrics collection**
+  - 🎉 **Create GitHub release** with detailed notes
+  - 📎 **Attach comprehensive build artifacts**
+  - 📝 **Generate categorized release notes** with emojis
+
+### 12. ✅ **Enhanced Post-Release Validation** (`post-release-validation`)
+- **Purpose**: Comprehensive release verification and monitoring
+- **✨ NEW FEATURES**:
+  - 🧪 **Installation testing** with multiple scenarios
+  - 📊 **Enhanced metrics collection** and reporting
+  - 🔔 **Improved notification system** with detailed summaries
+- **Actions**:
+  - 🔍 **NPM package availability check** with retry logic
+  - 📦 **Comprehensive installation testing** in clean environments
+  - 📊 **Release metrics collection** and success tracking
+  - 🎉 **Success notifications** with package links and installation commands
 
 ## 🧪 Testing Coverage
 

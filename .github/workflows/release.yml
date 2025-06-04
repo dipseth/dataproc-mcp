@@ -64,16 +64,43 @@ jobs:
             exit 0
           fi
           
-          # Check if there are releasable commits since last release
-          if git log $(git describe --tags --abbrev=0 2>/dev/null || echo "HEAD~10")..HEAD --oneline | grep -E '^[a-f0-9]+ (feat|fix|perf|revert|BREAKING CHANGE)'; then
+          # Enhanced commit analysis for PR merges
+          echo "🔍 Analyzing commits for release eligibility..."
+          
+          # Get the last release tag
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [[ -z "$LAST_TAG" ]]; then
+            echo "📝 No previous tags found, checking last 10 commits"
+            COMMIT_RANGE="HEAD~10..HEAD"
+          else
+            echo "📝 Last release: $LAST_TAG"
+            COMMIT_RANGE="$LAST_TAG..HEAD"
+          fi
+          
+          # Check for conventional commits that warrant a release
+          RELEASABLE_COMMITS=$(git log $COMMIT_RANGE --oneline --grep="^feat" --grep="^fix" --grep="^perf" --grep="^revert" --grep="BREAKING CHANGE" --extended-regexp)
+          
+          # Also check commit messages directly (for squashed PR merges)
+          CONVENTIONAL_COMMITS=$(git log $COMMIT_RANGE --pretty=format:"%s" | grep -E '^(feat|fix|perf|revert)(\(.+\))?!?:' || true)
+          BREAKING_CHANGES=$(git log $COMMIT_RANGE --pretty=format:"%B" | grep -E 'BREAKING CHANGE|BREAKING:' || true)
+          
+          if [[ -n "$RELEASABLE_COMMITS" ]] || [[ -n "$CONVENTIONAL_COMMITS" ]] || [[ -n "$BREAKING_CHANGES" ]]; then
             echo "should-release=true" >> $GITHUB_OUTPUT
             echo "release-type=auto" >> $GITHUB_OUTPUT
-            echo "✅ Releasable changes detected"
+            echo "✅ Releasable changes detected:"
+            [[ -n "$CONVENTIONAL_COMMITS" ]] && echo "  📝 Conventional commits found"
+            [[ -n "$BREAKING_CHANGES" ]] && echo "  💥 Breaking changes found"
+            [[ -n "$RELEASABLE_COMMITS" ]] && echo "  🔄 Releasable commits found"
           else
             echo "should-release=false" >> $GITHUB_OUTPUT
             echo "release-type=none" >> $GITHUB_OUTPUT
-            echo "ℹ️ No releasable changes found"
+            echo "ℹ️ No releasable changes found in range $COMMIT_RANGE"
+            echo "💡 Tip: Use conventional commits (feat:, fix:, etc.) to trigger releases"
           fi
+          
+          # Log recent commits for debugging
+          echo "📋 Recent commits analyzed:"
+          git log $COMMIT_RANGE --oneline --max-count=5 || echo "No commits in range"
 
       - name: 🔨 Build & Test
         if: steps.check.outputs.should-release != 'false'
