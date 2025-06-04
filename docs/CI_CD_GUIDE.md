@@ -272,11 +272,44 @@ npm pack
 tar -tzf *.tgz
 ```
 
-## 🚀 Release Process
+## 🚀 Enhanced Automatic Release Process
 
-### Automatic Releases (Recommended)
+### ✨ **NEW: Automatic PR Merge Publishing**
 
-1. **Use Conventional Commits:**
+The CI/CD pipeline now **automatically publishes new versions when PRs are merged to main branch**. Here's how it works:
+
+#### **1. PR Development Workflow:**
+```bash
+# Create feature branch
+git checkout -b feat/new-feature
+
+# Always run golden command before committing
+npm run pre-push
+
+# Use conventional commits
+git commit -m "feat: add cluster auto-scaling support"
+
+# Push and create PR
+git push origin feat/new-feature
+```
+
+#### **2. PR Merge Triggers Release:**
+When a PR is merged to `main`, the enhanced release workflow:
+- ✅ **Detects conventional commits** in the merge
+- ✅ **Analyzes commit types** (feat, fix, perf, BREAKING CHANGE)
+- ✅ **Determines version bump** automatically
+- ✅ **Publishes to NPM** if changes warrant a release
+- ✅ **Creates GitHub release** with changelog
+- ✅ **Validates publication** success
+
+#### **3. Enhanced Commit Detection:**
+The workflow now intelligently detects:
+- **Conventional commits** in PR titles and descriptions
+- **Squashed merge commits** with conventional format
+- **Breaking changes** in commit bodies
+- **Multiple commit types** in a single PR
+
+#### **4. Conventional Commit Examples:**
 ```bash
 # Feature additions (minor version bump)
 git commit -m "feat: add cluster auto-scaling support"
@@ -287,28 +320,38 @@ git commit -m "fix: resolve memory leak in job monitoring"
 # Breaking changes (major version bump)
 git commit -m "feat!: redesign authentication API"
 
+# Performance improvements (patch version bump)
+git commit -m "perf: optimize query response time"
+
 # Documentation (no version bump)
 git commit -m "docs: add troubleshooting guide"
+
+# Chores/CI (no version bump)
+git commit -m "ci: enhance release workflow detection"
 ```
 
-2. **Push to main branch:**
+#### **5. Enhanced Golden Command:**
+The `npm run pre-push` command now includes release validation:
 ```bash
-# Always run golden command first
 npm run pre-push
-
-# Then commit and push
-git add .
-git commit -m "feat: your feature description"
-git push origin main
+# Now includes: build, lint, format, type-check, tests, security,
+# package validation, docs, AND release:dry validation
 ```
 
-3. **Automated Process:**
-- Semantic Release analyzes commits
-- Version bump based on commit types
-- Changelog generation
-- GitHub release creation
-- NPM publishing
-- Documentation updates
+### **Automatic Release Flow:**
+```mermaid
+graph TD
+    A[🔄 PR Merged to Main] --> B[🔍 Enhanced Commit Analysis]
+    B --> C{📝 Conventional Commits Found?}
+    C -->|Yes| D[📊 Determine Version Bump]
+    C -->|No| E[ℹ️ Skip Release]
+    D --> F[🔨 Build & Test]
+    F --> G[📦 Semantic Release]
+    G --> H[📤 NPM Publish]
+    H --> I[🎉 GitHub Release]
+    I --> J[✅ Post-Release Validation]
+    J --> K[📢 Success Notification]
+```
 
 ### Manual Release (Emergency)
 
