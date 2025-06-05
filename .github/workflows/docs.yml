@@ -140,8 +140,21 @@ jobs:
         run: |
           cd docs
           
-          # Copy README to docs as index
-          cp ../README.md index.md
+          # Ensure index.md has proper Jekyll front matter
+          if [ ! -f index.md ]; then
+            echo "Creating index.md from README.md..."
+            cat > index.md << 'EOF'
+          ---
+          layout: default
+          title: Home
+          description: Production-ready Model Context Protocol server for Google Cloud Dataproc operations
+          permalink: /
+          ---
+          
+          EOF
+            # Append README content without the first line (title)
+            tail -n +2 ../README.md >> index.md
+          fi
           
           # Build with Jekyll
           bundle exec jekyll build --destination ../_site

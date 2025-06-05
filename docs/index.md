@@ -1,6 +1,8 @@
 ---
 layout: default
 title: Home
+description: Production-ready Model Context Protocol server for Google Cloud Dataproc operations
+permalink: /
 ---
 
 # Dataproc MCP Server
