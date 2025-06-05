@@ -1,3 +1,10 @@
+---
+layout: default
+title: API Reference
+description: Complete reference for all Dataproc MCP Server tools with practical examples and usage patterns
+permalink: /API_REFERENCE/
+---
+
 # 📚 API Reference
 
 Complete reference for all 16 Dataproc MCP Server tools with practical examples and usage patterns.
