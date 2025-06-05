@@ -106,82 +106,48 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
-      - name: Create Pages directory structure
+      - name: Setup Ruby for Jekyll
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.1'
+          bundler-cache: true
+          working-directory: docs
+
+      - name: Create Gemfile for Jekyll
         run: |
-          mkdir -p _site
-          
-          # Copy all documentation files
-          cp -r docs/* _site/ 2>/dev/null || true
-          
-          # Ensure API docs are properly placed
-          if [ -d "docs/api" ]; then
-            echo "✅ API documentation found, copying to _site/api/"
-            cp -r docs/api _site/
-          else
-            echo "⚠️ API documentation not found at docs/api/"
-          fi
-          
-          # Copy generated docs if they exist
-          if [ -d "docs/generated" ]; then
-            echo "✅ Generated docs found, copying to _site/"
-            cp -r docs/generated/* _site/ 2>/dev/null || true
-          fi
-          
-          # Copy README as index
-          cp README.md _site/index.md 2>/dev/null || true
-          
-          echo "📁 Site structure:"
-          find _site -type f -name "*.html" | head -10
-          
-          # Create a simple index.html if none exists
-          if [ ! -f _site/index.html ]; then
-            cat > _site/index.html << 'EOF'
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <title>Dataproc MCP Server Documentation</title>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1">
-            <style>
-              body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 40px; }
-              .container { max-width: 800px; margin: 0 auto; }
-              h1 { color: #1a73e8; }
-              .nav { margin: 20px 0; }
-              .nav a { margin-right: 20px; text-decoration: none; color: #1a73e8; }
-              .nav a:hover { text-decoration: underline; }
-            </style>
-          </head>
-          <body>
-            <div class="container">
-              <h1>🔧 Dataproc MCP Server Documentation</h1>
-              <p>Production-ready Model Context Protocol server for Google Cloud Dataproc operations.</p>
-              
-              <div class="nav">
-                <a href="api/">📚 API Reference</a>
-                <a href="QUICK_START.html">🚀 Quick Start</a>
-                <a href="CONFIGURATION_EXAMPLES.html">⚙️ Configuration</a>
-                <a href="security/">🔐 Security Guide</a>
-              </div>
-              
-              <h2>Features</h2>
-              <ul>
-                <li>🎯 <strong>Intelligent Defaults</strong> - 60-80% fewer parameters required</li>
-                <li>🔐 <strong>Enterprise Security</strong> - Comprehensive validation and audit logging</li>
-                <li>📊 <strong>Rich Documentation</strong> - Interactive examples and guides</li>
-                <li>🚀 <strong>Production Ready</strong> - CI/CD, testing, and monitoring</li>
-              </ul>
-              
-              <h2>Quick Links</h2>
-              <ul>
-                <li><a href="https://github.com/dipseth/dataproc-mcp">GitHub Repository</a></li>
-                <li><a href="https://www.npmjs.com/package/@dipseth/dataproc-mcp-server">NPM Package</a></li>
-                <li><a href="https://github.com/dipseth/dataproc-mcp/issues">Report Issues</a></li>
-              </ul>
-            </div>
-          </body>
-          </html>
+          cd docs
+          if [ ! -f Gemfile ]; then
+            cat > Gemfile << 'EOF'
+          source "https://rubygems.org"
+          gem "jekyll", "~> 4.3.0"
+          gem "minima", "~> 2.5"
+          gem "jekyll-feed", "~> 0.12"
+          gem "jekyll-sitemap"
+          gem "jekyll-seo-tag"
+          gem "jekyll-optional-front-matter"
+          gem "jekyll-readme-index"
+          gem "jekyll-default-layout"
+          gem "jekyll-titles-from-headings"
           EOF
           fi
+
+      - name: Install Jekyll dependencies
+        run: |
+          cd docs
+          bundle install
+
+      - name: Build Jekyll site
+        run: |
+          cd docs
+          
+          # Copy README to docs as index
+          cp ../README.md index.md
+          
+          # Build with Jekyll
+          bundle exec jekyll build --destination ../_site
+          
+          echo "📁 Jekyll build complete. Site structure:"
+          find ../_site -type f -name "*.html" | head -10
 
       - name: Upload to GitHub Pages
         uses: actions/upload-pages-artifact@v3
