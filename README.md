@@ -65,7 +65,7 @@ npx @dataproc/mcp-server
 
 1. **Install the package:**
    ```bash
-   npm install -g @dataproc/mcp-server
+   npm install -g @dipseth/dataproc-mcp-server@2.1.1
    ```
 
 2. **Run the setup:**
@@ -123,26 +123,52 @@ npx @dataproc/mcp-server
 - **Troubleshooting Guides** - Common issues and solutions
 - **IDE Integration** - TypeScript support
 
-## 🛠️ Available Tools
+## 🛠️ Complete MCP Tools Suite (21 Tools)
 
-| Tool | Description | Parameters Reduced |
-|------|-------------|-------------------|
-| `start_dataproc_cluster` | Create and start clusters | 80% |
-| `stop_dataproc_cluster` | Stop running clusters | 75% |
-| `delete_dataproc_cluster` | Delete clusters | 70% |
-| `list_dataproc_clusters` | List all clusters | 85% |
-| `get_dataproc_cluster` | Get cluster details | 75% |
-| `submit_dataproc_job` | Submit Spark/Hive jobs | 70% |
-| `get_dataproc_job` | Get job status | 80% |
-| `list_dataproc_jobs` | List all jobs | 85% |
-| `cancel_dataproc_job` | Cancel running jobs | 75% |
-| `get_dataproc_job_results` | Get job outputs | 70% |
-| `list_profiles` | List cluster profiles | 90% |
-| `get_profile` | Get profile details | 85% |
-| `validate_profile` | Validate configurations | 80% |
-| `get_cluster_metrics` | Get performance metrics | 75% |
-| `scale_dataproc_cluster` | Scale cluster nodes | 70% |
-| `update_cluster_labels` | Update cluster labels | 80% |
+### 🚀 **Cluster Management (8 Tools)**
+| Tool | Description | Smart Defaults | Key Features |
+|------|-------------|----------------|--------------|
+| `start_dataproc_cluster` | Create and start new clusters | ✅ 80% fewer params | Profile-based, auto-config |
+| `create_cluster_from_yaml` | Create from YAML configuration | ✅ Project/region injection | Template-driven setup |
+| `create_cluster_from_profile` | Create using predefined profiles | ✅ 85% fewer params | 8 built-in profiles |
+| `list_clusters` | List all clusters with filtering | ✅ No params needed | Semantic queries, pagination |
+| `list_tracked_clusters` | List MCP-created clusters | ✅ Profile filtering | Creation tracking |
+| `get_cluster` | Get detailed cluster information | ✅ 75% fewer params | Semantic data extraction |
+| `delete_cluster` | Delete existing clusters | ✅ Project/region defaults | Safe deletion |
+| `get_zeppelin_url` | Get Zeppelin notebook URL | ✅ Auto-discovery | Web interface access |
+
+### 💼 **Job Management (6 Tools)**
+| Tool | Description | Smart Defaults | Key Features |
+|------|-------------|----------------|--------------|
+| `submit_hive_query` | Submit Hive queries to clusters | ✅ 70% fewer params | Async support, timeouts |
+| `submit_dataproc_job` | Submit Spark/PySpark/Presto jobs | ✅ 75% fewer params | Multi-engine support |
+| `get_job_status` | Get job execution status | ✅ JobID only needed | Real-time monitoring |
+| `get_job_results` | Get job outputs and results | ✅ Auto-pagination | Result formatting |
+| `get_query_status` | Get Hive query status | ✅ Minimal params | Query tracking |
+| `get_query_results` | Get Hive query results | ✅ Smart pagination | Enhanced async support |
+
+### 📋 **Configuration & Profiles (3 Tools)**
+| Tool | Description | Smart Defaults | Key Features |
+|------|-------------|----------------|--------------|
+| `list_profiles` | List available cluster profiles | ✅ Category filtering | 8 production profiles |
+| `get_profile` | Get detailed profile configuration | ✅ Profile ID only | Template access |
+| `query_cluster_data` | Query stored cluster data | ✅ Natural language | Semantic search |
+
+### 📊 **Analytics & Insights (4 Tools)**
+| Tool | Description | Smart Defaults | Key Features |
+|------|-------------|----------------|--------------|
+| `check_active_jobs` | Quick status of all active jobs | ✅ No params needed | Multi-project view |
+| `get_cluster_insights` | Comprehensive cluster analytics | ✅ Auto-discovery | Machine types, components |
+| `get_job_analytics` | Job performance analytics | ✅ Success rates | Error patterns, metrics |
+| `query_knowledge` | Query comprehensive knowledge base | ✅ Natural language | Clusters, jobs, errors |
+
+### 🎯 **Key Capabilities**
+- **🧠 Semantic Search**: Natural language queries with Qdrant integration
+- **⚡ Smart Defaults**: 60-80% parameter reduction through intelligent injection
+- **📊 Response Optimization**: 96% token reduction with full data preservation
+- **🔄 Async Support**: Non-blocking job submission and monitoring
+- **🏷️ Profile System**: 8 production-ready cluster templates
+- **📈 Analytics**: Comprehensive insights and performance tracking
 
 ## 📋 Configuration
 
@@ -175,12 +201,12 @@ my-company-analytics-prod-1234:
 
 ## 📚 Documentation
 
-- **[Quick Start Guide](https://dipseth.github.io/dataproc-mcp/QUICK_START)** - Get started in 5 minutes
-- **[Knowledge Base Semantic Search](https://dipseth.github.io/dataproc-mcp/KNOWLEDGE_BASE_SEMANTIC_SEARCH)** - Natural language queries and setup
+- **[Quick Start Guide](https://dipseth.github.io/dataproc-mcp/QUICK_START.html)** - Get started in 5 minutes
+- **[Knowledge Base Semantic Search](https://dipseth.github.io/dataproc-mcp/KNOWLEDGE_BASE_SEMANTIC_SEARCH.html)** - Natural language queries and setup
 - **[API Reference](https://dipseth.github.io/dataproc-mcp/api/)** - Complete tool documentation
-- **[Configuration Examples](https://dipseth.github.io/dataproc-mcp/CONFIGURATION_EXAMPLES)** - Real-world configurations
+- **[Configuration Examples](https://dipseth.github.io/dataproc-mcp/CONFIGURATION_EXAMPLES.html)** - Real-world configurations
 - **[Security Guide](https://dipseth.github.io/dataproc-mcp/security/)** - Best practices and compliance
-- **[Installation Guide](https://dipseth.github.io/dataproc-mcp/INSTALLATION_GUIDE)** - Detailed setup instructions
+- **[Installation Guide](https://dipseth.github.io/dataproc-mcp/INSTALLATION_GUIDE.html)** - Detailed setup instructions
 
 ## 🔧 MCP Client Integration
 
@@ -304,6 +330,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - [Model Context Protocol](https://modelcontextprotocol.io/) - The protocol that makes this possible
 - [Google Cloud Dataproc](https://cloud.google.com/dataproc) - The service we're integrating with
+- [Qdrant](https://github.com/qdrant/qdrant) - High-performance vector database powering our semantic search and knowledge indexing
 - [TypeScript](https://www.typescriptlang.org/) - For type safety and developer experience
 
 ---

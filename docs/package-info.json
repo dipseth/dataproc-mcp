@@ -1,0 +1,11 @@
+{
+  "name": "@dipseth/dataproc-mcp-server",
+  "version": "2.1.1",
+  "updated": "2025-06-04T20:44:10.194Z",
+  "npmUrl": "https://www.npmjs.com/package/@dipseth/dataproc-mcp-server/v/2.1.1",
+  "githubRelease": "https://github.com/dipseth/dataproc-mcp/releases/tag/v2.1.1",
+  "installCommand": "npm install @dipseth/dataproc-mcp-server@2.1.1",
+  "homepage": "https://github.com/dipseth/dataproc-mcp#readme",
+  "repository": "git@github.com:dipseth/dataproc-mcp.git",
+  "bugs": "https://github.com/dipseth/dataproc-mcp/issues"
+}

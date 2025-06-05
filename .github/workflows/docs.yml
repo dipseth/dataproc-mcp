@@ -109,8 +109,29 @@ jobs:
       - name: Create Pages directory structure
         run: |
           mkdir -p _site
-          cp -r docs/generated/* _site/ 2>/dev/null || true
+          
+          # Copy all documentation files
+          cp -r docs/* _site/ 2>/dev/null || true
+          
+          # Ensure API docs are properly placed
+          if [ -d "docs/api" ]; then
+            echo "✅ API documentation found, copying to _site/api/"
+            cp -r docs/api _site/
+          else
+            echo "⚠️ API documentation not found at docs/api/"
+          fi
+          
+          # Copy generated docs if they exist
+          if [ -d "docs/generated" ]; then
+            echo "✅ Generated docs found, copying to _site/"
+            cp -r docs/generated/* _site/ 2>/dev/null || true
+          fi
+          
+          # Copy README as index
           cp README.md _site/index.md 2>/dev/null || true
+          
+          echo "📁 Site structure:"
+          find _site -type f -name "*.html" | head -10
           
           # Create a simple index.html if none exists
           if [ ! -f _site/index.html ]; then
@@ -136,10 +157,10 @@ jobs:
               <p>Production-ready Model Context Protocol server for Google Cloud Dataproc operations.</p>
               
               <div class="nav">
-                <a href="api-reference.html">📚 API Reference</a>
-                <a href="quick-start.html">🚀 Quick Start</a>
-                <a href="configuration-examples.html">⚙️ Configuration</a>
-                <a href="security-guide.html">🔐 Security Guide</a>
+                <a href="api/">📚 API Reference</a>
+                <a href="QUICK_START.html">🚀 Quick Start</a>
+                <a href="CONFIGURATION_EXAMPLES.html">⚙️ Configuration</a>
+                <a href="security/">🔐 Security Guide</a>
               </div>
               
               <h2>Features</h2>

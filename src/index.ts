@@ -1337,11 +1337,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'list_profiles': {
-        // Initialize profile manager if not already done
+        // Use the global profile manager that should already be initialized
         if (!profileManager) {
-          const serverConfig = await getServerConfig();
-          profileManager = new ProfileManager(serverConfig.profileManager);
-          await profileManager.initialize();
+          throw new Error('ProfileManager not initialized. Server may still be starting up.');
         }
 
         const { category } = args;
@@ -1352,11 +1350,23 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           ? profiles.filter((profile: any) => profile.category === category)
           : profiles;
 
+        // Create a concise summary of profiles
+        const summary = filteredProfiles
+          .map((profile: any) => {
+            const hasMetadata = profile.metadata && Object.keys(profile.metadata).length > 0;
+            const projectId = profile.metadata?.projectId ? ` (${profile.metadata.projectId})` : '';
+            const tags = profile.metadata?.tags ? ` [${profile.metadata.tags.join(', ')}]` : '';
+            return `  📁 ${profile.id} → ${profile.name}${projectId}${tags}`;
+          })
+          .join('\n');
+
+        const categoryInfo = category ? ` (filtered by category: ${category})` : '';
+
         return {
           content: [
             {
               type: 'text',
-              text: `Available profiles:\n${JSON.stringify(filteredProfiles, null, 2)}`,
+              text: `📋 Available Profiles${categoryInfo} (${filteredProfiles.length} found):\n\n${summary}\n\n💡 Use get_profile tool with profileId for detailed configuration.`,
             },
           ],
         };

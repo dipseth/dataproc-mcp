@@ -36,11 +36,11 @@ collections:
 
 # Navigation
 header_pages:
-  - quick-start.md
-  - api-reference.md
-  - configuration-examples.md
-  - guides/index.md
-  - changelog.md
+  - QUICK_START.md
+  - API_REFERENCE.md
+  - CONFIGURATION_EXAMPLES.md
+  - security/index.md
+  - INSTALLATION_GUIDE.md
 
 # Social links
 github_username: dipseth
@@ -113,7 +113,7 @@ defaults:
 # Custom variables
 project:
   name: Dataproc MCP Server
-  version: 1.0.0
+  version: 2.1.1
   npm_package: "@dataproc/mcp-server"
   github_repo: "dipseth/dataproc-mcp"
   license: MIT
