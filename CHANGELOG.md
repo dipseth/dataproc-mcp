@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- semantic-release-changelog -->
 
+## [3.1.1](https://github.com/dipseth/dataproc-mcp/compare/v3.1.0...v3.1.1) (2025-06-05)
+
+
+### 🐛 Bug Fixes
+
+* **docs:** fix GitHub Pages links and CI/CD workflow ([985a856](https://github.com/dipseth/dataproc-mcp/commit/985a856827c118e0632c5a49c988d959bbbd31c8))
+
 ## [3.1.0](https://github.com/dipseth/dataproc-mcp/compare/v3.0.0...v3.1.0) (2025-06-05)
 
 
