@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- semantic-release-changelog -->
 
+## [3.1.0](https://github.com/dipseth/dataproc-mcp/compare/v3.0.0...v3.1.0) (2025-06-05)
+
+
+### 🚀 Features
+
+* fix list_profiles bug and optimize response format ([#22](https://github.com/dipseth/dataproc-mcp/issues/22)) ([8f329e6](https://github.com/dipseth/dataproc-mcp/commit/8f329e62a45329903a95abd596daa85eb67c6c61))
+
 ## [3.0.0](https://github.com/dipseth/dataproc-mcp/compare/v2.1.1...v3.0.0) (2025-06-04)
 
 
