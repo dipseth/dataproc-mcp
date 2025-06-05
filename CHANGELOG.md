@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- semantic-release-changelog -->
 
+## [3.1.3](https://github.com/dipseth/dataproc-mcp/compare/v3.1.2...v3.1.3) (2025-06-05)
+
+
+### 🐛 Bug Fixes
+
+* enable Jekyll processing for GitHub Pages ([9598e37](https://github.com/dipseth/dataproc-mcp/commit/9598e3719b8d8858b1c93815ea88def6c73aabb8))
+
+
+### 📚 Documentation
+
+* update documentation for v3.1.2 ([ff9b7b7](https://github.com/dipseth/dataproc-mcp/commit/ff9b7b766eb381d208895edc022bb337b9918427))
+
 ## [3.1.2](https://github.com/dipseth/dataproc-mcp/compare/v3.1.1...v3.1.2) (2025-06-05)
 
 
