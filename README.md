@@ -22,7 +22,7 @@ Add this to your Roo MCP settings:
   "mcpServers": {
     "dataproc": {
       "command": "npx",
-      "args": ["@dipseth/dataproc-mcp-server"],
+      "args": ["@dipseth/dataproc-mcp-server@latest"],
       "env": {
         "LOG_LEVEL": "info"
       }
@@ -38,7 +38,7 @@ Add this to your Roo MCP settings:
   "mcpServers": {
     "dataproc": {
       "command": "npx",
-      "args": ["@dipseth/dataproc-mcp-server"],
+      "args": ["@dipseth/dataproc-mcp-server@latest"],
       "env": {
         "LOG_LEVEL": "info",
         "DATAPROC_CONFIG_PATH": "/path/to/your/config.json"
@@ -58,14 +58,14 @@ npm install -g @dipseth/dataproc-mcp-server
 dataproc-mcp-server
 
 # Or run directly
-npx @dataproc/mcp-server
+npx @dipseth/dataproc-mcp-server@latest
 ```
 
 ### 5-Minute Setup
 
 1. **Install the package:**
    ```bash
-   npm install -g @dipseth/dataproc-mcp-server@3.1.1
+   npm install -g @dipseth/dataproc-mcp-server@latest
    ```
 
 2. **Run the setup:**
@@ -201,12 +201,12 @@ my-company-analytics-prod-1234:
 
 ## 📚 Documentation
 
-- **[Quick Start Guide](https://dipseth.github.io/dataproc-mcp/QUICK_START)** - Get started in 5 minutes
-- **[Knowledge Base Semantic Search](https://dipseth.github.io/dataproc-mcp/KNOWLEDGE_BASE_SEMANTIC_SEARCH)** - Natural language queries and setup
+- **[Quick Start Guide](https://dipseth.github.io/dataproc-mcp/QUICK_START/)** - Get started in 5 minutes
+- **[Knowledge Base Semantic Search](https://dipseth.github.io/dataproc-mcp/KNOWLEDGE_BASE_SEMANTIC_SEARCH/)** - Natural language queries and setup
 - **[API Reference](https://dipseth.github.io/dataproc-mcp/api/)** - Complete tool documentation
-- **[Configuration Examples](https://dipseth.github.io/dataproc-mcp/CONFIGURATION_EXAMPLES)** - Real-world configurations
+- **[Configuration Examples](https://dipseth.github.io/dataproc-mcp/CONFIGURATION_EXAMPLES/)** - Real-world configurations
 - **[Security Guide](https://dipseth.github.io/dataproc-mcp/security/)** - Best practices and compliance
-- **[Installation Guide](https://dipseth.github.io/dataproc-mcp/INSTALLATION_GUIDE)** - Detailed setup instructions
+- **[Installation Guide](https://dipseth.github.io/dataproc-mcp/INSTALLATION_GUIDE/)** - Detailed setup instructions
 
 ## 🔧 MCP Client Integration
 

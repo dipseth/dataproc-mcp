@@ -1,3 +1,10 @@
+---
+layout: default
+title: Installation Guide
+description: Detailed installation instructions for the Dataproc MCP Server
+permalink: /INSTALLATION_GUIDE/
+---
+
 # Installation Guide - Dataproc MCP Server
 
 ## 🚀 **Recommended Installation (NPM Package)**
