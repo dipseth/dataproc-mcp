@@ -1,3 +1,10 @@
+---
+layout: default
+title: Knowledge Base Semantic Search
+description: Advanced semantic search feature for natural language queries against cluster configurations and operational data
+permalink: /KNOWLEDGE_BASE_SEMANTIC_SEARCH/
+---
+
 # Knowledge Base Semantic Search 🧠
 
 The Dataproc MCP Server includes an advanced **knowledge base semantic search** feature that enables natural language queries against stored cluster configurations, job data, and operational insights. This feature provides intelligent data extraction and search capabilities with graceful degradation when optional components are unavailable.

@@ -1,3 +1,10 @@
+---
+layout: default
+title: Quick Start Guide
+description: Get up and running with the Dataproc MCP Server in just 5 minutes
+permalink: /QUICK_START/
+---
+
 # Quick Start Guide 🚀
 
 Get up and running with the Dataproc MCP Server in just 5 minutes!

@@ -1,3 +1,10 @@
+---
+layout: default
+title: Configuration Examples
+description: Real-world configuration examples for different environments and use cases
+permalink: /CONFIGURATION_EXAMPLES/
+---
+
 # 🔧 Configuration Examples
 
 This guide provides real-world configuration examples for different environments and use cases.

@@ -27,7 +27,7 @@ Add this to your Roo MCP settings:
   "mcpServers": {
     "dataproc": {
       "command": "npx",
-      "args": ["@dipseth/dataproc-mcp-server"],
+      "args": ["@dipseth/dataproc-mcp-server@latest"],
       "env": {
         "LOG_LEVEL": "info"
       }
@@ -43,7 +43,7 @@ Add this to your Roo MCP settings:
   "mcpServers": {
     "dataproc": {
       "command": "npx",
-      "args": ["@dipseth/dataproc-mcp-server"],
+      "args": ["@dipseth/dataproc-mcp-server@latest"],
       "env": {
         "LOG_LEVEL": "info",
         "DATAPROC_CONFIG_PATH": "/path/to/your/config.json"
@@ -158,11 +158,11 @@ my-company-analytics-prod-1234:
 
 ## 📚 Documentation
 
-- **[Quick Start Guide]({{ '/QUICK_START' | relative_url }})** - Get started in 5 minutes
+- **[Quick Start Guide]({{ '/QUICK_START/' | relative_url }})** - Get started in 5 minutes
 - **[API Reference]({{ '/api/' | relative_url }})** - Complete tool documentation
-- **[Configuration Examples]({{ '/CONFIGURATION_EXAMPLES' | relative_url }})** - Real-world configurations
+- **[Configuration Examples]({{ '/CONFIGURATION_EXAMPLES/' | relative_url }})** - Real-world configurations
 - **[Security Guide]({{ '/security/' | relative_url }})** - Best practices and compliance
-- **[Installation Guide]({{ '/INSTALLATION_GUIDE' | relative_url }})** - Detailed setup instructions
+- **[Installation Guide]({{ '/INSTALLATION_GUIDE/' | relative_url }})** - Detailed setup instructions
 
 ## 🛠️ Key Features
 
