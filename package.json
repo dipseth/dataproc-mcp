@@ -13,7 +13,9 @@
     "spark",
     "model-context-protocol",
     "gcp",
-    "cluster-management"
+    "cluster-management",
+    "typescript",
+    "nodejs"
   ],
   "author": {
     "name": "dipseth",
@@ -22,9 +24,9 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git@github.com:dipseth/dataproc-mcp.git"
+    "url": "git+https://github.com/dipseth/dataproc-mcp.git"
   },
-  "homepage": "https://github.com/dipseth/dataproc-mcp#readme",
+  "homepage": "https://dipseth.github.io/dataproc-mcp/",
   "bugs": {
     "url": "https://github.com/dipseth/dataproc-mcp/issues"
   },
@@ -63,6 +65,7 @@
     "validate": "node scripts/validate-config.js",
     "validate:examples": "node scripts/validate-examples.js",
     "docs:generate": "node scripts/generate-docs.js",
+    "docs:update": "node scripts/update-docs.js",
     "docs:test-links": "node scripts/test-doc-links.js",
     "inspector": "npx @modelcontextprotocol/inspector build/index.js",
     "test": "npm run test:unit:fast",

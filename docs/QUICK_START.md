@@ -221,7 +221,7 @@ my-project-dev-cluster:
         boot_disk_size_gb: 100
       is_preemptible: true  # Cost savings for dev
     software_config:
-      image_version: 2.0-debian10
+      image_version: 2.1.1-debian10
       optional_components:
         - JUPYTER
       properties:

@@ -68,8 +68,11 @@ export class InitializationManager {
    */
   async initializeCoreServices(): Promise<void> {
     try {
-      // Initialize profile manager
-      this.services.profileManager = new ProfileManager();
+      // Initialize profile manager with server configuration
+      const { getServerConfig } = await import('../config/server.js');
+      const serverConfig = await getServerConfig();
+      this.services.profileManager = new ProfileManager(serverConfig.profileManager);
+      await this.services.profileManager.initialize();
 
       // Initialize cluster tracker
       this.services.clusterTracker = new ClusterTracker();

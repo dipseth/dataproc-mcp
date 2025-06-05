@@ -158,11 +158,11 @@ my-company-analytics-prod-1234:
 
 ## 📚 Documentation
 
-- **[Quick Start Guide](QUICK_START)** - Get started in 5 minutes
-- **[API Reference](api/)** - Complete tool documentation
-- **[Configuration Examples](CONFIGURATION_EXAMPLES)** - Real-world configurations
-- **[Security Guide](security/)** - Best practices and compliance
-- **[Installation Guide](INSTALLATION_GUIDE)** - Detailed setup instructions
+- **[Quick Start Guide]({{ '/QUICK_START' | relative_url }})** - Get started in 5 minutes
+- **[API Reference]({{ '/api/' | relative_url }})** - Complete tool documentation
+- **[Configuration Examples]({{ '/CONFIGURATION_EXAMPLES' | relative_url }})** - Real-world configurations
+- **[Security Guide]({{ '/security/' | relative_url }})** - Best practices and compliance
+- **[Installation Guide]({{ '/INSTALLATION_GUIDE' | relative_url }})** - Detailed setup instructions
 
 ## 🛠️ Key Features
 
