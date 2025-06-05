@@ -65,7 +65,7 @@ npx @dataproc/mcp-server
 
 1. **Install the package:**
    ```bash
-   npm install -g @dipseth/dataproc-mcp-server@2.1.1
+   npm install -g @dipseth/dataproc-mcp-server@3.1.1
    ```
 
 2. **Run the setup:**

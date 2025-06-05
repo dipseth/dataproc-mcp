@@ -3,20 +3,7 @@
   "version": "3.1.1",
   "description": "A production-ready Model Context Protocol (MCP) server for Google Cloud Dataproc operations. Provides intelligent defaults, comprehensive tooling, and seamless integration with Roo (VS Code) for big data workflows.",
   "type": "module",
-  "keywords": [
-    "mcpServers",
-    "mcp",
-    "dataproc",
-    "google-cloud",
-    "bigdata",
-    "hive",
-    "spark",
-    "model-context-protocol",
-    "gcp",
-    "cluster-management",
-    "typescript",
-    "nodejs"
-  ],
+  "keywords": "[\"mcp\", \"dataproc\", \"google-cloud\", \"model-context-protocol\", \"typescript\", \"nodejs\"]",
   "author": {
     "name": "dipseth",
     "url": "https://github.com/dipseth"
