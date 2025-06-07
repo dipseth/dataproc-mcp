@@ -134,3 +134,5 @@ export const clusterTools = [
     },
   },
 ];
+
+export default clusterTools;

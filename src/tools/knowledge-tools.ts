@@ -120,3 +120,5 @@ export const knowledgeTools = [
     },
   },
 ];
+
+export default knowledgeTools;
