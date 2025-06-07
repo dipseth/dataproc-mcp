@@ -56,8 +56,8 @@ export async function submitHiveQuery(
   region: string,
   clusterName: string,
   query: string,
-  options?: QueryOptions,
-  async: boolean = false
+  async: boolean = false,
+  options?: QueryOptions
 ): Promise<QueryJob> {
   const startTime = Date.now();
   console.error(`[TIMING] submitHiveQuery: Starting MCP tool execution`);
@@ -482,7 +482,7 @@ export async function submitHiveQueryWithRest(
 
   if (process.env.LOG_LEVEL === 'debug')
     console.error('[DEBUG] submitHiveQueryWithRest: Getting token from gcloud CLI with config');
-  const token = await getGcloudAccessTokenWithConfig();
+  const _token = await getGcloudAccessTokenWithConfig();
 
   // Ensure the URL is correctly formed with the full domain and :submit suffix
   const url = `https://${region}-dataproc.googleapis.com/v1/projects/${projectId}/regions/${region}/jobs:submit`;
@@ -541,7 +541,7 @@ export async function submitHiveQueryWithRest(
       {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${_token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(requestBody),
@@ -600,7 +600,7 @@ export async function getJobStatusWithRest(
 
   if (process.env.LOG_LEVEL === 'debug')
     console.error('[DEBUG] getJobStatusWithRest: Getting token from gcloud CLI with config');
-  const token = await getGcloudAccessTokenWithConfig();
+  const _token = await getGcloudAccessTokenWithConfig();
 
   const url = `https://${region}-dataproc.googleapis.com/v1/projects/${projectId}/regions/${region}/jobs/${jobId}`;
 
@@ -613,7 +613,7 @@ export async function getJobStatusWithRest(
       {
         method: 'GET',
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${_token}`,
           'Content-Type': 'application/json',
         },
       },
@@ -708,11 +708,29 @@ async function optimizeQueryResultsResponse(
     jobId: string;
     maxResults?: number;
     saveLocalFile?: boolean; // Optional parameter for local file download
+    clusterName?: string; // Optional clusterName from job context
   }
 ): Promise<QueryResult> {
   const { projectId, region, jobId, saveLocalFile = false } = context;
+  let { clusterName } = context;
 
   try {
+    // Try to get clusterName from job details if not provided
+    if (!clusterName || clusterName === 'unknown') {
+      try {
+        const { getDataprocJobStatus } = await import('./job.js');
+        const jobDetails = await getDataprocJobStatus({
+          projectId,
+          region,
+          jobId,
+        });
+        clusterName = (jobDetails as any)?.placement?.clusterName || clusterName || 'unknown';
+      } catch (jobError) {
+        console.warn(`[WARN] Could not fetch job details for clusterName: ${jobError}`);
+        clusterName = clusterName || 'unknown';
+      }
+    }
+
     // Import Qdrant services dynamically
     const { QdrantStorageService } = await import('./qdrant-storage.js');
 
@@ -804,7 +822,7 @@ async function optimizeQueryResultsResponse(
         timestamp,
         projectId,
         region,
-        clusterName: 'unknown', // We don't have cluster name in this context
+        clusterName: clusterName || 'unknown', // Now extracted from job context
         responseType: 'query_results',
         originalTokenCount: Math.round(originalTokenCount),
         filteredTokenCount,

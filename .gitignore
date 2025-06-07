@@ -113,3 +113,5 @@ examples/web-apps/*
 
 state/*
 scripts/copy-config-to-desktop.sh
+src/services/qdrantpayloadexample.json
+tests/manual/state/*

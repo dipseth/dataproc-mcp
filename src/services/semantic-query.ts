@@ -38,6 +38,13 @@
 import { QdrantStorageService } from './qdrant-storage.js';
 import { QdrantStorageMetadata } from '../types/response-filter.js';
 import { ClusterConfig } from '../types/cluster-config.js';
+import {
+  GenericQdrantConverter,
+  createGenericConverter,
+  quickConvert,
+} from './generic-converter.js';
+import { CompressionService } from './compression.js';
+import { ConversionConfig } from '../types/generic-converter.js';
 import { logger } from '../utils/logger.js';
 
 // Type definitions for better type safety
@@ -131,12 +138,20 @@ export class SemanticQueryService {
   private qdrantService: QdrantStorageService | null = null;
   private initializationPromise: Promise<void>;
 
+  // Phase 3: Generic Converter Integration
+  private genericConverter: GenericQdrantConverter;
+  private compressionService: CompressionService;
+
   constructor(qdrantConfig?: {
     url?: string;
     collectionName?: string;
     vectorSize?: number;
     distance?: 'Cosine' | 'Euclidean' | 'Dot';
   }) {
+    // Phase 3: Initialize Generic Converter Integration
+    this.compressionService = new CompressionService();
+    this.genericConverter = createGenericConverter(this.compressionService);
+
     // Use centralized connection manager to discover working Qdrant URL
     this.initializationPromise = this.initializeWithConnectionManager(qdrantConfig);
   }
@@ -170,6 +185,10 @@ export class SemanticQueryService {
 
       // Initialize the Qdrant service and ensure collection is ready
       await this.qdrantService.initialize();
+
+      // Phase 3: Recreate converter instances after successful initialization
+      this.compressionService = new CompressionService();
+      this.genericConverter = createGenericConverter(this.compressionService);
 
       // Log successful initialization
       logger.info(`🔍 [SEMANTIC-QUERY] SemanticQueryService initialized with URL: ${config.url}`);
@@ -351,7 +370,7 @@ export class SemanticQueryService {
         const data = result.data || {};
 
         // Extract relevant information based on query type
-        const extractedInfo = this.extractRelevantInfo(query, data);
+        const extractedInfo = await this.extractRelevantInfo(query, data);
 
         processedResults.push({
           clusterId: `${metadata.projectId || 'unknown'}-${metadata.region || 'unknown'}-${metadata.clusterName || 'unknown'}`,
@@ -370,7 +389,7 @@ export class SemanticQueryService {
     return processedResults.sort((a, b) => b.confidence - a.confidence);
   }
 
-  private extractRelevantInfo(query: string, data: unknown): ExtractedInfo {
+  private async extractRelevantInfo(query: string, data: unknown): Promise<ExtractedInfo> {
     const lowerQuery = query.toLowerCase();
 
     // Pip packages extraction
@@ -379,7 +398,7 @@ export class SemanticQueryService {
       lowerQuery.includes('package') ||
       lowerQuery.includes('python')
     ) {
-      return this.extractPipPackages(data);
+      return await this.extractPipPackages(data);
     }
 
     // Machine type extraction
@@ -388,7 +407,7 @@ export class SemanticQueryService {
       lowerQuery.includes('hardware') ||
       lowerQuery.includes('cpu')
     ) {
-      return this.extractMachineConfig(data);
+      return await this.extractMachineConfig(data);
     }
 
     // Network configuration extraction
@@ -397,7 +416,7 @@ export class SemanticQueryService {
       lowerQuery.includes('subnet') ||
       lowerQuery.includes('vpc')
     ) {
-      return this.extractNetworkConfig(data);
+      return await this.extractNetworkConfig(data);
     }
 
     // Software configuration extraction
@@ -406,14 +425,67 @@ export class SemanticQueryService {
       lowerQuery.includes('initialization') ||
       lowerQuery.includes('script')
     ) {
-      return this.extractSoftwareConfig(data);
+      return await this.extractSoftwareConfig(data);
     }
 
     // Default: return summary
     return this.extractSummary(data);
   }
 
-  private extractPipPackages(data: unknown): ExtractedInfo {
+  private async extractPipPackages(data: unknown): Promise<ExtractedInfo> {
+    const startTime = Date.now();
+
+    try {
+      // Phase 3: Use quickConvert for automatic field extraction
+      const metadata: QdrantStorageMetadata = {
+        toolName: 'extractPipPackages',
+        timestamp: new Date().toISOString(),
+        responseType: 'pip_packages_extraction',
+        originalTokenCount: 0,
+        filteredTokenCount: 0,
+        compressionRatio: 1.0,
+        type: 'pip_packages_extraction',
+      };
+
+      const conversionResult = await quickConvert(
+        data as Record<string, any>,
+        metadata,
+        this.compressionService
+      );
+      const payload = conversionResult.payload as any;
+
+      // Extract pip packages from converted payload
+      const pipPackages =
+        payload?.config?.softwareConfig?.properties?.['dataproc:pip.packages'] ||
+        payload?.softwareConfig?.properties?.['dataproc:pip.packages'];
+
+      if (pipPackages) {
+        const packages = pipPackages.split(',').map((pkg: string) => pkg.trim());
+        const processingTime = Date.now() - startTime;
+
+        logger.debug(
+          `🔄 [SEMANTIC-QUERY] extractPipPackages with generic converter: ${processingTime}ms, compression: ${conversionResult.metadata.compressionRatio.toFixed(2)}`
+        );
+
+        return {
+          type: 'pip_packages',
+          packages,
+          count: packages.length,
+          rawValue: pipPackages,
+        };
+      }
+    } catch (error) {
+      logger.warn(
+        'Generic converter failed for pip packages extraction, falling back to manual method:',
+        error
+      );
+      return this.extractPipPackagesManual(data);
+    }
+
+    return { type: 'pip_packages', packages: [], count: 0 };
+  }
+
+  private extractPipPackagesManual(data: unknown): ExtractedInfo {
     try {
       const clusterData = data as ClusterData;
       const pipPackages =
@@ -428,12 +500,90 @@ export class SemanticQueryService {
         };
       }
     } catch (error) {
-      logger.warn('Failed to extract pip packages:', error);
+      logger.warn('Failed to extract pip packages manually:', error);
     }
     return { type: 'pip_packages', packages: [], count: 0 };
   }
 
-  private extractMachineConfig(data: unknown): ExtractedInfo {
+  private async extractMachineConfig(data: unknown): Promise<ExtractedInfo> {
+    const startTime = Date.now();
+
+    try {
+      // Phase 3: Use createGenericConverter for complex configurations
+      const config: ConversionConfig<any> = {
+        fieldMappings: {
+          'config.masterConfig': 'masterConfig',
+          'config.workerConfig': 'workerConfig',
+          'config.secondaryWorkerConfig': 'secondaryWorkerConfig',
+        },
+        compressionRules: {
+          fields: ['config'],
+          sizeThreshold: 5120, // 5KB
+          compressionType: 'gzip',
+        },
+        transformations: {
+          machineTypeUri: (uri: string) => this.extractMachineType(uri || ''),
+        },
+      };
+
+      const metadata: QdrantStorageMetadata = {
+        toolName: 'extractMachineConfig',
+        timestamp: new Date().toISOString(),
+        responseType: 'machine_config_extraction',
+        originalTokenCount: 0,
+        filteredTokenCount: 0,
+        compressionRatio: 1.0,
+        type: 'machine_config_extraction',
+      };
+
+      const conversionResult = await this.genericConverter.convert(
+        data as Record<string, any>,
+        metadata,
+        config
+      );
+      const payload = conversionResult.payload as any;
+
+      const clusterData = payload?.config || payload;
+      const processingTime = Date.now() - startTime;
+
+      logger.debug(
+        `🔄 [SEMANTIC-QUERY] extractMachineConfig with generic converter: ${processingTime}ms, compression: ${conversionResult.metadata.compressionRatio.toFixed(2)}`
+      );
+
+      return {
+        type: 'machine_config',
+        master: {
+          instances: clusterData?.masterConfig?.numInstances,
+          machineType: this.extractMachineType(clusterData?.masterConfig?.machineTypeUri || ''),
+          diskSize: clusterData?.masterConfig?.diskConfig?.bootDiskSizeGb,
+          diskType: clusterData?.masterConfig?.diskConfig?.bootDiskType,
+        },
+        workers: {
+          instances: clusterData?.workerConfig?.numInstances,
+          machineType: this.extractMachineType(clusterData?.workerConfig?.machineTypeUri || ''),
+          diskSize: clusterData?.workerConfig?.diskConfig?.bootDiskSizeGb,
+          diskType: clusterData?.workerConfig?.diskConfig?.bootDiskType,
+        },
+        secondaryWorkers: clusterData?.secondaryWorkerConfig
+          ? {
+              instances: clusterData.secondaryWorkerConfig.numInstances,
+              machineType: this.extractMachineType(
+                clusterData.secondaryWorkerConfig.machineTypeUri || ''
+              ),
+              preemptible: clusterData.secondaryWorkerConfig.isPreemptible,
+            }
+          : null,
+      };
+    } catch (error) {
+      logger.warn(
+        'Generic converter failed for machine config extraction, falling back to manual method:',
+        error
+      );
+      return this.extractMachineConfigManual(data);
+    }
+  }
+
+  private extractMachineConfigManual(data: unknown): ExtractedInfo {
     try {
       const clusterData = data as ClusterData;
       const config = clusterData?.config;
@@ -462,12 +612,59 @@ export class SemanticQueryService {
           : null,
       };
     } catch (error) {
-      logger.warn('Failed to extract machine config:', error);
+      logger.warn('Failed to extract machine config manually:', error);
     }
     return { type: 'machine_config' };
   }
 
-  private extractNetworkConfig(data: unknown): ExtractedInfo {
+  private async extractNetworkConfig(data: unknown): Promise<ExtractedInfo> {
+    const startTime = Date.now();
+
+    try {
+      // Phase 3: Use quickConvert for automatic field mapping
+      const metadata: QdrantStorageMetadata = {
+        toolName: 'extractNetworkConfig',
+        timestamp: new Date().toISOString(),
+        responseType: 'network_config_extraction',
+        originalTokenCount: 0,
+        filteredTokenCount: 0,
+        compressionRatio: 1.0,
+        type: 'network_config_extraction',
+      };
+
+      const conversionResult = await quickConvert(
+        data as Record<string, any>,
+        metadata,
+        this.compressionService
+      );
+      const payload = conversionResult.payload as any;
+
+      const gceConfig = payload?.config?.gceClusterConfig || payload?.gceClusterConfig;
+      const processingTime = Date.now() - startTime;
+
+      logger.debug(
+        `🔄 [SEMANTIC-QUERY] extractNetworkConfig with generic converter: ${processingTime}ms, compression: ${conversionResult.metadata.compressionRatio.toFixed(2)}`
+      );
+
+      return {
+        type: 'network_config',
+        zone: gceConfig?.zoneUri,
+        subnet: gceConfig?.subnetworkUri,
+        internalIpOnly: gceConfig?.internalIpOnly,
+        serviceAccount: gceConfig?.serviceAccount,
+        tags: gceConfig?.tags || [],
+        shieldedInstance: gceConfig?.shieldedInstanceConfig,
+      };
+    } catch (error) {
+      logger.warn(
+        'Generic converter failed for network config extraction, falling back to manual method:',
+        error
+      );
+      return this.extractNetworkConfigManual(data);
+    }
+  }
+
+  private extractNetworkConfigManual(data: unknown): ExtractedInfo {
     try {
       const clusterData = data as ClusterData;
       const gceConfig = clusterData?.config?.gceClusterConfig;
@@ -481,12 +678,78 @@ export class SemanticQueryService {
         shieldedInstance: gceConfig?.shieldedInstanceConfig,
       };
     } catch (error) {
-      logger.warn('Failed to extract network config:', error);
+      logger.warn('Failed to extract network config manually:', error);
     }
     return { type: 'network_config' };
   }
 
-  private extractSoftwareConfig(data: unknown): ExtractedInfo {
+  private async extractSoftwareConfig(data: unknown): Promise<ExtractedInfo> {
+    const startTime = Date.now();
+
+    try {
+      // Phase 3: Use generic converter with compression for software config
+      const config: ConversionConfig<any> = {
+        fieldMappings: {
+          'config.softwareConfig': 'softwareConfig',
+          'config.initializationActions': 'initializationActions',
+        },
+        compressionRules: {
+          fields: ['softwareConfig', 'initializationActions', 'properties'],
+          sizeThreshold: 2048, // 2KB
+          compressionType: 'gzip',
+        },
+        transformations: {
+          optionalComponents: (components: string[]) => components || [],
+          properties: (props: Record<string, any>) => this.extractKeyProperties(props || {}),
+        },
+      };
+
+      const metadata: QdrantStorageMetadata = {
+        toolName: 'extractSoftwareConfig',
+        timestamp: new Date().toISOString(),
+        responseType: 'software_config_extraction',
+        originalTokenCount: 0,
+        filteredTokenCount: 0,
+        compressionRatio: 1.0,
+        type: 'software_config_extraction',
+      };
+
+      const conversionResult = await this.genericConverter.convert(
+        data as Record<string, any>,
+        metadata,
+        config
+      );
+      const payload = conversionResult.payload as any;
+
+      const softwareConfig = payload?.config?.softwareConfig || payload?.softwareConfig;
+      const initActions =
+        payload?.config?.initializationActions || payload?.initializationActions || [];
+      const processingTime = Date.now() - startTime;
+
+      logger.debug(
+        `🔄 [SEMANTIC-QUERY] extractSoftwareConfig with generic converter: ${processingTime}ms, compression: ${conversionResult.metadata.compressionRatio.toFixed(2)}`
+      );
+
+      return {
+        type: 'software_config',
+        imageVersion: softwareConfig?.imageVersion,
+        optionalComponents: softwareConfig?.optionalComponents || [],
+        initializationActions: initActions.map((action: any) => ({
+          script: action.executableFile,
+          timeout: action.executionTimeout,
+        })),
+        keyProperties: this.extractKeyProperties(softwareConfig?.properties || {}),
+      };
+    } catch (error) {
+      logger.warn(
+        'Generic converter failed for software config extraction, falling back to manual method:',
+        error
+      );
+      return this.extractSoftwareConfigManual(data);
+    }
+  }
+
+  private extractSoftwareConfigManual(data: unknown): ExtractedInfo {
     try {
       const clusterData = data as ClusterData;
       const softwareConfig = clusterData?.config?.softwareConfig;
@@ -503,7 +766,7 @@ export class SemanticQueryService {
         keyProperties: this.extractKeyProperties(softwareConfig?.properties || {}),
       };
     } catch (error) {
-      logger.warn('Failed to extract software config:', error);
+      logger.warn('Failed to extract software config manually:', error);
     }
     return { type: 'software_config' };
   }
@@ -584,6 +847,69 @@ export class SemanticQueryService {
       return bestMatch || dataStr.substring(0, 200) + '...';
     } catch (error) {
       return 'Content extraction failed';
+    }
+  }
+
+  // Phase 3: Generic Converter Integration Utility Methods
+
+  /**
+   * Get conversion metrics from the generic converter
+   */
+  getConversionMetrics() {
+    return this.genericConverter.getMetrics();
+  }
+
+  /**
+   * Reset conversion metrics
+   */
+  resetConversionMetrics(): void {
+    this.genericConverter.resetMetrics();
+  }
+
+  /**
+   * Get compression service for external access
+   */
+  getCompressionService(): CompressionService {
+    return this.compressionService;
+  }
+
+  /**
+   * Test generic converter integration with sample data
+   */
+  async testGenericConverterIntegration(): Promise<{
+    success: boolean;
+    metrics: any;
+    extractedInfo?: any;
+    error?: string;
+  }> {
+    try {
+      const sampleData = {
+        clusterName: 'test-cluster',
+        projectId: 'test-project',
+        region: 'us-central1',
+        config: {
+          softwareConfig: {
+            properties: {
+              'dataproc:pip.packages': 'pandas==1.3.0,numpy==1.21.0',
+            },
+          },
+        },
+      };
+
+      const result = await this.extractPipPackages(sampleData);
+      const metrics = this.getConversionMetrics();
+
+      return {
+        success: true,
+        metrics,
+        extractedInfo: result,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        metrics: this.getConversionMetrics(),
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
     }
   }
 }

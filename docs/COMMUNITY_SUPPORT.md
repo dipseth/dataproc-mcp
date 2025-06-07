@@ -14,14 +14,14 @@ Before seeking help, please check our comprehensive documentation:
 ### 2. Search Existing Issues
 Check if your question has already been answered:
 - **[GitHub Issues](https://github.com/dipseth/dataproc-mcp/issues)** - Bug reports and feature requests
-- **[GitHub Discussions](https://github.com/dipseth/dataproc-mcp/discussions)** - Community Q&A
+- **[GitHub Issues](https://github.com/dipseth/dataproc-mcp/issues)** - Community Q&A and support
 
 ### 3. Community Channels
 
-#### GitHub Discussions (Primary)
-- **Q&A**: General questions and help requests
-- **Ideas**: Feature suggestions and brainstorming
-- **Show and Tell**: Share your projects and use cases
+#### GitHub Issues (Primary)
+- **Q&A**: General questions and help requests (use question label)
+- **Ideas**: Feature suggestions and brainstorming (use enhancement label)
+- **Show and Tell**: Share your projects and use cases (use discussion label)
 - **General**: Community announcements and discussions
 
 #### GitHub Issues
@@ -240,7 +240,7 @@ We track:
 
 ### Community Channels
 - **GitHub**: [dipseth/dataproc-mcp](https://github.com/dipseth/dataproc-mcp)
-- **Discussions**: [GitHub Discussions](https://github.com/dipseth/dataproc-mcp/discussions)
+- **Issues**: [GitHub Issues](https://github.com/dipseth/dataproc-mcp/issues)
 - **NPM**: [@dataproc/mcp-server](https://www.npmjs.com/package/@dataproc/mcp-server)
 
 ### Social Media

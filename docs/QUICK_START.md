@@ -318,7 +318,7 @@ gcloud compute firewall-rules list
 
 ### Community
 - **[GitHub Issues](https://github.com/dipseth/dataproc-mcp/issues)** - Bug reports and feature requests
-- **[GitHub Discussions](https://github.com/dipseth/dataproc-mcp/discussions)** - Community Q&A
+- **[Community Support](./COMMUNITY_SUPPORT.md)** - Community Q&A
 - **[Contributing Guide](../CONTRIBUTING.md)** - How to contribute
 
 ## 🎉 You're Ready!
