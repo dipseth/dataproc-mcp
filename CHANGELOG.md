@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- semantic-release-changelog -->
 
+## [4.1.0](https://github.com/dipseth/dataproc-mcp/compare/v4.0.0...v4.1.0) (2025-06-07)
+
+
+### 🚀 Features
+
+* **docs:** enable Mermaid diagram rendering in Jekyll documentation ([#24](https://github.com/dipseth/dataproc-mcp/issues/24)) ([67f9cdc](https://github.com/dipseth/dataproc-mcp/commit/67f9cdcbb0cece22ebb8b1a2dd3328d62a5db2e1))
+
+
+### 📚 Documentation
+
+* update documentation for v4.0.0 ([19f77c7](https://github.com/dipseth/dataproc-mcp/commit/19f77c723041222a79b5e146516eba41273df218))
+
 ## [4.0.0](https://github.com/dipseth/dataproc-mcp/compare/v3.1.3...v4.0.0) (2025-06-07)
 
 
