@@ -44,8 +44,9 @@ class LinkTester {
         // First, identify code blocks to exclude from link detection
         const codeBlocks = this.findCodeBlocks(content);
         
-        // Match markdown links: [text](url)
-        const markdownLinkRegex = /\[([^\]]*)\]\(([^)]+)\)/g;
+        // Match markdown links: [text](url) - more specific to avoid false positives
+        // Only match valid URLs (must contain . or start with / or #)
+        const markdownLinkRegex = /\[([^\]]*)\]\(([^)\s]+(?:\.[^)\s]*|\/[^)\s]*|#[^)\s]*)?)\)/g;
         let match;
         
         while ((match = markdownLinkRegex.exec(content)) !== null) {
@@ -55,6 +56,11 @@ class LinkTester {
             
             // Skip if this match is inside a code block
             if (this.isInCodeBlock(matchStart, matchEnd, codeBlocks)) {
+                continue;
+            }
+            
+            // Additional validation: skip if URL looks like TypeScript syntax
+            if (this.isTypeScriptSyntax(url)) {
                 continue;
             }
             
@@ -167,6 +173,19 @@ class LinkTester {
             (end > block.start && end <= block.end) ||
             (start <= block.start && end >= block.end)
         );
+    }
+
+    isTypeScriptSyntax(url) {
+        // Check for common TypeScript syntax patterns that might be mistaken for URLs
+        const typeScriptPatterns = [
+            /^[A-Z]\[.*\]\s+extends\s+/, // Generic type constraints like T[K] extends
+            /\|\s*(string|number|boolean|null|undefined)/, // Union types
+            /extends\s+(string|number|boolean|null|undefined)/, // Type extensions
+            /^[A-Z]\[[^\]]+\]$/, // Generic type access like T[K]
+            /\s+(extends|keyof|typeof|infer)\s+/, // TypeScript keywords
+        ];
+        
+        return typeScriptPatterns.some(pattern => pattern.test(url));
     }
 
     isInternalLink(url) {
