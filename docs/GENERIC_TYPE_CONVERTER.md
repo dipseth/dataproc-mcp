@@ -75,37 +75,7 @@ export interface ConversionConfig<TSource> {
 }
 ```
 
-### 2. TypeScript Utility Types
-
-```typescript
-// Advanced mapped types for automatic field detection
-export type ExtractQdrantFields<T> = {
-  [K in keyof T]: T[K] extends string | number | boolean | null | undefined
-    ? T[K] 
-    : T[K] extends Array<infer U> 
-      ? CompressibleField<T[K]>
-      : T[K] extends object 
-        ? CompressibleField<T[K]>
-        : T[K];
-};
-
-export type CompressibleField<T> = {
-  data: T;
-  isCompressed?: boolean;
-  compressionType?: 'gzip' | 'deflate';
-  originalSize?: number;
-  compressedSize?: number;
-};
-
-// Conditional type for automatic payload type selection
-export type InferQdrantPayload<T> = 
-  T extends QueryResultData ? QdrantQueryResultPayload :
-  T extends ExtendedClusterData ? QdrantClusterPayload :
-  T extends DataprocJob ? QdrantJobPayload :
-  QdrantPayloadBase;
-```
-
-### 3. Automatic Field Detection Engine
+### 2. Automatic Field Detection Engine
 
 ```typescript
 // File: src/services/generic-converter.ts
