@@ -17,6 +17,7 @@ plugins:
   - jekyll-readme-index
   - jekyll-default-layout
   - jekyll-titles-from-headings
+  - jekyll-spaceship
 
 # Markdown processing
 markdown: kramdown
@@ -24,6 +25,30 @@ highlighter: rouge
 kramdown:
   input: GFM
   syntax_highlighter: rouge
+  parse_block_html: true
+  parse_span_html: true
+
+# Mermaid configuration
+mermaid:
+  # Enable Mermaid diagrams
+  enabled: true
+
+# Jekyll Spaceship configuration (enables Mermaid, PlantUML, etc.)
+jekyll-spaceship:
+  # Enable all processors
+  processors:
+    - table-processor
+    - mathjax-processor
+    - plantuml-processor
+    - mermaid-processor
+    - polyfill-processor
+    - media-processor
+    - emoji-processor
+    - element-processor
+  mermaid-processor:
+    mode: default
+    theme: default
+    background: white
 
 # Collections
 collections:
