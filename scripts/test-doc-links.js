@@ -41,12 +41,23 @@ class LinkTester {
     extractLinksFromMarkdown(content, filePath) {
         const links = [];
         
+        // First, identify code blocks to exclude from link detection
+        const codeBlocks = this.findCodeBlocks(content);
+        
         // Match markdown links: [text](url)
         const markdownLinkRegex = /\[([^\]]*)\]\(([^)]+)\)/g;
         let match;
         
         while ((match = markdownLinkRegex.exec(content)) !== null) {
             const [fullMatch, text, url] = match;
+            const matchStart = match.index;
+            const matchEnd = match.index + fullMatch.length;
+            
+            // Skip if this match is inside a code block
+            if (this.isInCodeBlock(matchStart, matchEnd, codeBlocks)) {
+                continue;
+            }
+            
             links.push({
                 text: text.trim(),
                 url: url.trim(),
@@ -87,6 +98,75 @@ class LinkTester {
 
     getLineNumber(content, index) {
         return content.substring(0, index).split('\n').length;
+    }
+
+    findCodeBlocks(content) {
+        const codeBlocks = [];
+        
+        // Find fenced code blocks (```...```)
+        const fencedCodeRegex = /```[\s\S]*?```/g;
+        let match;
+        while ((match = fencedCodeRegex.exec(content)) !== null) {
+            codeBlocks.push({
+                start: match.index,
+                end: match.index + match[0].length,
+                type: 'fenced'
+            });
+        }
+        
+        // Find inline code blocks (`...`)
+        const inlineCodeRegex = /`[^`\n]+`/g;
+        while ((match = inlineCodeRegex.exec(content)) !== null) {
+            codeBlocks.push({
+                start: match.index,
+                end: match.index + match[0].length,
+                type: 'inline'
+            });
+        }
+        
+        // Find indented code blocks (4+ spaces at start of line)
+        const lines = content.split('\n');
+        let inCodeBlock = false;
+        let codeBlockStart = 0;
+        let currentIndex = 0;
+        
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            const isCodeLine = /^    /.test(line) || /^\t/.test(line);
+            
+            if (isCodeLine && !inCodeBlock) {
+                inCodeBlock = true;
+                codeBlockStart = currentIndex;
+            } else if (!isCodeLine && inCodeBlock && line.trim() !== '') {
+                codeBlocks.push({
+                    start: codeBlockStart,
+                    end: currentIndex,
+                    type: 'indented'
+                });
+                inCodeBlock = false;
+            }
+            
+            currentIndex += line.length + 1; // +1 for newline
+        }
+        
+        // Handle case where file ends with code block
+        if (inCodeBlock) {
+            codeBlocks.push({
+                start: codeBlockStart,
+                end: currentIndex,
+                type: 'indented'
+            });
+        }
+        
+        return codeBlocks;
+    }
+
+    isInCodeBlock(start, end, codeBlocks) {
+        return codeBlocks.some(block =>
+            (start >= block.start && start < block.end) ||
+            (end > block.start && end <= block.end) ||
+            (start <= block.start && end >= block.end)
+        );
     }
 
     isInternalLink(url) {
