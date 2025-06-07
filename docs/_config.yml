@@ -138,7 +138,7 @@ defaults:
 # Custom variables
 project:
   name: Dataproc MCP Server
-  version: 4.0.0
+  version: 4.1.0
   npm_package: "@dataproc/mcp-server"
   github_repo: "dipseth/dataproc-mcp"
   license: MIT
