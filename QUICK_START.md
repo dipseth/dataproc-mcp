@@ -474,7 +474,7 @@ npm run setup
 - 🔧 [Configuration Guide](docs/CONFIGURATION_GUIDE.md)
 - 🔒 [Security Guide](docs/SECURITY_GUIDE.md)
 - 🐛 [Report Issues](https://github.com/dipseth/dataproc-mcp/issues)
-- 💬 [Discussions](https://github.com/dipseth/dataproc-mcp/discussions)
+- 💬 [Community Support](docs/COMMUNITY_SUPPORT.md)
 
 ## Next Steps
 

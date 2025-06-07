@@ -45,6 +45,15 @@ import { QdrantClient } from '@qdrant/js-client-rest';
 import { QdrantStorageMetadata } from '../types/response-filter.js';
 import { TransformersEmbeddingService } from './transformers-embeddings.js';
 import { logger } from '../utils/logger.js';
+import {
+  QdrantPayload,
+  QdrantQueryResultPayload,
+  QdrantClusterPayload,
+  QdrantJobPayload,
+  CompressionConfig,
+} from '../types/qdrant-payload.js';
+import { CompressionService } from './compression.js';
+import { GenericQdrantConverter, createGenericConverter } from './generic-converter.js';
 
 export interface QdrantConfig {
   url: string;
@@ -52,6 +61,7 @@ export interface QdrantConfig {
   collectionName: string;
   vectorSize: number;
   distance: 'Cosine' | 'Euclidean' | 'Dot';
+  compression?: Partial<CompressionConfig>;
 }
 
 export class QdrantStorageService {
@@ -59,6 +69,22 @@ export class QdrantStorageService {
   private config: QdrantConfig;
   private collectionInitialized = false;
   private embeddingService: TransformersEmbeddingService;
+  private compressionService: CompressionService;
+  private genericConverter: GenericQdrantConverter;
+
+  /**
+   * Get the Qdrant client for direct access
+   */
+  public getQdrantClient(): QdrantClient {
+    return this.client;
+  }
+
+  /**
+   * Get the collection name
+   */
+  public getCollectionName(): string {
+    return this.config.collectionName;
+  }
 
   constructor(config: QdrantConfig) {
     this.config = config;
@@ -66,7 +92,10 @@ export class QdrantStorageService {
       url: config.url,
       apiKey: config.apiKey,
     });
-    this.embeddingService = new TransformersEmbeddingService();
+    // Use singleton pattern to prevent multiple Transformers.js instances
+    this.embeddingService = TransformersEmbeddingService.getInstance();
+    this.compressionService = new CompressionService(config.compression);
+    this.genericConverter = createGenericConverter(this.compressionService);
   }
 
   /**
@@ -114,9 +143,19 @@ export class QdrantStorageService {
 
   /**
    * Store cluster data with metadata and return resource URI
+   * Enhanced with structured payload and compression support
    */
   async storeClusterData(data: unknown, metadata: QdrantStorageMetadata): Promise<string> {
     try {
+      console.log('[DEBUG] storeClusterData called with:');
+      console.log('[DEBUG] - data type:', typeof data);
+      console.log(
+        '[DEBUG] - data keys:',
+        data && typeof data === 'object' ? Object.keys(data) : 'N/A'
+      );
+      console.log('[DEBUG] - metadata type:', typeof metadata);
+      console.log('[DEBUG] - metadata keys:', Object.keys(metadata));
+
       await this.ensureCollection();
 
       // Train the embedding model with this cluster data
@@ -125,31 +164,90 @@ export class QdrantStorageService {
       // Generate a unique ID for this storage
       const id = this.generateId(metadata);
 
-      // Generate embedding vector using the trained model
-      const vector = await this.embeddingService.generateClusterEmbedding(data as any);
+      // Generate embedding vector - use local method as fallback for Transformers.js issues
+      let vector: number[];
+      try {
+        const rawVector = await this.embeddingService.generateClusterEmbedding(data as any);
 
-      // Prepare payload with metadata and data
-      const payload = {
-        ...metadata,
-        data: JSON.stringify(data),
-        storedAt: new Date().toISOString(),
-      };
+        // Ensure vector is a proper number array (fix for ERR_INVALID_ARG_TYPE)
+        if (Array.isArray(rawVector)) {
+          vector = rawVector;
+        } else if (rawVector && typeof rawVector === 'object' && 'length' in rawVector) {
+          // Convert array-like object (Float32Array, etc.) to regular array
+          vector = Array.from(rawVector as ArrayLike<number>);
+        } else {
+          throw new Error('Invalid vector format from embedding service');
+        }
 
-      // Store in Qdrant
-      await this.client.upsert(this.config.collectionName, {
+        // Validate vector format
+        if (!Array.isArray(vector) || vector.length !== this.config.vectorSize) {
+          throw new Error(
+            `Invalid vector: expected array of length ${this.config.vectorSize}, got ${typeof vector} of length ${vector?.length}`
+          );
+        }
+
+        // Validate all elements are numbers
+        if (!vector.every((v) => typeof v === 'number' && !isNaN(v) && isFinite(v))) {
+          throw new Error('Vector contains invalid numeric values');
+        }
+
+        // Validate vector is not all zeros (indicates Transformers.js failure)
+        const isZeroVector = vector.every((v) => v === 0);
+        if (isZeroVector) {
+          logger.warn('Transformers.js returned zero vector, using local embedding generation');
+          vector = this.generateEmbedding(data);
+        }
+      } catch (error) {
+        logger.warn('Transformers.js embedding failed, using local embedding generation:', error);
+        vector = this.generateEmbedding(data);
+      }
+
+      // Create structured payload based on data type
+      const payload = await this.createStructuredPayload(data, metadata);
+
+      // Store in Qdrant with detailed logging
+      logger.info(`🔍 Attempting to store in Qdrant:`);
+      logger.info(`   Collection: ${this.config.collectionName}`);
+      logger.info(`   ID: ${id} (type: ${typeof id})`);
+      logger.info(`   Vector length: ${vector.length} (type: ${typeof vector})`);
+      logger.info(`   Vector sample: [${vector.slice(0, 3).join(', ')}...]`);
+      logger.info(`   Payload keys: ${Object.keys(payload).join(', ')}`);
+
+      // Sanitize payload to ensure it's properly serializable (fix for ERR_INVALID_ARG_TYPE)
+      const sanitizedPayload = this.sanitizePayload(payload);
+
+      // Ensure vector is in the correct format for Qdrant
+      const validatedVector = this.validateAndConvertVector(vector);
+
+      const upsertData = {
         wait: true,
         points: [
           {
-            id,
-            vector,
-            payload,
+            id: id, // UUID string (already validated)
+            vector: validatedVector, // Properly formatted vector
+            payload: sanitizedPayload,
           },
         ],
+      };
+
+      logger.debug(`🔍 Full upsert data structure:`, {
+        collectionName: this.config.collectionName,
+        pointsCount: upsertData.points.length,
+        idType: typeof upsertData.points[0].id,
+        vectorType: typeof upsertData.points[0].vector,
+        vectorLength: upsertData.points[0].vector.length,
+        payloadKeys: Object.keys(upsertData.points[0].payload),
       });
 
+      await this.client.upsert(this.config.collectionName, upsertData);
+
       const stats = this.embeddingService.getStats();
+      const compressionInfo = payload.isCompressed
+        ? ` | Compressed: ${this.compressionService.formatSize(payload.originalSize || 0)} → ${this.compressionService.formatSize(payload.compressedSize || 0)}`
+        : '';
+
       logger.info(
-        `📊 Stored cluster ${metadata.clusterName} | Model: ${stats.modelName}, ${stats.documentsProcessed} docs processed`
+        `📊 Stored ${metadata.responseType} ${metadata.clusterName} | Model: ${stats.modelName}, ${stats.documentsProcessed} docs processed${compressionInfo}`
       );
 
       // Return resource URI for MCP access
@@ -161,7 +259,192 @@ export class QdrantStorageService {
   }
 
   /**
-   * Retrieve data by ID
+   * Create structured payload based on data type with compression support
+   * Now uses the generic converter with fallback to legacy methods
+   */
+  private async createStructuredPayload(
+    data: unknown,
+    metadata: QdrantStorageMetadata
+  ): Promise<QdrantPayload> {
+    // Try generic converter first for supported types
+    if (data && typeof data === 'object' && data !== null) {
+      try {
+        const result = await this.genericConverter.convert(data as Record<string, any>, metadata);
+
+        logger.debug('Used generic converter for payload creation', {
+          type: metadata.type,
+          responseType: metadata.responseType,
+          fieldsProcessed: result.metadata.fieldsProcessed,
+          compressionRatio: result.metadata.compressionRatio,
+        });
+
+        return result.payload as QdrantPayload;
+      } catch (error) {
+        logger.warn('Generic converter failed, falling back to legacy methods', {
+          error: error instanceof Error ? error.message : String(error),
+          type: metadata.type,
+          responseType: metadata.responseType,
+        });
+      }
+    }
+
+    // Fallback to legacy conversion methods
+    const basePayload = {
+      ...metadata,
+      storedAt: new Date().toISOString(),
+    };
+
+    // Handle different data types with structured payloads (legacy)
+    if (metadata.responseType === 'query_results' && metadata.type === 'query_result') {
+      return await this.createQueryResultPayload(data, basePayload);
+    } else if (metadata.responseType === 'cluster_data' || metadata.type === 'cluster') {
+      return await this.createClusterPayload(data, basePayload);
+    } else if (metadata.type === 'job' || metadata.responseType === 'job_submission') {
+      return await this.createJobPayload(data, basePayload);
+    } else {
+      // Fallback to legacy format with compression
+      return await this.createLegacyPayload(data, basePayload);
+    }
+  }
+
+  /**
+   * Create structured query result payload
+   */
+  private async createQueryResultPayload(
+    data: any,
+    basePayload: any
+  ): Promise<QdrantQueryResultPayload> {
+    const queryData = data as any;
+
+    // Extract structured fields
+    const schema = queryData.schema;
+    const rows = queryData.rows;
+    const summary = queryData.summary;
+    const searchableContent = queryData.searchableContent;
+
+    // Compress large data fields if needed (with null/undefined safety)
+    const schemaCompression = await this.compressionService.compressIfNeeded(schema || {});
+    const rowsCompression = await this.compressionService.compressIfNeeded(rows || []);
+
+    const payload: QdrantQueryResultPayload = {
+      ...basePayload,
+      jobId: queryData.jobId || basePayload.jobId || 'unknown',
+      contentType: queryData.contentType || 'structured_data',
+      totalRows: queryData.totalRows || (Array.isArray(rows) ? rows.length : 0),
+      schemaFields: queryData.schemaFields || schema?.fields?.length || 0,
+      dataSize: queryData.dataSize || JSON.stringify(data).length,
+
+      // Store structured data
+      schema: schemaCompression.data,
+      rows: rowsCompression.data,
+      summary,
+      searchableContent,
+
+      // Compression metadata
+      isCompressed: schemaCompression.isCompressed || rowsCompression.isCompressed,
+      compressionType: schemaCompression.compressionType || rowsCompression.compressionType,
+      originalSize: (schemaCompression.originalSize || 0) + (rowsCompression.originalSize || 0),
+      compressedSize:
+        (schemaCompression.compressedSize || 0) + (rowsCompression.compressedSize || 0),
+    };
+
+    return payload;
+  }
+
+  /**
+   * Create structured cluster payload
+   */
+  private async createClusterPayload(data: any, basePayload: any): Promise<QdrantClusterPayload> {
+    const clusterData = data as any;
+
+    // Extract cluster-specific fields
+    const clusterConfig = clusterData.config || clusterData.clusterConfig;
+    const machineTypes =
+      clusterData.machineTypes ||
+      clusterData.config?.masterConfig ||
+      clusterData.config?.workerConfig;
+    const networkConfig = clusterData.networkConfig || clusterData.config?.networkConfig;
+    const softwareConfig = clusterData.softwareConfig || clusterData.config?.softwareConfig;
+
+    // Compress large configuration data (with null/undefined safety)
+    const configCompression = await this.compressionService.compressIfNeeded(clusterConfig || {});
+
+    const payload: QdrantClusterPayload = {
+      ...basePayload,
+
+      // Store structured data
+      clusterConfig: configCompression.data,
+      machineTypes,
+      networkConfig,
+      softwareConfig,
+
+      // Compression metadata
+      isCompressed: configCompression.isCompressed,
+      compressionType: configCompression.compressionType,
+      originalSize: configCompression.originalSize,
+      compressedSize: configCompression.compressedSize,
+    };
+
+    return payload;
+  }
+
+  /**
+   * Create structured job payload
+   */
+  private async createJobPayload(data: any, basePayload: any): Promise<QdrantJobPayload> {
+    const jobData = data as any;
+
+    // Compress large results data (with null/undefined safety)
+    const resultsCompression = await this.compressionService.compressIfNeeded(
+      jobData.results || {}
+    );
+
+    const payload: QdrantJobPayload = {
+      ...basePayload,
+      jobId: jobData.jobId || basePayload.jobId || 'unknown',
+      jobType: jobData.jobType || 'unknown',
+      status: jobData.status || 'unknown',
+      submissionTime: jobData.submissionTime || new Date().toISOString(),
+      duration: jobData.duration,
+      query: jobData.query,
+      results: resultsCompression.data,
+      error: jobData.error,
+
+      // Compression metadata
+      isCompressed: resultsCompression.isCompressed,
+      compressionType: resultsCompression.compressionType,
+      originalSize: resultsCompression.originalSize,
+      compressedSize: resultsCompression.compressedSize,
+    };
+
+    return payload;
+  }
+
+  /**
+   * Create legacy payload format with compression (for backward compatibility)
+   */
+  private async createLegacyPayload(data: any, basePayload: any): Promise<QdrantPayload> {
+    const dataCompression = await this.compressionService.compressIfNeeded(data);
+
+    const payload: QdrantPayload = {
+      ...basePayload,
+      data:
+        typeof dataCompression.data === 'string'
+          ? dataCompression.data
+          : JSON.stringify(dataCompression.data),
+
+      // Compression metadata
+      isCompressed: dataCompression.isCompressed,
+      compressionType: dataCompression.compressionType,
+      originalSize: dataCompression.originalSize,
+      compressedSize: dataCompression.compressedSize,
+    } as QdrantPayload;
+
+    return payload;
+  }
+
+  /**
+   * Retrieve data by ID with decompression support
    */
   async retrieveById(id: string): Promise<unknown | null> {
     try {
@@ -177,15 +460,112 @@ export class QdrantStorageService {
       }
 
       const point = result[0];
-      if (point.payload?.data) {
-        return JSON.parse(point.payload.data as string);
+      const payload = point.payload as QdrantPayload;
+
+      if (!payload) {
+        return null;
       }
 
-      return null;
+      // Handle new structured format
+      if (payload.type === 'query_result' && 'schema' in payload) {
+        return await this.reconstructQueryResult(payload as QdrantQueryResultPayload);
+      } else if (payload.type === 'cluster' && 'clusterConfig' in payload) {
+        return await this.reconstructClusterData(payload as QdrantClusterPayload);
+      } else if (payload.type === 'job' && 'jobId' in payload) {
+        return await this.reconstructJobData(payload as QdrantJobPayload);
+      } else if (payload.data) {
+        // Legacy format - decompress if needed
+        return await this.compressionService.decompressIfNeeded(
+          payload.data,
+          payload.isCompressed || false,
+          payload.compressionType
+        );
+      }
+
+      return payload;
     } catch (error) {
       console.error('Failed to retrieve data from Qdrant:', error);
       return null;
     }
+  }
+
+  /**
+   * Reconstruct query result from structured payload
+   */
+  private async reconstructQueryResult(payload: QdrantQueryResultPayload): Promise<any> {
+    const schema = await this.compressionService.decompressIfNeeded(
+      payload.schema,
+      payload.isCompressed || false,
+      payload.compressionType
+    );
+
+    const rows = await this.compressionService.decompressIfNeeded(
+      payload.rows,
+      payload.isCompressed || false,
+      payload.compressionType
+    );
+
+    return {
+      jobId: payload.jobId,
+      projectId: payload.projectId,
+      region: payload.region,
+      timestamp: payload.timestamp,
+      contentType: payload.contentType,
+      totalRows: payload.totalRows,
+      schemaFields: payload.schemaFields,
+      dataSize: payload.dataSize,
+      schema,
+      rows,
+      summary: payload.summary,
+      searchableContent: payload.searchableContent,
+    };
+  }
+
+  /**
+   * Reconstruct cluster data from structured payload
+   */
+  private async reconstructClusterData(payload: QdrantClusterPayload): Promise<any> {
+    const clusterConfig = await this.compressionService.decompressIfNeeded(
+      payload.clusterConfig,
+      payload.isCompressed || false,
+      payload.compressionType
+    );
+
+    return {
+      clusterName: payload.clusterName,
+      projectId: payload.projectId,
+      region: payload.region,
+      config: clusterConfig,
+      clusterConfig,
+      machineTypes: payload.machineTypes,
+      networkConfig: payload.networkConfig,
+      softwareConfig: payload.softwareConfig,
+    };
+  }
+
+  /**
+   * Reconstruct job data from structured payload
+   */
+  private async reconstructJobData(payload: QdrantJobPayload): Promise<any> {
+    const results = await this.compressionService.decompressIfNeeded(
+      payload.results,
+      payload.isCompressed || false,
+      payload.compressionType
+    );
+
+    return {
+      jobId: payload.jobId,
+      jobType: payload.jobType,
+      clusterName: payload.clusterName,
+      projectId: payload.projectId,
+      region: payload.region,
+      status: payload.status,
+      submissionTime: payload.submissionTime,
+      duration: payload.duration,
+      query: payload.query,
+      results,
+      error: payload.error,
+    };
   }
 
   /**
@@ -199,14 +579,29 @@ export class QdrantStorageService {
     try {
       await this.ensureCollection();
 
-      // Use generateClusterEmbedding for consistency with storage
-      // If queryData is a string, convert to cluster-like format for consistent embedding
+      // Generate query vector with fallback for Transformers.js issues
       let queryVector: number[];
-      if (typeof queryData === 'string') {
-        queryVector = await this.embeddingService.generateEmbedding(queryData);
-      } else {
-        // For object data, use generateClusterEmbedding to match storage method
-        queryVector = await this.embeddingService.generateClusterEmbedding(queryData as any);
+      try {
+        if (typeof queryData === 'string') {
+          queryVector = await this.embeddingService.generateEmbedding(queryData);
+        } else {
+          queryVector = await this.embeddingService.generateClusterEmbedding(queryData as any);
+        }
+
+        // Validate vector is not all zeros (indicates Transformers.js failure)
+        const isZeroVector = queryVector.every((v) => v === 0);
+        if (isZeroVector) {
+          logger.warn(
+            'Transformers.js returned zero vector for search, using local embedding generation'
+          );
+          queryVector = this.generateEmbedding(queryData);
+        }
+      } catch (error) {
+        logger.warn(
+          'Transformers.js embedding failed for search, using local embedding generation:',
+          error
+        );
+        queryVector = this.generateEmbedding(queryData);
       }
 
       const searchResult = await this.client.search(this.config.collectionName, {
@@ -225,6 +620,85 @@ export class QdrantStorageService {
     } catch (error) {
       console.error('Failed to search Qdrant:', error);
       return [];
+    }
+  }
+
+  /**
+   * Retrieve raw Qdrant document with full payload (for enhanced query_knowledge tool)
+   */
+  async retrieveRawDocument(id: string): Promise<{
+    id: string;
+    payload: QdrantPayload;
+    vector?: number[];
+    metadata?: {
+      compressionStatus: 'compressed' | 'uncompressed';
+      compressionType?: string;
+      originalSize?: number;
+      compressedSize?: number;
+      compressionRatio?: number;
+      clusterName: string;
+      projectId: string;
+      region: string;
+      timestamp: string;
+      dataType: string;
+    };
+  } | null> {
+    try {
+      await this.ensureCollection();
+
+      logger.info(
+        `🔍 Attempting to retrieve raw document with ID: ${id} from collection: ${this.config.collectionName}`
+      );
+
+      const result = await this.client.retrieve(this.config.collectionName, {
+        ids: [id],
+        with_payload: true,
+        with_vector: true,
+      });
+
+      logger.info(`📊 Qdrant retrieve result: found ${result.length} documents`);
+
+      if (result.length === 0) {
+        logger.warn(`❌ No document found with ID: ${id}`);
+        return null;
+      }
+
+      const point = result[0];
+      const payload = point.payload as QdrantPayload;
+
+      logger.debug(`📄 Retrieved payload type: ${payload?.type || 'unknown'}`);
+      logger.debug(`📄 Payload keys: ${payload ? Object.keys(payload).join(', ') : 'none'}`);
+
+      if (!payload) {
+        logger.warn(`❌ Retrieved document has no payload for ID: ${id}`);
+        return null;
+      }
+
+      // Extract metadata
+      const metadata = {
+        compressionStatus: payload.isCompressed
+          ? ('compressed' as const)
+          : ('uncompressed' as const),
+        compressionType: payload.compressionType,
+        originalSize: payload.originalSize,
+        compressedSize: payload.compressedSize,
+        compressionRatio: payload.compressionRatio,
+        clusterName: payload.clusterName || 'unknown',
+        projectId: payload.projectId || 'unknown',
+        region: payload.region || 'unknown',
+        timestamp: payload.timestamp || payload.storedAt || 'unknown',
+        dataType: payload.type || 'unknown',
+      };
+
+      return {
+        id: String(point.id),
+        payload,
+        vector: point.vector as number[],
+        metadata,
+      };
+    } catch (error) {
+      console.error('Failed to retrieve raw document from Qdrant:', error);
+      return null;
     }
   }
 
@@ -313,10 +787,20 @@ export class QdrantStorageService {
 
   /**
    * Generate a unique ID for storage
+   * Qdrant requires IDs to be either unsigned integers or UUIDs
    */
   private generateId(_metadata: QdrantStorageMetadata): string {
-    // Generate a proper UUID for Qdrant
-    return globalThis.crypto.randomUUID();
+    // DIAGNOSTIC: Log ID generation
+    const uuid = globalThis.crypto.randomUUID();
+    console.log('[DEBUG] generateId called - generating UUID:', uuid);
+    console.log('[DEBUG] ID type:', typeof uuid);
+    console.log(
+      '[DEBUG] ID format validation:',
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(uuid)
+    );
+
+    // Generate a proper UUID for Qdrant (required format)
+    return uuid;
   }
 
   /**
@@ -388,6 +872,85 @@ export class QdrantStorageService {
   }
 
   /**
+   * Validate and convert vector to ensure it's in the correct format for Qdrant
+   */
+  private validateAndConvertVector(vector: number[]): number[] {
+    // Ensure vector is a proper array of numbers
+    if (!Array.isArray(vector)) {
+      throw new Error(`Vector must be an array, got ${typeof vector}`);
+    }
+
+    if (vector.length !== this.config.vectorSize) {
+      throw new Error(`Vector length must be ${this.config.vectorSize}, got ${vector.length}`);
+    }
+
+    // Ensure all elements are finite numbers
+    const validatedVector = vector.map((value, index) => {
+      if (typeof value !== 'number' || !isFinite(value)) {
+        throw new Error(
+          `Vector element at index ${index} must be a finite number, got ${typeof value}: ${value}`
+        );
+      }
+      return Number(value); // Ensure it's a proper number
+    });
+
+    return validatedVector;
+  }
+
+  /**
+   * Sanitize payload to ensure it's properly serializable and doesn't cause ERR_INVALID_ARG_TYPE
+   */
+  private sanitizePayload(payload: any): Record<string, any> {
+    try {
+      // First, try to serialize and deserialize to catch any circular references
+      const serialized = JSON.stringify(payload);
+      const deserialized = JSON.parse(serialized);
+
+      // Ensure all values are primitive types or simple objects
+      const sanitized: Record<string, any> = {};
+
+      for (const [key, value] of Object.entries(deserialized)) {
+        if (value === null || value === undefined) {
+          sanitized[key] = value;
+        } else if (
+          typeof value === 'string' ||
+          typeof value === 'number' ||
+          typeof value === 'boolean'
+        ) {
+          sanitized[key] = value;
+        } else if (Array.isArray(value)) {
+          // Ensure array elements are serializable
+          sanitized[key] = value.map((item) =>
+            typeof item === 'object' ? JSON.stringify(item) : item
+          );
+        } else if (typeof value === 'object') {
+          // Convert complex objects to strings to avoid serialization issues
+          sanitized[key] = JSON.stringify(value);
+        } else {
+          // Convert anything else to string
+          sanitized[key] = String(value);
+        }
+      }
+
+      return sanitized;
+    } catch (error) {
+      logger.error('Failed to sanitize payload:', error);
+      // Fallback: create a minimal payload
+      return {
+        toolName: payload.toolName || 'unknown',
+        timestamp: payload.timestamp || new Date().toISOString(),
+        projectId: payload.projectId || 'unknown',
+        region: payload.region || 'unknown',
+        clusterName: payload.clusterName || 'unknown',
+        responseType: payload.responseType || 'unknown',
+        type: payload.type || 'unknown',
+        storedAt: new Date().toISOString(),
+        data: typeof payload.data === 'string' ? payload.data : JSON.stringify(payload.data || {}),
+        error: 'Payload sanitization failed',
+      };
+    }
+  }
+  /**
    * Health check for Qdrant connection
    */
   async healthCheck(): Promise<boolean> {
@@ -397,6 +960,64 @@ export class QdrantStorageService {
     } catch (error) {
       console.error('Qdrant health check failed:', error);
       return false;
+    }
+  }
+
+  /**
+   * Graceful shutdown - cleanup Qdrant client connections
+   */
+  async shutdown(): Promise<void> {
+    logger.info('🔄 [MUTEX-DEBUG] QdrantStorageService: Initiating graceful shutdown');
+
+    try {
+      // Reset collection initialization flag
+      this.collectionInitialized = false;
+      logger.debug('🔄 [MUTEX-DEBUG] QdrantStorageService: Collection initialization flag reset');
+
+      // Shutdown embedding service FIRST to avoid circular dependencies
+      if (this.embeddingService) {
+        logger.info('🔄 [MUTEX-DEBUG] QdrantStorageService: Shutting down embedding service FIRST');
+        try {
+          await this.embeddingService.shutdown();
+          logger.info('🔄 [MUTEX-DEBUG] QdrantStorageService: Embedding service shutdown SUCCESS');
+        } catch (embeddingError) {
+          logger.error(
+            '🔄 [MUTEX-DEBUG] QdrantStorageService: Embedding service shutdown FAILED:',
+            embeddingError
+          );
+          // Continue with cleanup
+        }
+        this.embeddingService = null as any;
+      }
+
+      // Note: QdrantClient from @qdrant/js-client-rest doesn't expose a close() method
+      // but we can clear the client reference to help with garbage collection
+      if (this.client) {
+        logger.debug('🔄 [MUTEX-DEBUG] QdrantStorageService: Clearing client reference');
+        // The client will be garbage collected, which should close any underlying connections
+        (this.client as any) = null;
+      }
+
+      // Clear other service references
+      if (this.compressionService) {
+        logger.debug(
+          '🔄 [MUTEX-DEBUG] QdrantStorageService: Clearing compression service reference'
+        );
+        this.compressionService = null as any;
+      }
+
+      if (this.genericConverter) {
+        logger.debug('🔄 [MUTEX-DEBUG] QdrantStorageService: Clearing generic converter reference');
+        this.genericConverter = null as any;
+      }
+
+      logger.info('🔄 [MUTEX-DEBUG] QdrantStorageService: Graceful shutdown completed');
+    } catch (error) {
+      logger.error('🔄 [MUTEX-DEBUG] QdrantStorageService: Error during shutdown:', error);
+      // Don't re-throw to prevent cascading failures
+      logger.warn(
+        '🔄 [MUTEX-DEBUG] Continuing shutdown despite errors to prevent mutex lock issues'
+      );
     }
   }
 }

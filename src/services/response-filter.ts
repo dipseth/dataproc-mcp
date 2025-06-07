@@ -1,6 +1,13 @@
 /**
  * ResponseFilter Service
  * Filters and optimizes MCP responses based on token limits and extraction rules
+ *
+ * PHASE 2 ENHANCEMENT: Generic Converter Integration
+ * - Integrated quickConvert() for simple conversions
+ * - Added createGenericConverter() for complex configurations
+ * - Enhanced error handling with fallback mechanisms
+ * - Performance logging and metrics tracking
+ * - Type-safe field mappings with automatic compression
  */
 
 import { promises as fs } from 'fs';
@@ -25,6 +32,15 @@ import {
 import { ResponseFormatter } from './response-formatter.js';
 import { QdrantStorageService } from './qdrant-storage.js';
 import { QdrantManager } from './qdrant-manager.js';
+import {
+  GenericQdrantConverter,
+  createGenericConverter,
+  quickConvert,
+} from './generic-converter.js';
+import { CompressionService } from './compression.js';
+import { ConversionConfig } from '../types/generic-converter.js';
+import { performance } from 'perf_hooks';
+import { logger } from '../utils/logger.js';
 
 export class ResponseFilter {
   private config: ResponseFilterConfig;
@@ -34,6 +50,10 @@ export class ResponseFilter {
   private storageInitialized = false;
   private static instance: ResponseFilter;
 
+  // Phase 2: Generic Converter Integration
+  private genericConverter: GenericQdrantConverter;
+  private compressionService: CompressionService;
+
   constructor(config: ResponseFilterConfig) {
     this.config = config;
     this.formatter = new ResponseFormatter(config);
@@ -42,6 +62,10 @@ export class ResponseFilter {
       autoStart: false, // DISABLED: Use centralized Qdrant discovery instead
       preferredPort: 6333,
     });
+
+    // Phase 2: Initialize Generic Converter Integration
+    this.compressionService = new CompressionService();
+    this.genericConverter = createGenericConverter(this.compressionService);
 
     // Initialize Qdrant storage asynchronously with error handling
     this.initializeStorage(config.qdrant);
@@ -295,7 +319,7 @@ export class ResponseFilter {
       switch (toolName) {
         case 'list_clusters':
         case 'list_tracked_clusters':
-          extractedData = this.extractClusterEssentials(originalResponse);
+          extractedData = await this.extractClusterEssentials(originalResponse);
           standardContent = this.formatter.formatClusterSummary(
             extractedData as ClusterSummary[],
             originalTokens - this.estimateTokens(JSON.stringify(extractedData))
@@ -303,7 +327,7 @@ export class ResponseFilter {
           break;
 
         case 'get_cluster':
-          extractedData = this.extractSingleClusterEssentials(originalResponse);
+          extractedData = await this.extractSingleClusterEssentials(originalResponse);
           standardContent = this.formatter.formatClusterDetails(
             extractedData as ClusterDetails,
             originalTokens - this.estimateTokens(JSON.stringify(extractedData))
@@ -312,7 +336,7 @@ export class ResponseFilter {
 
         case 'submit_hive_query':
         case 'get_query_results': {
-          extractedData = this.extractQueryEssentials(originalResponse);
+          extractedData = await this.extractQueryEssentials(originalResponse);
           const queryData = extractedData as ExtractedQueryData;
           standardContent = this.formatter.formatQueryResults(
             queryData.results,
@@ -334,7 +358,7 @@ export class ResponseFilter {
 
         default:
           // Generic filtering - truncate and summarize
-          extractedData = this.genericExtraction(originalResponse, tokenLimit);
+          extractedData = await this.genericExtraction(originalResponse, tokenLimit);
           standardContent = JSON.stringify(extractedData, null, 2);
       }
 
@@ -414,70 +438,401 @@ export class ResponseFilter {
 
   /**
    * Extract essential cluster information for list operations
+   * Phase 2: Enhanced with Generic Converter Integration
    */
-  private extractClusterEssentials(response: DataprocApiResponse): ClusterSummary[] {
-    const clusters = isClusterResponse(response)
-      ? response.clusters || [response.cluster].filter(Boolean)
-      : [];
-    const maxClusters = this.config.extractionRules.list_clusters.maxClusters;
-    const essentialFields = this.config.extractionRules.list_clusters.essentialFields;
+  private async extractClusterEssentials(response: DataprocApiResponse): Promise<ClusterSummary[]> {
+    const startTime = performance.now();
 
-    return clusters.slice(0, maxClusters).map((cluster) => {
-      if (!cluster) {
-        return {
-          clusterName: 'unknown',
-          status: 'unknown',
-          createTime: new Date().toISOString(),
-          projectId: 'unknown',
-          region: 'unknown',
+    try {
+      const clusters = isClusterResponse(response)
+        ? response.clusters || [response.cluster].filter(Boolean)
+        : [];
+      const maxClusters = this.config.extractionRules.list_clusters.maxClusters;
+      const essentialFields = this.config.extractionRules.list_clusters.essentialFields;
+
+      const results: ClusterSummary[] = [];
+
+      for (const cluster of clusters.slice(0, maxClusters)) {
+        if (!cluster) {
+          results.push({
+            clusterName: 'unknown',
+            status: 'unknown',
+            createTime: new Date().toISOString(),
+            projectId: 'unknown',
+            region: 'unknown',
+          });
+          continue;
+        }
+
+        try {
+          // Phase 2: Use quickConvert for automatic field mapping and compression
+          const metadata: QdrantStorageMetadata = {
+            toolName: 'extractClusterEssentials',
+            timestamp: new Date().toISOString(),
+            responseType: 'cluster_summary',
+            originalTokenCount: JSON.stringify(cluster).length / 4,
+            filteredTokenCount: 0,
+            compressionRatio: 1,
+            projectId: cluster.projectId || 'unknown',
+            region: this.extractRegion(cluster),
+            clusterName: cluster.clusterName || (cluster as any).name || 'unknown',
+            type: 'cluster',
+          };
+
+          const conversionResult = await quickConvert(cluster, metadata, this.compressionService);
+
+          // Extract essential fields from converted payload
+          const summary: ClusterSummary = {
+            clusterName: conversionResult.payload.clusterName || (cluster as any).name || 'unknown',
+            status:
+              conversionResult.payload.status ||
+              (cluster.status as any)?.state ||
+              cluster.status ||
+              'unknown',
+            createTime:
+              conversionResult.payload.createTime ||
+              (cluster.status as any)?.stateStartTime ||
+              cluster.createTime ||
+              new Date().toISOString(),
+            projectId: conversionResult.payload.projectId || 'unknown',
+            region: conversionResult.payload.region || this.extractRegion(cluster),
+          };
+
+          // Add optional fields if present and requested
+          if (essentialFields.includes('machineType')) {
+            summary.machineType = this.extractMachineTypeFromCluster(cluster);
+          }
+
+          if (essentialFields.includes('numWorkers')) {
+            summary.numWorkers = cluster.config?.workerConfig?.numInstances || 0;
+          }
+
+          if (essentialFields.includes('labels') && cluster.labels) {
+            summary.labels = cluster.labels;
+          }
+
+          results.push(summary);
+
+          logger.debug('🔄 [RESPONSE-FILTER] Cluster extraction with generic converter', {
+            clusterName: summary.clusterName,
+            compressionRatio: conversionResult.metadata.compressionRatio,
+            processingTime: `${conversionResult.metadata.processingTime.toFixed(2)}ms`,
+          });
+        } catch (conversionError) {
+          // Fallback to manual extraction on conversion failure
+          logger.warn('Generic converter failed for cluster, using manual extraction', {
+            error:
+              conversionError instanceof Error ? conversionError.message : String(conversionError),
+            clusterName: cluster.clusterName || 'unknown',
+          });
+
+          const summary: ClusterSummary = {
+            clusterName: cluster.clusterName || (cluster as any).name || 'unknown',
+            status: (cluster.status as any)?.state || cluster.status || 'unknown',
+            createTime:
+              (cluster.status as any)?.stateStartTime ||
+              cluster.createTime ||
+              new Date().toISOString(),
+            projectId: cluster.projectId || 'unknown',
+            region: this.extractRegion(cluster),
+          };
+
+          // Add optional fields if present and requested
+          if (essentialFields.includes('machineType')) {
+            summary.machineType = this.extractMachineTypeFromCluster(cluster);
+          }
+
+          if (essentialFields.includes('numWorkers')) {
+            summary.numWorkers = cluster.config?.workerConfig?.numInstances || 0;
+          }
+
+          if (essentialFields.includes('labels') && cluster.labels) {
+            summary.labels = cluster.labels;
+          }
+
+          results.push(summary);
+        }
+      }
+
+      const totalTime = performance.now() - startTime;
+      logger.debug('🔄 [RESPONSE-FILTER] Cluster essentials extraction completed', {
+        clustersProcessed: results.length,
+        totalTime: `${totalTime.toFixed(2)}ms`,
+      });
+
+      return results;
+    } catch (error) {
+      // Complete fallback to original manual method
+      logger.error('Complete failure in extractClusterEssentials, using original method', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+
+      const clusters = isClusterResponse(response)
+        ? response.clusters || [response.cluster].filter(Boolean)
+        : [];
+      const maxClusters = this.config.extractionRules.list_clusters.maxClusters;
+      const essentialFields = this.config.extractionRules.list_clusters.essentialFields;
+
+      return clusters.slice(0, maxClusters).map((cluster) => {
+        if (!cluster) {
+          return {
+            clusterName: 'unknown',
+            status: 'unknown',
+            createTime: new Date().toISOString(),
+            projectId: 'unknown',
+            region: 'unknown',
+          };
+        }
+
+        const summary: ClusterSummary = {
+          clusterName: cluster.clusterName || (cluster as any).name || 'unknown',
+          status: (cluster.status as any)?.state || cluster.status || 'unknown',
+          createTime:
+            (cluster.status as any)?.stateStartTime ||
+            cluster.createTime ||
+            new Date().toISOString(),
+          projectId: cluster.projectId || 'unknown',
+          region: this.extractRegion(cluster),
         };
-      }
 
-      const summary: ClusterSummary = {
-        clusterName: cluster.clusterName || (cluster as any).name || 'unknown',
-        status: (cluster.status as any)?.state || cluster.status || 'unknown',
-        createTime:
-          (cluster.status as any)?.stateStartTime || cluster.createTime || new Date().toISOString(),
-        projectId: cluster.projectId || 'unknown',
-        region: this.extractRegion(cluster),
-      };
+        // Add optional fields if present and requested
+        if (essentialFields.includes('machineType')) {
+          summary.machineType = this.extractMachineTypeFromCluster(cluster);
+        }
 
-      // Add optional fields if present and requested
-      if (essentialFields.includes('machineType')) {
-        summary.machineType = this.extractMachineTypeFromCluster(cluster);
-      }
+        if (essentialFields.includes('numWorkers')) {
+          summary.numWorkers = cluster.config?.workerConfig?.numInstances || 0;
+        }
 
-      if (essentialFields.includes('numWorkers')) {
-        summary.numWorkers = cluster.config?.workerConfig?.numInstances || 0;
-      }
+        if (essentialFields.includes('labels') && cluster.labels) {
+          summary.labels = cluster.labels;
+        }
 
-      if (essentialFields.includes('labels') && cluster.labels) {
-        summary.labels = cluster.labels;
-      }
-
-      return summary;
-    });
+        return summary;
+      });
+    }
   }
 
   /**
    * Extract essential information for single cluster details
+   * Phase 2: Enhanced with Generic Converter Integration
    */
-  private extractSingleClusterEssentials(response: DataprocApiResponse): ClusterDetails {
-    // Helper function to detect if response has cluster wrapper structure
-    const hasClusterWrapper = (resp: any): boolean => {
-      return resp && typeof resp === 'object' && ('cluster' in resp || 'clusters' in resp);
-    };
+  private async extractSingleClusterEssentials(
+    response: DataprocApiResponse
+  ): Promise<ClusterDetails> {
+    const startTime = performance.now();
 
-    let cluster: any;
+    try {
+      // Helper function to detect if response has cluster wrapper structure
+      const hasClusterWrapper = (resp: any): boolean => {
+        return resp && typeof resp === 'object' && ('cluster' in resp || 'clusters' in resp);
+      };
 
-    if (hasClusterWrapper(response)) {
-      // Response has cluster wrapper structure
-      cluster = (response as any).cluster || (response as any).clusters?.[0];
-    } else if (response && typeof response === 'object' && (response as any).clusterName) {
-      // Response IS the cluster data directly
-      cluster = response;
-    } else {
-      // Fallback for non-cluster responses
+      let cluster: any;
+
+      if (hasClusterWrapper(response)) {
+        // Response has cluster wrapper structure
+        cluster = (response as any).cluster || (response as any).clusters?.[0];
+      } else if (response && typeof response === 'object' && (response as any).clusterName) {
+        // Response IS the cluster data directly
+        cluster = response;
+      } else {
+        // Fallback for non-cluster responses
+        return {
+          clusterName: 'unknown',
+          projectId: 'unknown',
+          region: 'unknown',
+          status: 'unknown',
+          createTime: new Date().toISOString(),
+          config: {},
+        };
+      }
+
+      if (!cluster) {
+        return {
+          clusterName: 'unknown',
+          projectId: 'unknown',
+          region: 'unknown',
+          status: 'unknown',
+          createTime: new Date().toISOString(),
+          config: {},
+        };
+      }
+
+      try {
+        // Phase 2: Use createGenericConverter for complex configuration extraction
+        const metadata: QdrantStorageMetadata = {
+          toolName: 'extractSingleClusterEssentials',
+          timestamp: new Date().toISOString(),
+          responseType: 'cluster_details',
+          originalTokenCount: JSON.stringify(cluster).length / 4,
+          filteredTokenCount: 0,
+          compressionRatio: 1,
+          projectId: cluster.projectId || 'unknown',
+          region: this.extractRegion(cluster),
+          clusterName: cluster.clusterName || cluster.name || 'unknown',
+          type: 'cluster',
+        };
+
+        const config: ConversionConfig<any> = {
+          fieldMappings: {
+            clusterName: 'clusterName',
+            projectId: 'projectId',
+            region: 'region',
+            status: 'status',
+            createTime: 'createTime',
+          },
+          transformations: {
+            clusterName: (value: any) => value || cluster.name || 'unknown',
+            projectId: (value: any) => value || 'unknown',
+            region: (value: any) => value || this.extractRegion(cluster),
+            status: (value: any) => value?.state || value || 'unknown',
+            createTime: (value: any) => value?.stateStartTime || value || new Date().toISOString(),
+          },
+          compressionRules: {
+            fields: ['config', 'metrics', 'statusHistory'],
+            sizeThreshold: 5120, // 5KB
+            compressionType: 'gzip',
+          },
+        };
+
+        const conversionResult = await this.genericConverter.convert(cluster, metadata, config);
+        const essentialSections = this.config.extractionRules.get_cluster.essentialSections;
+
+        const details: ClusterDetails = {
+          clusterName: (conversionResult.payload as any).clusterName || 'unknown',
+          projectId: (conversionResult.payload as any).projectId || 'unknown',
+          region: (conversionResult.payload as any).region || 'unknown',
+          status: (conversionResult.payload as any).status || 'unknown',
+          createTime: (conversionResult.payload as any).createTime || new Date().toISOString(),
+          config: {},
+        };
+
+        // Extract configuration sections using converted data
+        if (essentialSections.includes('config.masterConfig') && cluster.config?.masterConfig) {
+          details.config.masterConfig = {
+            numInstances: cluster.config.masterConfig.numInstances,
+            machineTypeUri: cluster.config.masterConfig.machineTypeUri,
+            diskConfig: cluster.config.masterConfig.diskConfig,
+          };
+        }
+
+        if (essentialSections.includes('config.workerConfig') && cluster.config?.workerConfig) {
+          details.config.workerConfig = {
+            numInstances: cluster.config.workerConfig.numInstances,
+            machineTypeUri: cluster.config.workerConfig.machineTypeUri,
+            diskConfig: cluster.config.workerConfig.diskConfig,
+          };
+        }
+
+        if (essentialSections.includes('config.softwareConfig') && cluster.config?.softwareConfig) {
+          details.config.softwareConfig = {
+            imageVersion: cluster.config.softwareConfig.imageVersion,
+            optionalComponents: cluster.config.softwareConfig.optionalComponents,
+          };
+        }
+
+        // Add labels if requested
+        if (essentialSections.includes('labels') && cluster.labels) {
+          details.labels = cluster.labels;
+        }
+
+        // Add metrics if enabled
+        if (this.config.extractionRules.get_cluster.includeMetrics && cluster.metrics) {
+          details.metrics = cluster.metrics;
+        }
+
+        // Add status history if enabled
+        if (this.config.extractionRules.get_cluster.includeHistory && cluster.statusHistory) {
+          details.statusHistory = cluster.statusHistory.slice(0, 5); // Limit to recent history
+        }
+
+        const processingTime = performance.now() - startTime;
+        logger.debug('🔄 [RESPONSE-FILTER] Single cluster extraction with generic converter', {
+          clusterName: details.clusterName,
+          compressionRatio: conversionResult.metadata.compressionRatio,
+          processingTime: `${processingTime.toFixed(2)}ms`,
+        });
+
+        return details;
+      } catch (conversionError) {
+        // Fallback to manual extraction on conversion failure
+        logger.warn('Generic converter failed for single cluster, using manual extraction', {
+          error:
+            conversionError instanceof Error ? conversionError.message : String(conversionError),
+          clusterName: cluster.clusterName || cluster.name || 'unknown',
+        });
+
+        const essentialSections = this.config.extractionRules.get_cluster.essentialSections;
+
+        const details: ClusterDetails = {
+          clusterName: cluster.clusterName || cluster.name || 'unknown',
+          projectId: cluster.projectId || 'unknown',
+          region: this.extractRegion(cluster),
+          status: cluster.status?.state || cluster.status || 'unknown',
+          createTime:
+            (cluster.status as any)?.stateStartTime ||
+            cluster.createTime ||
+            new Date().toISOString(),
+          config: {},
+        };
+
+        // Extract configuration sections
+        if (
+          essentialSections.includes('config.masterConfig') &&
+          (cluster as any).config?.masterConfig
+        ) {
+          details.config.masterConfig = {
+            numInstances: (cluster as any).config.masterConfig.numInstances,
+            machineTypeUri: (cluster as any).config.masterConfig.machineTypeUri,
+            diskConfig: (cluster as any).config.masterConfig.diskConfig,
+          };
+        }
+
+        if (
+          essentialSections.includes('config.workerConfig') &&
+          (cluster as any).config?.workerConfig
+        ) {
+          details.config.workerConfig = {
+            numInstances: (cluster as any).config.workerConfig.numInstances,
+            machineTypeUri: (cluster as any).config.workerConfig.machineTypeUri,
+            diskConfig: (cluster as any).config.workerConfig.diskConfig,
+          };
+        }
+
+        if (
+          essentialSections.includes('config.softwareConfig') &&
+          (cluster as any).config?.softwareConfig
+        ) {
+          details.config.softwareConfig = {
+            imageVersion: (cluster as any).config.softwareConfig.imageVersion,
+            optionalComponents: (cluster as any).config.softwareConfig.optionalComponents,
+          };
+        }
+
+        // Add labels if requested
+        if (essentialSections.includes('labels') && cluster.labels) {
+          details.labels = cluster.labels;
+        }
+
+        // Add metrics if enabled
+        if (this.config.extractionRules.get_cluster.includeMetrics && cluster.metrics) {
+          details.metrics = cluster.metrics;
+        }
+
+        // Add status history if enabled
+        if (this.config.extractionRules.get_cluster.includeHistory && cluster.statusHistory) {
+          details.statusHistory = cluster.statusHistory.slice(0, 5); // Limit to recent history
+        }
+
+        return details;
+      }
+    } catch (error) {
+      // Complete fallback to original manual method
+      logger.error('Complete failure in extractSingleClusterEssentials, using original method', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+
       return {
         clusterName: 'unknown',
         projectId: 'unknown',
@@ -487,114 +842,156 @@ export class ResponseFilter {
         config: {},
       };
     }
-    if (!cluster) {
-      return {
-        clusterName: 'unknown',
-        projectId: 'unknown',
-        region: 'unknown',
-        status: 'unknown',
-        createTime: new Date().toISOString(),
-        config: {},
-      };
-    }
-
-    const essentialSections = this.config.extractionRules.get_cluster.essentialSections;
-
-    const details: ClusterDetails = {
-      clusterName: cluster.clusterName || cluster.name || 'unknown',
-      projectId: cluster.projectId || 'unknown',
-      region: this.extractRegion(cluster),
-      status: cluster.status?.state || cluster.status || 'unknown',
-      createTime:
-        (cluster.status as any)?.stateStartTime || cluster.createTime || new Date().toISOString(),
-      config: {},
-    };
-
-    // Extract configuration sections
-    if (
-      essentialSections.includes('config.masterConfig') &&
-      (cluster as any).config?.masterConfig
-    ) {
-      details.config.masterConfig = {
-        numInstances: (cluster as any).config.masterConfig.numInstances,
-        machineTypeUri: (cluster as any).config.masterConfig.machineTypeUri,
-        diskConfig: (cluster as any).config.masterConfig.diskConfig,
-      };
-    }
-
-    if (
-      essentialSections.includes('config.workerConfig') &&
-      (cluster as any).config?.workerConfig
-    ) {
-      details.config.workerConfig = {
-        numInstances: (cluster as any).config.workerConfig.numInstances,
-        machineTypeUri: (cluster as any).config.workerConfig.machineTypeUri,
-        diskConfig: (cluster as any).config.workerConfig.diskConfig,
-      };
-    }
-
-    if (
-      essentialSections.includes('config.softwareConfig') &&
-      (cluster as any).config?.softwareConfig
-    ) {
-      details.config.softwareConfig = {
-        imageVersion: (cluster as any).config.softwareConfig.imageVersion,
-        optionalComponents: (cluster as any).config.softwareConfig.optionalComponents,
-      };
-    }
-
-    // Add labels if requested
-    if (essentialSections.includes('labels') && cluster.labels) {
-      details.labels = cluster.labels;
-    }
-
-    // Add metrics if enabled
-    if (this.config.extractionRules.get_cluster.includeMetrics && cluster.metrics) {
-      details.metrics = cluster.metrics;
-    }
-
-    // Add status history if enabled
-    if (this.config.extractionRules.get_cluster.includeHistory && cluster.statusHistory) {
-      details.statusHistory = cluster.statusHistory.slice(0, 5); // Limit to recent history
-    }
-
-    return details;
   }
 
   /**
    * Extract essential query/job result information
+   * Phase 2: Enhanced with Generic Converter Integration
    */
-  private extractQueryEssentials(response: DataprocApiResponse): ExtractedQueryData {
-    const maxRows = this.config.extractionRules.query_results.maxRows;
-    const includeSchema = this.config.extractionRules.query_results.includeSchema;
-    const summaryStats = this.config.extractionRules.query_results.summaryStats;
+  private async extractQueryEssentials(response: DataprocApiResponse): Promise<ExtractedQueryData> {
+    const startTime = performance.now();
 
-    const extracted: ExtractedQueryData = {};
+    try {
+      const maxRows = this.config.extractionRules.query_results.maxRows;
+      const includeSchema = this.config.extractionRules.query_results.includeSchema;
+      const summaryStats = this.config.extractionRules.query_results.summaryStats;
 
-    if (isQueryResultData(response)) {
-      // Extract results
-      if (response.results || response.rows) {
-        const results = response.results || response.rows;
-        extracted.results = Array.isArray(results) ? results.slice(0, maxRows) : results;
+      if (!isQueryResultData(response)) {
+        return {};
       }
 
-      // Extract schema
-      if (includeSchema && response.schema) {
-        extracted.schema = response.schema;
-      }
-
-      // Extract statistics
-      if (summaryStats) {
-        extracted.stats = {
-          totalRows: response.totalRows || response.numRows,
-          executionTime: response.executionTime || response.elapsedTime,
-          bytesProcessed: response.bytesProcessed || response.totalBytesProcessed,
-          jobId: response.jobId || response.reference?.jobId,
+      try {
+        // Phase 2: Use quickConvert for automatic field mapping and compression
+        const metadata: QdrantStorageMetadata = {
+          toolName: 'extractQueryEssentials',
+          timestamp: new Date().toISOString(),
+          responseType: 'query_results',
+          originalTokenCount: JSON.stringify(response).length / 4,
+          filteredTokenCount: 0,
+          compressionRatio: 1,
+          projectId: (response as any).projectId || 'unknown',
+          region: (response as any).region || 'unknown',
+          clusterName: (response as any).clusterName || 'unknown',
+          type: 'query',
         };
-      }
-    }
 
-    return extracted;
+        const conversionResult = await quickConvert(response, metadata, this.compressionService);
+        const payload = conversionResult.payload as any;
+
+        const extracted: ExtractedQueryData = {};
+
+        // Extract results with automatic compression
+        if (payload.results || payload.rows || response.results || response.rows) {
+          const results = payload.results || payload.rows || response.results || response.rows;
+          extracted.results = Array.isArray(results) ? results.slice(0, maxRows) : results;
+        }
+
+        // Extract schema
+        if (includeSchema && (payload.schema || response.schema)) {
+          extracted.schema = payload.schema || response.schema;
+        }
+
+        // Extract statistics with enhanced field mapping
+        if (summaryStats) {
+          extracted.stats = {
+            totalRows:
+              payload.totalRows || payload.numRows || response.totalRows || response.numRows,
+            executionTime:
+              payload.executionTime ||
+              payload.elapsedTime ||
+              response.executionTime ||
+              response.elapsedTime,
+            bytesProcessed:
+              payload.bytesProcessed ||
+              payload.totalBytesProcessed ||
+              response.bytesProcessed ||
+              response.totalBytesProcessed,
+            jobId:
+              payload.jobId ||
+              payload.reference?.jobId ||
+              response.jobId ||
+              response.reference?.jobId,
+          };
+        }
+
+        const processingTime = performance.now() - startTime;
+        logger.debug('🔄 [RESPONSE-FILTER] Query extraction with generic converter', {
+          jobId: extracted.stats?.jobId || 'unknown',
+          compressionRatio: conversionResult.metadata.compressionRatio,
+          processingTime: `${processingTime.toFixed(2)}ms`,
+        });
+
+        return extracted;
+      } catch (conversionError) {
+        // Fallback to manual extraction on conversion failure
+        logger.warn('Generic converter failed for query results, using manual extraction', {
+          error:
+            conversionError instanceof Error ? conversionError.message : String(conversionError),
+          jobId: (response as any).jobId || 'unknown',
+        });
+
+        const extracted: ExtractedQueryData = {};
+
+        // Extract results
+        if (response.results || response.rows) {
+          const results = response.results || response.rows;
+          extracted.results = Array.isArray(results) ? results.slice(0, maxRows) : results;
+        }
+
+        // Extract schema
+        if (includeSchema && response.schema) {
+          extracted.schema = response.schema;
+        }
+
+        // Extract statistics
+        if (summaryStats) {
+          extracted.stats = {
+            totalRows: response.totalRows || response.numRows,
+            executionTime: response.executionTime || response.elapsedTime,
+            bytesProcessed: response.bytesProcessed || response.totalBytesProcessed,
+            jobId: response.jobId || response.reference?.jobId,
+          };
+        }
+
+        return extracted;
+      }
+    } catch (error) {
+      // Complete fallback to original manual method
+      logger.error('Complete failure in extractQueryEssentials, using original method', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+
+      const maxRows = this.config.extractionRules.query_results.maxRows;
+      const includeSchema = this.config.extractionRules.query_results.includeSchema;
+      const summaryStats = this.config.extractionRules.query_results.summaryStats;
+
+      const extracted: ExtractedQueryData = {};
+
+      if (isQueryResultData(response)) {
+        // Extract results
+        if (response.results || response.rows) {
+          const results = response.results || response.rows;
+          extracted.results = Array.isArray(results) ? results.slice(0, maxRows) : results;
+        }
+
+        // Extract schema
+        if (includeSchema && response.schema) {
+          extracted.schema = response.schema;
+        }
+
+        // Extract statistics
+        if (summaryStats) {
+          extracted.stats = {
+            totalRows: response.totalRows || response.numRows,
+            executionTime: response.executionTime || response.elapsedTime,
+            bytesProcessed: response.bytesProcessed || response.totalBytesProcessed,
+            jobId: response.jobId || response.reference?.jobId,
+          };
+        }
+      }
+
+      return extracted;
+    }
   }
 
   /**
@@ -623,27 +1020,133 @@ export class ResponseFilter {
 
   /**
    * Generic extraction for unknown response types
+   * Phase 2: Enhanced with Generic Converter Integration
    */
-  private genericExtraction(response: DataprocApiResponse, tokenLimit: number): unknown {
-    const responseStr = JSON.stringify(response);
-    const maxLength = tokenLimit * 4; // Convert tokens to approximate characters
+  private async genericExtraction(
+    response: DataprocApiResponse,
+    tokenLimit: number
+  ): Promise<unknown> {
+    const startTime = performance.now();
 
-    if (responseStr.length <= maxLength) {
-      return response;
-    }
+    try {
+      const responseStr = JSON.stringify(response);
+      const maxLength = tokenLimit * 4; // Convert tokens to approximate characters
 
-    // Try to preserve structure while truncating
-    if (Array.isArray(response)) {
-      const itemSize = Math.floor(maxLength / response.length);
-      return response.map((item) => {
-        const itemStr = JSON.stringify(item);
-        if (itemStr.length <= itemSize) return item;
-        return JSON.parse(itemStr.substring(0, itemSize - 10) + '"}');
+      if (responseStr.length <= maxLength) {
+        return response;
+      }
+
+      try {
+        // Phase 2: Use quickConvert for intelligent compression and field optimization
+        const metadata: QdrantStorageMetadata = {
+          toolName: 'genericExtraction',
+          timestamp: new Date().toISOString(),
+          responseType: 'generic',
+          originalTokenCount: responseStr.length / 4,
+          filteredTokenCount: 0,
+          compressionRatio: 1,
+          projectId: (response as any).projectId || 'unknown',
+          region: (response as any).region || 'unknown',
+          clusterName: (response as any).clusterName || 'unknown',
+          type: 'generic',
+        };
+
+        const conversionResult = await quickConvert(
+          response as any,
+          metadata,
+          this.compressionService
+        );
+
+        // Check if conversion resulted in size reduction
+        const convertedStr = JSON.stringify(conversionResult.payload);
+        if (convertedStr.length <= maxLength) {
+          const processingTime = performance.now() - startTime;
+          logger.debug('🔄 [RESPONSE-FILTER] Generic extraction with compression successful', {
+            originalSize: responseStr.length,
+            compressedSize: convertedStr.length,
+            compressionRatio: conversionResult.metadata.compressionRatio,
+            processingTime: `${processingTime.toFixed(2)}ms`,
+          });
+
+          return conversionResult.payload;
+        }
+
+        // If still too large, apply additional truncation to compressed data
+        logger.debug(
+          '🔄 [RESPONSE-FILTER] Generic extraction applying additional truncation after compression',
+          {
+            originalSize: responseStr.length,
+            compressedSize: convertedStr.length,
+            targetSize: maxLength,
+          }
+        );
+
+        return this.applyStructuralTruncation(conversionResult.payload, maxLength);
+      } catch (conversionError) {
+        // Fallback to manual truncation on conversion failure
+        logger.warn('Generic converter failed for generic extraction, using manual truncation', {
+          error:
+            conversionError instanceof Error ? conversionError.message : String(conversionError),
+          responseSize: responseStr.length,
+        });
+
+        return this.applyStructuralTruncation(response, maxLength);
+      }
+    } catch (error) {
+      // Complete fallback to original manual method
+      logger.error('Complete failure in genericExtraction, using original method', {
+        error: error instanceof Error ? error.message : String(error),
       });
-    }
 
-    // For objects, truncate string representation
-    return JSON.parse(responseStr.substring(0, maxLength - 10) + '}');
+      const responseStr = JSON.stringify(response);
+      const maxLength = tokenLimit * 4;
+
+      if (responseStr.length <= maxLength) {
+        return response;
+      }
+
+      return this.applyStructuralTruncation(response, maxLength);
+    }
+  }
+
+  /**
+   * Apply structural truncation while preserving data integrity
+   */
+  private applyStructuralTruncation(response: unknown, maxLength: number): unknown {
+    try {
+      // Try to preserve structure while truncating
+      if (Array.isArray(response)) {
+        const itemSize = Math.floor(maxLength / response.length);
+        return response.map((item) => {
+          const itemStr = JSON.stringify(item);
+          if (itemStr.length <= itemSize) return item;
+
+          // Try to truncate gracefully
+          try {
+            return JSON.parse(itemStr.substring(0, itemSize - 10) + '"}');
+          } catch {
+            return { truncated: true, originalSize: itemStr.length };
+          }
+        });
+      }
+
+      // For objects, truncate string representation
+      const responseStr = JSON.stringify(response);
+      try {
+        return JSON.parse(responseStr.substring(0, maxLength - 10) + '}');
+      } catch {
+        return {
+          truncated: true,
+          originalSize: responseStr.length,
+          preview: responseStr.substring(0, Math.min(500, maxLength - 100)),
+        };
+      }
+    } catch (error) {
+      return {
+        error: 'Truncation failed',
+        message: error instanceof Error ? error.message : String(error),
+      };
+    }
   }
 
   /**
@@ -1040,5 +1543,26 @@ export class ResponseFilter {
     if (!uri) return 'unknown';
     const match = uri.match(/zones\/([^/]+)/);
     return match ? match[1] : 'unknown';
+  }
+
+  /**
+   * Phase 2: Get conversion metrics for monitoring and performance tracking
+   */
+  getConversionMetrics() {
+    return this.genericConverter.getMetrics();
+  }
+
+  /**
+   * Phase 2: Reset conversion metrics
+   */
+  resetConversionMetrics(): void {
+    this.genericConverter.resetMetrics();
+  }
+
+  /**
+   * Phase 2: Get compression service for external access
+   */
+  getCompressionService() {
+    return this.compressionService;
   }
 }

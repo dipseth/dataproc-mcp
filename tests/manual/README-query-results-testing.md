@@ -23,7 +23,43 @@ tests/manual/
 ├── test-query-results.ts                    # Original basic test (enhanced)
 └── test-utils/
     └── query-results-test-utils.ts          # Shared utilities and helpers
+├── test-knowledge-indexer-comprehensive.js  # Semantic search & knowledge indexing tests
+├── restore-ml-cluster-data.js               # ML cluster data restoration for semantic search
 ```
+
+## Semantic Search Tests
+
+### `test-knowledge-indexer-comprehensive.js`
+**Dependencies:**
+- ✅ Runs standalone (no MCP server required)
+- ✅ Requires Qdrant running on localhost:6333
+- ✅ Auto-builds project if needed
+
+**Usage:**
+```bash
+npm run build && node tests/manual/test-knowledge-indexer-comprehensive.js
+```
+
+**OR with Qdrant setup:**
+```bash
+docker-compose -f docker-compose.qdrant.yml up -d
+npm run build && node tests/manual/test-knowledge-indexer-comprehensive.js
+```
+
+**Purpose:** Comprehensive test of semantic search functionality including ML cluster queries like "machine learning clusters with pandas" and "tensorflow scikit-learn".
+
+### `restore-ml-cluster-data.js`
+**Dependencies:**
+- ✅ Runs standalone (no MCP server required)
+- ✅ Requires Qdrant running on localhost:6333
+- ✅ Auto-builds project if needed
+
+**Usage:**
+```bash
+npm run build && node tests/manual/restore-ml-cluster-data.js
+```
+
+**Purpose:** Restores ML cluster configurations for semantic search queries. Use this if semantic search tests fail due to missing data.
 
 ## Quick Start
 
@@ -340,7 +376,7 @@ The testing is considered successful when:
 ## Related Documentation
 
 - [Query Results Enhancement Guide](../../docs/QUERY_RESULTS_ENHANCEMENT.md)
-- [GCS Service Documentation](../../docs/GCS_SERVICE.md)
+- [Authentication Guide](../../docs/AUTHENTICATION_IMPLEMENTATION_GUIDE.md)
 - [Semantic Search Guide](../../docs/KNOWLEDGE_BASE_SEMANTIC_SEARCH.md)
 - [Authentication Guide](../../docs/AUTHENTICATION_IMPLEMENTATION_GUIDE.md)
 - [Testing Guide](../../docs/TESTING_GUIDE.md)

@@ -558,219 +558,183 @@ Gets the Zeppelin notebook URL for a cluster (if enabled).
 }
 ```
 
-## Common Usage Patterns
+## Data Structures
 
-### 1. Complete Data Pipeline
+### Output Formats
 
-```json
-// 1. Create cluster
-{
-  "tool": "create_cluster_from_profile",
-  "arguments": {
-    "profileName": "production/high-memory/analysis",
-    "clusterName": "pipeline-cluster-001"
-  }
+```typescript
+type OutputFormat = 'text' | 'json' | 'csv' | 'unknown';
+```
+
+### Job Output Options
+
+```typescript
+interface JobOutputOptions extends ParseOptions {
+  /**
+   * Whether to use cache
+   */
+  useCache?: boolean;
+
+  /**
+   * Whether to validate file hashes
+   */
+  validateHash?: boolean;
+
+  /**
+   * Custom cache config overrides
+   */
+  cacheConfig?: Partial<CacheConfig>;
 }
+```
 
-// 2. Submit data processing job
-{
-  "tool": "submit_hive_query",
-  "arguments": {
-    "clusterName": "pipeline-cluster-001",
-    "query": "CREATE TABLE processed_data AS SELECT * FROM raw_data WHERE date >= '2024-01-01'"
-  }
+### Parse Options
+
+```typescript
+interface ParseOptions {
+  /**
+   * Whether to trim whitespace from values
+   */
+  trim?: boolean;
+
+  /**
+   * Custom delimiter for CSV parsing
+   */
+  delimiter?: string;
+
+  /**
+   * Whether to parse numbers in JSON/CSV
+   */
+  parseNumbers?: boolean;
+
+  /**
+   * Whether to skip empty lines
+   */
+  skipEmpty?: boolean;
 }
+```
 
-// 3. Check job status
-{
-  "tool": "get_job_status",
-  "arguments": {
-    "jobId": "returned-job-id"
-  }
+### Table Structure
+
+The table structure used in the formatted output feature:
+
+```typescript
+interface Table {
+  /**
+   * Array of column names
+   */
+  columns: string[];
+  
+  /**
+   * Array of row objects, where each object has properties matching column names
+   */
+  rows: Record<string, any>[];
 }
+```
 
-// 4. Get results
-{
-  "tool": "get_job_results",
-  "arguments": {
-    "jobId": "returned-job-id"
-  }
-}
+## Formatted Output Feature
 
-// 5. Clean up
+### Overview
+
+The formatted output feature enhances job results by providing a clean, readable ASCII table representation of the data alongside the structured data.
+
+### Output Structure
+
+When a job produces tabular output, the result will include:
+
+```javascript
 {
-  "tool": "delete_cluster",
-  "arguments": {
-    "clusterName": "pipeline-cluster-001"
+  // Job details...
+  parsedOutput: {
+    tables: [
+      {
+        columns: ["column1", "column2", ...],
+        rows: [
+          { "column1": "value1", "column2": "value2", ... },
+          // More rows...
+        ]
+      },
+      // More tables...
+    ],
+    formattedOutput: "┌─────────┬─────────┐\n│ column1 │ column2 │\n├─────────┼─────────┤\n│ value1  │ value2  │\n└─────────┴─────────┘"
   }
 }
 ```
 
-### 2. Interactive Analysis
+### Usage
 
-```json
-// 1. Create development cluster
-{
-  "tool": "create_cluster_from_profile",
-  "arguments": {
-    "profileName": "development/small",
-    "clusterName": "analysis-session"
-  }
-}
+To access and display the formatted output:
 
-// 2. Get Zeppelin URL for notebooks
-{
-  "tool": "get_zeppelin_url",
-  "arguments": {
-    "clusterName": "analysis-session"
-  }
-}
+```javascript
+const results = await getDataprocJobResults({
+  projectId: 'your-project',
+  region: 'us-central1',
+  jobId: 'job-id',
+  format: 'text',
+  wait: true
+});
 
-// 3. Run exploratory queries
-{
-  "tool": "submit_hive_query",
-  "arguments": {
-    "clusterName": "analysis-session",
-    "query": "SELECT COUNT(*) FROM my_table",
-    "async": false
-  }
+if (results.parsedOutput && results.parsedOutput.formattedOutput) {
+  console.log('Formatted Table Output:');
+  console.log(results.parsedOutput.formattedOutput);
 }
 ```
 
-### 3. Batch Processing
+### Multiple Tables
 
-```json
-// 1. List existing clusters
-{
-  "tool": "list_clusters",
-  "arguments": {
-    "filter": "status.state=RUNNING"
-  }
-}
+If the job produces multiple tables, they will be formatted separately with table numbers:
 
-// 2. Submit batch job to existing cluster
-{
-  "tool": "submit_dataproc_job",
-  "arguments": {
-    "clusterName": "existing-cluster",
-    "jobType": "spark",
-    "jobConfig": {
-      "mainClass": "com.example.BatchProcessor",
-      "jarFileUris": ["gs://my-bucket/batch-processor.jar"]
-    },
-    "async": true
-  }
-}
-
-// 3. Monitor progress
-{
-  "tool": "get_job_status",
-  "arguments": {
-    "jobId": "batch-job-id"
-  }
-}
 ```
-## 🚀 Response Optimization
+Table 1:
+┌─────────┬─────────┐
+│ column1 │ column2 │
+├─────────┼─────────┤
+│ value1  │ value2  │
+└─────────┴─────────┘
 
-The Dataproc MCP Server features intelligent response optimization that dramatically reduces token usage while maintaining full data accessibility through Qdrant storage.
-
-### Performance Metrics
-
-| Tool | Token Reduction | Before | After | Processing Time |
-|------|----------------|--------|-------|----------------|
-| `list_clusters` | **96.2%** | 7,651 | 292 | ~8ms |
-| `get_cluster` | **64.0%** | 553 | 199 | ~12ms |
-| `check_active_jobs` | **80.6%** | 1,626 | 316 | ~10ms |
-| `get_job_status` | **75.3%** | 445 | 110 | ~9ms |
-
-**Average Performance:**
-- **Token Reduction**: 79.0% across all tools
-- **Processing Time**: 9.95ms average
-- **Memory Usage**: <1MB per operation
-- **Storage Efficiency**: 99.9% compression ratio
-
-### How It Works
-
-1. **Intelligent Filtering**: Responses are automatically optimized to show only essential information
-2. **Qdrant Storage**: Complete data is stored in vector database for later access
-3. **Resource URIs**: Each response includes a `dataproc://` URI for full data retrieval
-4. **Graceful Fallback**: If Qdrant is unavailable, full responses are returned
-5. **Configurable Limits**: Token limits and optimization rules are customizable
-
-### Verbose Parameter
-
-All optimized tools support a `verbose` parameter:
-
-```json
-{
-  "tool": "list_clusters",
-  "arguments": {
-    "verbose": false  // Default: optimized response
-  }
-}
+Table 2:
+┌─────────┬─────────┐
+│ column3 │ column4 │
+├─────────┼─────────┤
+│ value3  │ value4  │
+└─────────┴─────────┘
 ```
 
-```json
-{
-  "tool": "list_clusters", 
-  "arguments": {
-    "verbose": true   // Full response, no optimization
-  }
-}
-```
+### Implementation Details
 
-### Accessing Stored Data
+The formatted output is generated using the `table` library with specific configuration options for clean formatting:
 
-Full data is accessible via Qdrant resource URIs:
+- Border style: Uses the 'norc' border character set for a clean, minimal look
+- Column padding: Adds 1 space of padding on both sides of column content
+- Horizontal lines: Draws horizontal lines only at the top, after the header, and at the bottom
 
-**Resource URI Format:**
-```
-dataproc://responses/{tool}/{operation}/{id}
-```
+For more detailed implementation information, see the source code in `src/services/output-parser.ts`.
 
-**Examples:**
-- `dataproc://responses/clusters/list/abc123` - Full cluster list data
-- `dataproc://responses/clusters/get/def456` - Complete cluster configuration
-- `dataproc://responses/jobs/active/ghi789` - Full job status details
+## Error Handling
 
-**Accessing via MCP Resource:**
-```json
-{
-  "method": "resources/read",
-  "params": {
-    "uri": "dataproc://responses/clusters/list/abc123"
-  }
-}
-```
+The API includes comprehensive error handling for various scenarios:
 
-### Configuration
+- **GCS Access Errors**: When files cannot be accessed or downloaded
+- **Parse Errors**: When content cannot be parsed in the expected format
+- **Job Execution Errors**: When jobs fail or are cancelled
+- **Timeout Errors**: When operations exceed specified timeouts
 
-Response optimization can be configured via environment variables:
+Each error type includes detailed information to help diagnose and resolve issues.
 
-```bash
-# Enable/disable optimization (default: true)
-RESPONSE_OPTIMIZATION_ENABLED=true
+## Best Practices
 
-# Token limits for optimization triggers
-RESPONSE_TOKEN_LIMIT=500
+### Working with Formatted Output
 
-# Qdrant connection settings
-QDRANT_URL=http://localhost:6333
-QDRANT_COLLECTION=dataproc_responses
+1. **Check for existence**: Always check if `formattedOutput` exists before using it
+2. **Display as-is**: The formatted output is already optimized for console display
+3. **Preserve original data**: Use the structured data in `tables` for programmatic processing
+4. **Handle large outputs**: For very large tables, consider implementing pagination in your UI
 
-# Auto-startup Qdrant (default: true)
-QDRANT_AUTO_START=true
-```
+### Performance Optimization
 
-### Benefits
-
-1. **Reduced Token Costs**: 60-96% reduction in token usage
-2. **Faster Responses**: Optimized responses are processed faster
-3. **Better UX**: Concise, actionable information in responses
-4. **Full Data Access**: Complete data always available via URIs
-5. **Automatic Storage**: No manual data management required
-6. **Semantic Search**: Stored data is searchable via vector similarity
-
+1. **Use caching**: Enable the cache for frequently accessed job results
+2. **Specify format**: Explicitly specify the expected format when known
+3. **Limit wait time**: Set appropriate timeouts for waiting operations
+4. **Use async mode**: For long-running jobs, submit in async mode and check status separately
 ## Error Handling
 
 ### Common Error Responses
