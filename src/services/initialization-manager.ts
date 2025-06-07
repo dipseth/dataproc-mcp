@@ -139,6 +139,9 @@ export class InitializationManager {
 
         // Initialize KnowledgeIndexer
         await this.initializeKnowledgeIndexer(discoveredQdrantUrl, startupStatus);
+
+        // Perform health check to update Qdrant connection status
+        await startupStatus.performHealthCheck();
       } else {
         this.markServicesAsFailed(startupStatus, 'Configuration file not found');
       }

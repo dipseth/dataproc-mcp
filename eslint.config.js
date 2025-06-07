@@ -21,7 +21,8 @@ export default [
         clearTimeout: 'readonly',
         setInterval: 'readonly',
         clearInterval: 'readonly',
-        NodeJS: 'readonly'
+        NodeJS: 'readonly',
+        global: 'readonly'
       }
     },
     plugins: {

@@ -119,10 +119,14 @@ export const ListClustersSchema = z.object({
 });
 
 export const GetClusterSchema = z.object({
-  projectId: ProjectIdSchema,
-  region: RegionSchema,
+  projectId: ProjectIdSchema.optional(),
+  region: RegionSchema.optional(),
   clusterName: ClusterNameSchema,
   verbose: z.boolean().optional().default(false).describe('Return full response without filtering'),
+  semanticQuery: z
+    .string()
+    .optional()
+    .describe('Optional: Semantic query to extract specific information'),
 });
 
 export const DeleteClusterSchema = z.object({
@@ -166,8 +170,8 @@ export const GetJobStatusSchema = z.object({
 });
 
 export const GetQueryResultsSchema = z.object({
-  projectId: ProjectIdSchema,
-  region: RegionSchema,
+  projectId: ProjectIdSchema.optional(),
+  region: RegionSchema.optional(),
   jobId: JobIdSchema,
   maxResults: z
     .number()
@@ -214,14 +218,70 @@ export const GetZeppelinUrlSchema = z.object({
 });
 
 export const ListTrackedClustersSchema = z.object({
+  projectId: ProjectIdSchema.optional(),
+  region: RegionSchema.optional(),
   profileId: z.string().max(100, 'Profile ID too long').optional().describe('Filter by profile ID'),
 });
 
+export const QueryClusterDataSchema = z.object({
+  projectId: ProjectIdSchema.optional(),
+  region: RegionSchema.optional(),
+  query: z
+    .string()
+    .min(1, 'Query is required')
+    .max(1000, 'Query too long')
+    .describe('Natural language query'),
+  clusterName: ClusterNameSchema.optional(),
+  limit: z
+    .number()
+    .int('Limit must be an integer')
+    .min(1, 'Limit must be at least 1')
+    .max(100, 'Limit must be at most 100')
+    .default(5)
+    .describe('Maximum number of results'),
+});
+
+export const GetClusterInsightsSchema = z.object({
+  projectId: ProjectIdSchema.optional(),
+  region: RegionSchema.optional(),
+});
+
+export const GetJobAnalyticsSchema = z.object({
+  projectId: ProjectIdSchema.optional(),
+  region: RegionSchema.optional(),
+});
+
+export const QueryKnowledgeSchema = z.object({
+  projectId: ProjectIdSchema.optional(),
+  region: RegionSchema.optional(),
+  query: z
+    .string()
+    .min(1, 'Query is required')
+    .max(1000, 'Query too long')
+    .describe('Natural language query'),
+  type: z
+    .enum(['clusters', 'cluster', 'jobs', 'job', 'errors', 'error', 'all'])
+    .optional()
+    .describe('Type of knowledge to search'),
+  limit: z
+    .number()
+    .int('Limit must be an integer')
+    .min(1, 'Limit must be at least 1')
+    .max(100, 'Limit must be at most 100')
+    .default(10)
+    .describe('Maximum number of results'),
+  includeRawDocument: z.boolean().optional().default(false).describe('Include raw Qdrant document'),
+});
+
 export const ListProfilesSchema = z.object({
+  projectId: ProjectIdSchema.optional(),
+  region: RegionSchema.optional(),
   category: z.string().max(50, 'Category name too long').optional().describe('Filter by category'),
 });
 
 export const GetProfileSchema = z.object({
+  projectId: ProjectIdSchema.optional(),
+  region: RegionSchema.optional(),
   profileId: z
     .string()
     .min(1, 'Profile ID is required')

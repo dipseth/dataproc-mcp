@@ -8,6 +8,13 @@
 import { pipeline } from '@huggingface/transformers';
 import { writeFileSync, readFileSync, existsSync } from 'fs';
 import { join } from 'path';
+import {
+  GenericQdrantConverter,
+  createGenericConverter,
+  quickConvert,
+} from './generic-converter.js';
+import { CompressionService } from './compression.js';
+import { QdrantStorageMetadata } from '../types/response-filter.js';
 import { ClusterConfig } from '../types/cluster-config.js';
 import { logger } from '../utils/logger.js';
 
@@ -53,23 +60,68 @@ export interface TrainingData {
 }
 
 export class TransformersEmbeddingService {
+  private static instance: TransformersEmbeddingService | null = null;
+  private static instanceCount = 0;
+
   private pipeline: unknown = null;
   private modelName: string;
   private vectorSize: number;
   private trainingDataPath: string;
   private trainingData: TrainingData[] = [];
   private documentsProcessed: number = 0;
+  private isShuttingDown = false;
+
+  // Phase 3: Generic Converter Integration
+  private genericConverter: GenericQdrantConverter;
+  private compressionService: CompressionService;
 
   constructor(
     modelName: string = 'Xenova/all-MiniLM-L6-v2', // 384-dimensional embeddings
     trainingDataPath?: string
   ) {
+    TransformersEmbeddingService.instanceCount++;
+    logger.info(
+      `🔄 [MUTEX-DEBUG] TransformersEmbeddingService instance #${TransformersEmbeddingService.instanceCount} created`
+    );
+
     this.modelName = modelName;
     this.vectorSize = 384; // Standard for all-MiniLM-L6-v2
     this.trainingDataPath =
       trainingDataPath || join(process.cwd(), 'state', 'embedding-training-data.json');
 
+    // Phase 3: Initialize Generic Converter Integration
+    this.compressionService = new CompressionService();
+    this.genericConverter = createGenericConverter(this.compressionService);
+
     this.loadTrainingData();
+  }
+
+  /**
+   * Get singleton instance to prevent multiple Transformers.js models
+   */
+  public static getInstance(
+    modelName: string = 'Xenova/all-MiniLM-L6-v2',
+    trainingDataPath?: string
+  ): TransformersEmbeddingService {
+    if (!TransformersEmbeddingService.instance) {
+      logger.info('🔄 [MUTEX-DEBUG] Creating singleton TransformersEmbeddingService instance');
+      TransformersEmbeddingService.instance = new TransformersEmbeddingService(
+        modelName,
+        trainingDataPath
+      );
+    } else {
+      logger.info('🔄 [MUTEX-DEBUG] Reusing existing TransformersEmbeddingService singleton');
+    }
+    return TransformersEmbeddingService.instance;
+  }
+
+  /**
+   * Clear singleton instance (for testing)
+   */
+  public static clearInstance(): void {
+    logger.info('🔄 [MUTEX-DEBUG] Clearing TransformersEmbeddingService singleton instance');
+    TransformersEmbeddingService.instance = null;
+    TransformersEmbeddingService.instanceCount = 0;
   }
 
   /**
@@ -136,8 +188,119 @@ export class TransformersEmbeddingService {
 
   /**
    * Extract comprehensive text from cluster data for embedding
+   * Phase 3: Enhanced with Generic Converter Integration
    */
-  private extractClusterText(clusterData: ClusterData): string {
+  private async extractClusterText(clusterData: ClusterData): Promise<string> {
+    const startTime = Date.now();
+
+    try {
+      // Phase 3: Use quickConvert for automatic text extraction
+      const metadata: QdrantStorageMetadata = {
+        toolName: 'extractClusterText',
+        timestamp: new Date().toISOString(),
+        responseType: 'text_extraction',
+        originalTokenCount: 0,
+        filteredTokenCount: 0,
+        compressionRatio: 1.0,
+        type: 'text_extraction',
+      };
+
+      const conversionResult = await quickConvert(
+        clusterData as Record<string, any>,
+        metadata,
+        this.compressionService
+      );
+      const payload = conversionResult.payload as any;
+
+      const textParts: string[] = [];
+
+      // Extract text using converted payload with intelligent field mapping
+      if (payload.clusterName) textParts.push(`cluster ${payload.clusterName}`);
+      if (payload.projectId) textParts.push(`project ${payload.projectId}`);
+      if (payload.region) textParts.push(`region ${payload.region}`);
+
+      // Labels - very important for semantic search
+      if (payload.labels) {
+        Object.entries(payload.labels).forEach(([key, value]) => {
+          textParts.push(`${key} ${value}`);
+        });
+      }
+
+      // Software configuration - enhanced extraction
+      const softwareConfig = payload.config?.softwareConfig || payload.softwareConfig;
+      if (softwareConfig?.properties) {
+        Object.entries(softwareConfig.properties).forEach(([key, value]) => {
+          if (key.includes('pip.packages') && typeof value === 'string') {
+            // Extract package names for better semantic matching
+            const packages = value.split(',').map((pkg: string) => {
+              const [name] = pkg.trim().split('==');
+              return name.trim();
+            });
+            textParts.push(`python packages: ${packages.join(' ')}`);
+            textParts.push(`pip install ${packages.join(' ')}`);
+          } else {
+            textParts.push(`${key} ${value}`);
+          }
+        });
+      }
+
+      // Machine configuration with automatic field extraction
+      const masterConfig = payload.config?.masterConfig || payload.masterConfig;
+      const workerConfig = payload.config?.workerConfig || payload.workerConfig;
+
+      if (masterConfig?.machineTypeUri) {
+        const machineType = masterConfig.machineTypeUri.split('/').pop();
+        if (machineType) {
+          textParts.push(`machine type ${machineType}`);
+          textParts.push(`compute ${machineType}`);
+        }
+      }
+
+      if (workerConfig?.machineTypeUri) {
+        const machineType = workerConfig.machineTypeUri.split('/').pop();
+        if (machineType) {
+          textParts.push(`worker machine ${machineType}`);
+        }
+      }
+
+      // Optional components
+      if (softwareConfig?.optionalComponents) {
+        softwareConfig.optionalComponents.forEach((comp: string) => {
+          textParts.push(`component ${comp.toLowerCase()}`);
+          textParts.push(comp.toLowerCase());
+        });
+      }
+
+      // Network and disk configuration
+      if (masterConfig?.diskConfig) {
+        const diskConfig = masterConfig.diskConfig;
+        if (diskConfig.bootDiskSizeGb) {
+          textParts.push(`disk ${diskConfig.bootDiskSizeGb}GB`);
+        }
+        if (diskConfig.bootDiskType) {
+          textParts.push(`disk type ${diskConfig.bootDiskType}`);
+        }
+      }
+
+      const processingTime = Date.now() - startTime;
+      logger.debug(
+        `🔄 [TRANSFORMERS-EMBEDDINGS] extractClusterText with generic converter: ${processingTime}ms, compression: ${conversionResult.metadata.compressionRatio.toFixed(2)}`
+      );
+
+      return textParts.join(' ');
+    } catch (error) {
+      logger.warn(
+        'Generic converter failed for text extraction, falling back to manual method:',
+        error
+      );
+      return this.extractClusterTextManual(clusterData);
+    }
+  }
+
+  /**
+   * Manual fallback method for text extraction
+   */
+  private extractClusterTextManual(clusterData: ClusterData): string {
     const textParts: string[] = [];
 
     // Basic cluster info
@@ -209,9 +372,10 @@ export class TransformersEmbeddingService {
 
   /**
    * Train the model with new cluster data (store for future fine-tuning)
+   * Phase 3: Enhanced with Generic Converter Integration
    */
-  public trainOnClusterData(clusterData: ClusterData): void {
-    const extractedText = this.extractClusterText(clusterData);
+  public async trainOnClusterData(clusterData: ClusterData): Promise<void> {
+    const extractedText = await this.extractClusterText(clusterData);
 
     if (extractedText.trim().length === 0) {
       logger.warn('No text extracted from cluster data');
@@ -291,19 +455,39 @@ export class TransformersEmbeddingService {
         logger.warn(`Expected vector size ${this.vectorSize}, got ${embedding.length}`);
       }
 
+      // DIAGNOSTIC: Check embedding quality
+      const isZeroVector = embedding.every((v) => v === 0);
+      const magnitude = Math.sqrt(embedding.reduce((sum, val) => sum + val * val, 0));
+
+      if (isZeroVector) {
+        logger.error(
+          `❌ [DIAGNOSTIC] Generated zero vector for text: "${text.substring(0, 100)}..."`
+        );
+      } else {
+        logger.info(
+          `✅ [DIAGNOSTIC] Generated valid embedding - magnitude: ${magnitude.toFixed(6)} for text: "${text.substring(0, 50)}..."`
+        );
+      }
+
       return embedding;
     } catch (error) {
-      logger.error('Failed to generate embedding:', error);
+      logger.error(
+        `❌ [DIAGNOSTIC] Failed to generate embedding for text: "${text.substring(0, 100)}..."`,
+        error
+      );
       // Return zero vector as fallback
-      return new Array(this.vectorSize).fill(0);
+      const zeroVector = new Array(this.vectorSize).fill(0);
+      logger.warn(`🔄 [DIAGNOSTIC] Returning zero vector fallback (length: ${zeroVector.length})`);
+      return zeroVector;
     }
   }
 
   /**
    * Generate embeddings for cluster data with semantic enhancement
+   * Phase 3: Enhanced with Generic Converter Integration
    */
   public async generateClusterEmbedding(clusterData: ClusterData): Promise<number[]> {
-    const text = this.extractClusterText(clusterData);
+    const text = await this.extractClusterText(clusterData);
     return this.generateEmbedding(text);
   }
 
@@ -343,5 +527,172 @@ export class TransformersEmbeddingService {
    */
   public getSampleTrainingData(limit: number = 3): TrainingData[] {
     return this.trainingData.slice(-limit);
+  }
+
+  // Phase 3: Generic Converter Integration Utility Methods
+
+  /**
+   * Get conversion metrics from the generic converter
+   */
+  getConversionMetrics() {
+    return this.genericConverter.getMetrics();
+  }
+
+  /**
+   * Reset conversion metrics
+   */
+  resetConversionMetrics(): void {
+    this.genericConverter.resetMetrics();
+  }
+
+  /**
+   * Get compression service for external access
+   */
+  getCompressionService(): CompressionService {
+    return this.compressionService;
+  }
+
+  /**
+   * Test generic converter integration with sample cluster data
+   */
+  async testGenericConverterIntegration(): Promise<{
+    success: boolean;
+    metrics: any;
+    extractedText?: string;
+    error?: string;
+  }> {
+    try {
+      const sampleClusterData: ClusterData = {
+        clusterName: 'test-embedding-cluster',
+        projectId: 'test-project',
+        region: 'us-central1',
+        config: {
+          softwareConfig: {
+            properties: {
+              'dataproc:pip.packages': 'pandas==1.3.0,numpy==1.21.0,scikit-learn==0.24.2',
+            },
+            optionalComponents: ['JUPYTER', 'ZEPPELIN'],
+          },
+          masterConfig: {
+            machineTypeUri: 'zones/us-central1-a/machineTypes/n1-standard-4',
+            diskConfig: {
+              bootDiskSizeGb: 100,
+              bootDiskType: 'pd-standard',
+            },
+          },
+        },
+        labels: {
+          environment: 'test',
+          team: 'data-science',
+        },
+      };
+
+      const extractedText = await this.extractClusterText(sampleClusterData);
+      const metrics = this.getConversionMetrics();
+
+      return {
+        success: true,
+        metrics,
+        extractedText,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        metrics: this.getConversionMetrics(),
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Graceful shutdown - cleanup AI model pipeline and worker threads
+   */
+  async shutdown(): Promise<void> {
+    if (this.isShuttingDown) {
+      logger.warn('🔄 [MUTEX-DEBUG] TransformersEmbeddingService: Already shutting down, skipping');
+      return;
+    }
+
+    this.isShuttingDown = true;
+    logger.info('🔄 [MUTEX-DEBUG] TransformersEmbeddingService: Initiating graceful shutdown');
+
+    try {
+      // Save any pending training data
+      this.saveTrainingData();
+      logger.debug('🔄 [MUTEX-DEBUG] TransformersEmbeddingService: Training data saved');
+
+      // Clear the pipeline to release worker threads
+      if (this.pipeline) {
+        logger.info(
+          '🔄 [MUTEX-DEBUG] TransformersEmbeddingService: Disposing AI model pipeline - CRITICAL STEP'
+        );
+
+        try {
+          // Force garbage collection before disposal
+          if (typeof global !== 'undefined' && (global as any).gc) {
+            (global as any).gc();
+            logger.debug('🔄 [MUTEX-DEBUG] Forced garbage collection before pipeline disposal');
+          }
+
+          // Try to dispose the pipeline if it has a dispose method
+          if (typeof (this.pipeline as any).dispose === 'function') {
+            logger.debug('🔄 [MUTEX-DEBUG] Calling pipeline.dispose()...');
+            await (this.pipeline as any).dispose();
+            logger.info('🔄 [MUTEX-DEBUG] Pipeline disposed via dispose() - SUCCESS');
+          } else {
+            logger.warn(
+              '🔄 [MUTEX-DEBUG] Pipeline has no dispose() method - potential resource leak'
+            );
+          }
+
+          // Try alternative cleanup methods
+          if (typeof (this.pipeline as any).terminate === 'function') {
+            logger.debug('🔄 [MUTEX-DEBUG] Calling pipeline.terminate()...');
+            await (this.pipeline as any).terminate();
+            logger.info('🔄 [MUTEX-DEBUG] Pipeline terminated via terminate() - SUCCESS');
+          }
+
+          // Clear the pipeline reference
+          this.pipeline = null;
+          logger.info('🔄 [MUTEX-DEBUG] Pipeline reference cleared - SUCCESS');
+
+          // Force another garbage collection after disposal
+          if (typeof global !== 'undefined' && (global as any).gc) {
+            (global as any).gc();
+            logger.debug('🔄 [MUTEX-DEBUG] Forced garbage collection after pipeline disposal');
+          }
+
+          // Add a small delay to allow worker threads to fully terminate
+          await new Promise((resolve) => setTimeout(resolve, 200));
+          logger.debug('🔄 [MUTEX-DEBUG] Waited 200ms for worker thread cleanup');
+        } catch (pipelineError) {
+          logger.error('🔄 [MUTEX-DEBUG] Error disposing pipeline:', pipelineError);
+          // Continue with cleanup even if pipeline disposal fails
+          this.pipeline = null;
+        }
+      } else {
+        logger.debug('🔄 [MUTEX-DEBUG] No pipeline to dispose');
+      }
+
+      // Clear training data cache
+      this.trainingData = [];
+      logger.debug('🔄 [MUTEX-DEBUG] Training data cache cleared');
+
+      // Clear singleton instance if this is the singleton
+      if (TransformersEmbeddingService.instance === this) {
+        logger.info('🔄 [MUTEX-DEBUG] Clearing singleton instance');
+        TransformersEmbeddingService.clearInstance();
+      }
+
+      logger.info('🔄 [MUTEX-DEBUG] TransformersEmbeddingService: Graceful shutdown completed');
+    } catch (error) {
+      logger.error('🔄 [MUTEX-DEBUG] TransformersEmbeddingService: Error during shutdown:', error);
+      // Don't re-throw to prevent cascading failures
+      logger.warn(
+        '🔄 [MUTEX-DEBUG] Continuing shutdown despite errors to prevent mutex lock issues'
+      );
+    } finally {
+      this.isShuttingDown = false;
+    }
   }
 }

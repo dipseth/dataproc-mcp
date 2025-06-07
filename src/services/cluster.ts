@@ -26,7 +26,7 @@ export async function createCluster(
   clusterName: string,
   clusterConfig?: ClusterConfig,
   _client?: ClusterControllerClient,
-  __impersonateServiceAccount?: string,
+  ____impersonateServiceAccount?: string,
   labels?: Record<string, string> // Add labels parameter
 ): Promise<Cluster> {
   if (process.env.LOG_LEVEL === 'debug')
@@ -401,7 +401,7 @@ export async function getCluster(
   projectId: string,
   region: string,
   clusterName: string,
-  _impersonateServiceAccount?: string
+  ___impersonateServiceAccount?: string
 ): Promise<Cluster> {
   if (process.env.LOG_LEVEL === 'debug')
     console.error('[DEBUG] getCluster: Starting with params:', { projectId, region, clusterName });
