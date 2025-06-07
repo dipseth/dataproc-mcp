@@ -12,7 +12,6 @@
 import './utils/mcp-stdio-handler.js';
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
@@ -21,6 +20,7 @@ import {
   ErrorCode,
   McpError,
 } from '@modelcontextprotocol/sdk/types.js';
+import { TransportFactory } from './transport/index.js';
 import { z } from 'zod';
 import { logger } from './utils/logger.js';
 import { DefaultParameterManager } from './services/default-params.js';
@@ -409,18 +409,29 @@ async function main() {
     // Security middleware and credential manager are already initialized
     // No additional initialization needed
 
-    // Create transport
-    const transport = new StdioServerTransport();
+    // Create dependencies object for handlers
+    const handlerDeps: AllHandlerDependencies = {
+      defaultParamManager,
+      responseFilter,
+      knowledgeIndexer,
+      profileManager,
+      clusterTracker,
+      jobTracker,
+      asyncQueryPoller,
+      semanticQueryService,
+      templatingIntegration,
+    };
 
-    if (httpMode) {
-      console.error('[INFO] HTTP mode requested but not yet implemented. Using stdio mode.');
-      console.error('[INFO] For simultaneous testing, run multiple instances:');
-      console.error('[INFO] 1. MCP Inspector: npx @modelcontextprotocol/inspector build/index.js');
-      console.error('[INFO] 2. VS Code: Configure .roo/mcp.json to use stdio transport');
-    }
+    // Create transport using factory with dependencies
+    const transportConfig = {
+      httpMode,
+      port,
+      handlerDeps,
+    };
+    const transport = await TransportFactory.createTransport(transportConfig);
 
     // Connect server to transport
-    await server.connect(transport);
+    await transport.connect(server);
 
     // Start AsyncQueryPoller for automatic query tracking
     if (asyncQueryPoller) {
@@ -430,7 +441,12 @@ async function main() {
     // Display clean startup summary
     startupStatus.displayStartupSummary();
   } catch (error) {
-    console.error('[DEBUG] MCP Server: Initialization error:', error);
+    console.error('[DEBUG] MCP Server: Initialization error:', {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      name: error instanceof Error ? error.name : typeof error,
+      error: error
+    });
     throw error;
   }
 }
@@ -459,6 +475,11 @@ process.on('SIGTERM', async () => {
 });
 
 main().catch((error) => {
-  console.error('[DEBUG] MCP Server: Fatal error:', error);
+  console.error('[DEBUG] MCP Server: Fatal error:', {
+    message: error instanceof Error ? error.message : String(error),
+    stack: error instanceof Error ? error.stack : undefined,
+    name: error instanceof Error ? error.name : typeof error,
+    error: error
+  });
   process.exit(1);
 });

@@ -34,3 +34,5 @@ export const profileTools = [
     },
   },
 ];
+
+export default profileTools;

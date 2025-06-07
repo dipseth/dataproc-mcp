@@ -15,11 +15,21 @@
   "defaultParameters": {
     "defaultEnvironment": "production",
     "parameters": [
+      {
+        "name": "projectId",
+        "value": "prj-grp-data-sci-prod-b425"
+      },
+      {
+        "name": "region",
+        "value": "us-central1"
+      }
     ],
     "environments": [
       {
         "environment": "production",
         "parameters": {
+          "projectId": "prj-grp-data-sci-prod-b425",
+          "region": "us-central1",
           "machineType": "n1-standard-8",
           "numWorkers": 4
         }
