@@ -12,8 +12,8 @@
  */
 
 import { QdrantClient } from '@qdrant/js-client-rest';
-import { QdrantStorageService } from '../../build/services/qdrant-storage.js';
-import { TransformersEmbeddingService } from '../../build/services/transformers-embeddings.js';
+import { QdrantStorageService } from '../../../build/services/qdrant-storage.js';
+import { TransformersEmbeddingService } from '../../../build/services/transformers-embeddings.js';
 
 console.log('🔬 Comprehensive Qdrant Storage Test');
 console.log('=' .repeat(60));
