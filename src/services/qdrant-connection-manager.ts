@@ -165,10 +165,10 @@ export class QdrantConnectionManager {
         logger.info('🎯 [QDRANT-COLLECTIONS] Key Collections Status:');
         if (knowledgeCol) {
           logger.info(
-            `   ✅ dataproc_knowledge: ${this.getDashboardUrl(url)}#/collections/dataproc_knowledge`
+            `   ✅ dataproc_knowledge (MAIN): ${this.getDashboardUrl(url)}#/collections/dataproc_knowledge`
           );
         } else {
-          logger.info('   ⚠️  dataproc_knowledge: Not found (will be created on first use)');
+          logger.info('   ⚠️  dataproc_knowledge (MAIN): Not found (will be created on first use)');
         }
 
         if (queryResultsCol) {
@@ -181,10 +181,12 @@ export class QdrantConnectionManager {
 
         if (exampleTestCol) {
           logger.info(
-            `   ✅ dataproc_example_test: ${this.getDashboardUrl(url)}#/collections/dataproc_example_test`
+            `   ✅ dataproc_example_test (TEST): ${this.getDashboardUrl(url)}#/collections/dataproc_example_test`
           );
         } else {
-          logger.info('   ⚠️  dataproc_example_test: Not found (will be created with mock data)');
+          logger.info(
+            '   ⚠️  dataproc_example_test (TEST): Not found (will be created with mock data)'
+          );
         }
       } else {
         logger.info('📊 [QDRANT-COLLECTIONS] No collections found - will be created as needed');

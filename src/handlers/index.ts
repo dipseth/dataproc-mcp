@@ -75,6 +75,8 @@ export async function handleToolCall(toolName: string, args: any, deps: AllHandl
       return handleSubmitHiveQuery(args, deps);
     case 'get_query_status':
       return handleGetQueryStatus(args, deps);
+    case 'get_job_status':
+      return handleGetQueryStatus(args, deps); // Use same handler as get_query_status
     case 'get_query_results':
       return handleGetQueryResults(args, deps);
     case 'check_active_jobs':
@@ -116,6 +118,7 @@ export function getSupportedToolNames(): string[] {
     // Job tools
     'submit_hive_query',
     'get_query_status',
+    'get_job_status',
     'get_query_results',
     'check_active_jobs',
 
@@ -137,7 +140,7 @@ export function getSupportedToolNames(): string[] {
 export const handlerSummary = {
   total: getSupportedToolNames().length,
   cluster: 5,
-  job: 4,
+  job: 5,
   profile: 2,
   knowledge: 4,
 };

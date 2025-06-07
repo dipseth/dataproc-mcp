@@ -23,7 +23,7 @@ import { ResponseFilter } from './response-filter.js';
 import { QdrantManager } from './qdrant-manager.js';
 import { SemanticQueryService } from './semantic-query.js';
 import { KnowledgeIndexer } from './knowledge-indexer.js';
-import { MockDataLoader } from './mock-data-loader.js';
+import { MockDataLoader } from './mock-data-loader.js'; // Only used for testing
 import { getStartupStatus } from './startup-status.js';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -218,20 +218,16 @@ export class InitializationManager {
 
       await this.services.knowledgeIndexer.initialize({
         url: discoveredQdrantUrl,
-        collectionName: 'dataproc_knowledge',
+        collectionName: 'dataproc_knowledge', // Main collection for real data
         vectorSize: 384,
         distance: 'Cosine',
       });
 
-      // Load mock data if in development/testing mode
-      if (MockDataLoader.shouldLoadMockData()) {
-        await this.loadMockData(this.services.knowledgeIndexer, discoveredQdrantUrl, startupStatus);
-      } else {
-        startupStatus.updateComponent('Knowledge Indexer', {
-          status: 'OPERATIONAL',
-          details: 'Collection ready',
-        });
-      }
+      // Main collection ready for real data
+      startupStatus.updateComponent('Knowledge Indexer', {
+        status: 'OPERATIONAL',
+        details: 'Collection ready for real data',
+      });
     } catch (error) {
       startupStatus.updateComponent('Knowledge Indexer', {
         status: 'FAILED',
@@ -241,49 +237,26 @@ export class InitializationManager {
   }
 
   /**
-   * Load mock data into collections
+   * Create test collection with mock data (for testing purposes only)
+   * This method is available for test files but not used in main initialization
    */
-  private async loadMockData(
-    knowledgeIndexer: KnowledgeIndexer,
-    discoveredQdrantUrl: string,
-    startupStatus: any
-  ): Promise<void> {
-    try {
-      startupStatus.updateComponent('Knowledge Indexer', {
-        status: 'INITIALIZING',
-        details: 'Loading mock data...',
-      });
+  async createTestCollectionWithMockData(discoveredQdrantUrl: string): Promise<KnowledgeIndexer> {
+    logger.info('🧪 [TEST-COLLECTION] Creating test collection for testing...');
 
-      const mockDataLoader = new MockDataLoader(knowledgeIndexer);
-      await mockDataLoader.loadMockData();
+    const testKnowledgeIndexer = new KnowledgeIndexer();
+    await testKnowledgeIndexer.initialize({
+      url: discoveredQdrantUrl,
+      collectionName: 'dataproc_example_test',
+      vectorSize: 384,
+      distance: 'Cosine',
+    });
 
-      // Initialize test collection for mock data
-      logger.info('🧪 [TEST-COLLECTION] Initializing dataproc_example_test collection...');
+    const testMockDataLoader = new MockDataLoader(testKnowledgeIndexer);
+    await testMockDataLoader.loadMockData();
 
-      const testKnowledgeIndexer = new KnowledgeIndexer();
-      await testKnowledgeIndexer.initialize({
-        url: discoveredQdrantUrl,
-        collectionName: 'dataproc_example_test',
-        vectorSize: 384,
-        distance: 'Cosine',
-      });
+    logger.info('🧪 [TEST-COLLECTION] Test collection ready with mock data');
 
-      const testMockDataLoader = new MockDataLoader(testKnowledgeIndexer);
-      await testMockDataLoader.loadMockData();
-
-      logger.info('🧪 [TEST-COLLECTION] dataproc_example_test collection ready with mock data');
-
-      startupStatus.updateComponent('Knowledge Indexer', {
-        status: 'OPERATIONAL',
-        details: 'Collection ready with mock data',
-      });
-    } catch (error) {
-      logger.warn('🎭 [MOCK-DATA] Failed to load mock data, continuing without it:', error);
-      startupStatus.updateComponent('Knowledge Indexer', {
-        status: 'OPERATIONAL',
-        details: 'Collection ready (mock data failed to load)',
-      });
-    }
+    return testKnowledgeIndexer;
   }
 
   /**

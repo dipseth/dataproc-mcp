@@ -535,6 +535,13 @@ export async function handleQueryKnowledge(args: any, deps: KnowledgeHandlerDepe
 
     results.forEach((result, index) => {
       const data = result.data as any;
+      if (!data) {
+        response += `**${index + 1}. [No Data]**\n`;
+        response += `   🎯 Confidence: ${(result.confidence * 100).toFixed(1)}%\n`;
+        response += `   ⚠️ Warning: Result has null data\n`;
+        return;
+      }
+
       response += `**${index + 1}. ${data.clusterName || data.jobId || 'Unknown'}**\n`;
       response += `   🎯 Confidence: ${(result.confidence * 100).toFixed(1)}%\n`;
 
