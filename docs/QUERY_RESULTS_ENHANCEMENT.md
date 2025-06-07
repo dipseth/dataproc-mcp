@@ -264,7 +264,7 @@ Planned improvements include:
 
 ## Related Documentation
 
-- [GCS Service Documentation](./GCS_SERVICE.md)
 - [Semantic Search Guide](./KNOWLEDGE_BASE_SEMANTIC_SEARCH.md)
-- [Job Output Handler](./JOB_OUTPUT_HANDLER.md)
+- [Authentication Guide](./AUTHENTICATION_IMPLEMENTATION_GUIDE.md)
+- [Configuration Guide](./CONFIGURATION_GUIDE.md)
 - [Authentication Guide](./AUTHENTICATION_IMPLEMENTATION_GUIDE.md)

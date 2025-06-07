@@ -273,7 +273,7 @@ if (!version) {
 
 const changelog = fs.readFileSync('CHANGELOG.md', 'utf8');
 // Regex pattern to match version sections in changelog
-const versionRegex = new RegExp('## \\\\[' + version.replace('v', '') + '\\\\](.\\*?)(?=## \\\\[|$)', 's');
+const versionRegex = new RegExp('## \\\\[' + version.replace('v', '') + '\\\\](.*?)(?=## \\\\[|$)', 's');
 const match = changelog.match(versionRegex);
 
 if (match) {
@@ -422,7 +422,7 @@ Add badges to `README.md` for key metrics and status indicators:
 
 [![npm version](https://badge.fury.io/js/%40dataproc%2Fmcp-server.svg)](https://badge.fury.io/js/%40dataproc%2Fmcp-server)
 [![npm downloads](https://img.shields.io/npm/dm/@dataproc/mcp-server.svg)](https://npmjs.org/package/@dataproc/mcp-server)
-[![Build Status](https://github.com/dipseth/dataproc-mcp/workflows/CI/badge.svg)](https://github.com/dipseth/dataproc-mcp/actions)
+[![Build Status](https://github.com/dipseth/dataproc-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/dipseth/dataproc-mcp/actions)
 [![Coverage Status](https://coveralls.io/repos/github/dipseth/dataproc-mcp/badge.svg?branch=main)](https://coveralls.io/github/dipseth/dataproc-mcp?branch=main)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/node/v/@dataproc/mcp-server.svg)](https://nodejs.org/)

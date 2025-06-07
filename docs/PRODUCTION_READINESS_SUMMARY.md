@@ -220,7 +220,7 @@ cd dataproc-mcp && npm install && npm run setup
 - ✅ **PR Templates** - Comprehensive review process
 
 ### Community Support
-- ✅ **GitHub Discussions** - Community Q&A
+- ✅ **GitHub Issues** - Community Q&A and support
 - ✅ **Issue Tracking** - Bug reports and features
 - ✅ **Documentation Wiki** - Community-editable docs
 - ✅ **Response Commitments** - SLA for community support

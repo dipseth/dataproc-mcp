@@ -66,7 +66,7 @@ graph TB
 #### 1. Create Response Filter Service
 
 ```typescript
-// src/services/response-filter.ts
+// ../src/services/response-filter.ts
 export interface FilteredResponse {
   type: 'direct' | 'summarized';
   content?: any;
@@ -171,7 +171,7 @@ extractSingleClusterEssentials(cluster: any): ClusterDetails {
 #### 1. Qdrant Service Setup
 
 ```typescript
-// src/services/qdrant-storage.ts
+// ../src/services/qdrant-storage.ts
 import { QdrantClient } from '@qdrant/js-client-rest';
 
 export class QdrantStorageService {
@@ -280,7 +280,7 @@ export class QdrantStorageService {
 #### 2. Enhanced MCP Resources
 
 ```typescript
-// Add new resource types for Qdrant data in src/index.ts
+// Add new resource types for Qdrant data in ../src/index.ts
 server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
   const { uri } = request.params;
   
@@ -311,7 +311,7 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
 #### 1. Response Configuration
 
 ```json
-// config/response-filter.json
+// ../config/response-filter.json
 {
   "tokenLimits": {
     "list_clusters": 500,
@@ -371,7 +371,7 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
 #### 3. Response Formatter
 
 ```typescript
-// src/services/response-formatter.ts
+// ../src/services/response-formatter.ts
 export class ResponseFormatter {
   formatClusterSummary(clusters: ClusterSummary[]): string {
     const header = `📊 Cluster Summary (${clusters.length} clusters found):\n\n`;
@@ -454,7 +454,7 @@ Clusters in project your-project-id, region us-central1:
 - [ ] Create `ResponseFormatter` for human-readable summaries
 
 ### Step 3: Integration
-- [ ] Modify existing tool handlers in `src/index.ts`
+- [ ] Modify existing tool handlers in `../src/index.ts`
 - [ ] Add new MCP resources for Qdrant data access
 - [ ] Update response formatting throughout the application
 - [ ] Add verbosity parameter to all relevant tools
@@ -499,7 +499,7 @@ Clusters in project your-project-id, region us-central1:
 docker run -p 6333:6333 qdrant/qdrant
 
 # Or use cloud deployment
-# Configure connection in config/response-filter.json
+# Configure connection in ../config/response-filter.json
 ```
 
 ### Dependencies to Add
@@ -544,7 +544,7 @@ This plan provides a comprehensive approach to solving the token consumption pro
 
 Based on codebase analysis, here are the exact locations that need modification:
 
-### 1. Main Response Handler Locations in [`src/index.ts`](src/index.ts)
+### 1. Main Response Handler Locations in [`../src/index.ts`](../../src/index.ts)
 
 **Current Pattern (Found 22 instances):**
 ```typescript
@@ -616,34 +616,34 @@ return {
 
 ### 3. New Service Files to Create
 
-#### A. [`src/services/response-filter.ts`](src/services/response-filter.ts)
+#### A. [`../src/services/response-filter.ts`](../src/services/response-filter.ts)
 - **Purpose**: Main response filtering logic
 - **Dependencies**: QdrantStorageService, ResponseFormatter
-- **Integration**: Import in `src/index.ts` line ~78
+- **Integration**: Import in `../src/index.ts` line ~78
 
-#### B. [`src/services/qdrant-storage.ts`](src/services/qdrant-storage.ts)
+#### B. [`../src/services/qdrant-storage.ts`](../src/services/qdrant-storage.ts)
 - **Purpose**: Qdrant vector database integration
 - **Dependencies**: `@qdrant/js-client-rest` (new dependency)
 - **Integration**: Used by ResponseFilter service
 
-#### C. [`src/services/response-formatter.ts`](src/services/response-formatter.ts)
+#### C. [`../src/services/response-formatter.ts`](../src/services/response-formatter.ts)
 - **Purpose**: Human-readable response formatting
 - **Dependencies**: None
 - **Integration**: Used by ResponseFilter service
 
-#### D. [`src/types/response-filter.ts`](src/types/response-filter.ts)
+#### D. [`../src/types/response-filter.ts`](../src/types/response-filter.ts)
 - **Purpose**: Type definitions for filtering system
 - **Dependencies**: Extends existing response types
 - **Integration**: Import in response-filter.ts
 
 ### 4. Configuration Files to Add
 
-#### A. [`config/response-filter.json`](config/response-filter.json)
+#### A. [`../config/response-filter.json`](../config/response-filter.json)
 - **Purpose**: Token limits and extraction rules
 - **Location**: New file in config directory
 - **Integration**: Loaded in ResponseFilter constructor
 
-#### B. Update [`package.json`](package.json) Dependencies
+#### B. Update [`../package.json`](../package.json) Dependencies
 ```json
 {
   "dependencies": {
@@ -654,7 +654,7 @@ return {
 
 ### 5. Schema Updates Required
 
-#### A. [`src/validation/schemas.ts`](src/validation/schemas.ts)
+#### A. [`../src/validation/schemas.ts`](../src/validation/schemas.ts)
 Add `verbose` parameter to existing schemas:
 
 ```typescript
@@ -664,7 +664,7 @@ verbose: z.boolean().optional().describe('Return full details instead of summary
 
 ### 6. Resource Handler Updates
 
-#### A. [`src/index.ts`](src/index.ts) Lines 542-665
+#### A. [`../src/index.ts`](../src/index.ts) Lines 542-665
 Update `ReadResourceRequestSchema` handler to support Qdrant URIs:
 
 ```typescript
@@ -684,7 +684,7 @@ if (uri.startsWith('qdrant://dataproc/')) {
 
 ### 7. Initialization Updates
 
-#### A. [`src/index.ts`](src/index.ts) Lines 94-112
+#### A. [`../src/index.ts`](../src/index.ts) Lines 94-112
 Add ResponseFilter initialization:
 
 ```typescript
@@ -703,7 +703,7 @@ try {
 
 ### 8. Error Handling Updates
 
-#### A. [`src/index.ts`](src/index.ts) Lines 1472-1483
+#### A. [`../src/index.ts`](../src/index.ts) Lines 1472-1483
 Update error response to use filtering:
 
 ```typescript
@@ -724,14 +724,14 @@ catch (error) {
 ## 🔧 Implementation Priority Order
 
 ### Phase 1: Core Infrastructure (Week 1)
-1. Create type definitions (`src/types/response-filter.ts`)
-2. Create ResponseFilter service (`src/services/response-filter.ts`)
-3. Create ResponseFormatter service (`src/services/response-formatter.ts`)
-4. Add configuration file (`config/response-filter.json`)
+1. Create type definitions (`../src/types/response-filter.ts`)
+2. Create ResponseFilter service (`../src/services/response-filter.ts`)
+3. Create ResponseFormatter service (`../src/services/response-formatter.ts`)
+4. Add configuration file (`../config/response-filter.json`)
 
 ### Phase 2: Qdrant Integration (Week 1-2)
-1. Add Qdrant dependency to package.json
-2. Create QdrantStorageService (`src/services/qdrant-storage.ts`)
+1. Add Qdrant dependency to ../package.json
+2. Create QdrantStorageService (`../src/services/qdrant-storage.ts`)
 3. Update resource handlers for Qdrant URIs
 4. Test Qdrant connectivity
 

@@ -402,7 +402,7 @@ jobs:
 ```markdown
 [![npm version](https://badge.fury.io/js/%40dataproc%2Fmcp-server.svg)](https://badge.fury.io/js/%40dataproc%2Fmcp-server)
 [![Downloads](https://img.shields.io/npm/dm/@dataproc/mcp-server.svg)](https://npmjs.org/package/@dataproc/mcp-server)
-[![Build Status](https://github.com/user/dataproc-mcp/workflows/CI/badge.svg)](https://github.com/user/dataproc-mcp/actions)
+[![Build Status](https://github.com/dipseth/dataproc-mcp/workflows/CI/badge.svg)](https://github.com/dipseth/dataproc-mcp/actions)
 ```
 
 This comprehensive version management strategy ensures smooth upgrades, clear communication of changes, and maintains backward compatibility while allowing for necessary evolution of the Dataproc MCP Server.

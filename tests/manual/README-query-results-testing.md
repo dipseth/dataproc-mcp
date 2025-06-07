@@ -376,7 +376,7 @@ The testing is considered successful when:
 ## Related Documentation
 
 - [Query Results Enhancement Guide](../../docs/QUERY_RESULTS_ENHANCEMENT.md)
-- [GCS Service Documentation](../../docs/GCS_SERVICE.md)
+- [Authentication Guide](../../docs/AUTHENTICATION_IMPLEMENTATION_GUIDE.md)
 - [Semantic Search Guide](../../docs/KNOWLEDGE_BASE_SEMANTIC_SEARCH.md)
 - [Authentication Guide](../../docs/AUTHENTICATION_IMPLEMENTATION_GUIDE.md)
 - [Testing Guide](../../docs/TESTING_GUIDE.md)
