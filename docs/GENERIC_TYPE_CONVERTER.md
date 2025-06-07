@@ -80,7 +80,7 @@ export interface ConversionConfig<TSource> {
 ```typescript
 // Advanced mapped types for automatic field detection
 export type ExtractQdrantFields<T> = {
-  [K in keyof T]: T[K] extends string | number | boolean | null | undefined 
+  [K in keyof T]: T[K] extends string | number | boolean | null | undefined
     ? T[K] 
     : T[K] extends Array<infer U> 
       ? CompressibleField<T[K]>

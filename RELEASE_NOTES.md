@@ -212,7 +212,7 @@ npm update @dipseth/dataproc-mcp-server
 
 **Questions? Feedback? We'd love to hear from you!**
 - 🐛 [Report Issues](https://github.com/dipseth/dataproc-mcp/issues)
-- 💬 [Join Discussions](https://github.com/dipseth/dataproc-mcp/discussions)
+- 💬 [Join Discussions](https://github.com/dipseth/dataproc-mcp/issues)
 - 📖 [Read Documentation](https://dipseth.github.io/dataproc-mcp/)
 
 Happy coding! 🚀

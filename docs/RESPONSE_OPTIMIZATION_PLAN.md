@@ -544,7 +544,7 @@ This plan provides a comprehensive approach to solving the token consumption pro
 
 Based on codebase analysis, here are the exact locations that need modification:
 
-### 1. Main Response Handler Locations in [`../src/index.ts`](../../src/index.ts)
+### 1. Main Response Handler Locations in [`../src/index.ts`](../src/index.ts)
 
 **Current Pattern (Found 22 instances):**
 ```typescript
