@@ -506,3 +506,71 @@ export async function handleCheckActiveJobs(args: any, deps: JobHandlerDependenc
 
 // Additional job handlers would go here (submitDataprocJob, getJobResults, etc.)
 // For brevity, I'm showing the main patterns. The remaining handlers follow similar patterns.
+
+/**
+ * Submit a generic Dataproc job
+ */
+export async function handleSubmitDataprocJob(args: any, deps: JobHandlerDependencies) {
+  // Apply security middleware
+  SecurityMiddleware.checkRateLimit(`submit_dataproc_job:${JSON.stringify(args)}`);
+
+  // Sanitize input
+  const sanitizedArgs = SecurityMiddleware.sanitizeObject(args);
+  const typedArgs = sanitizedArgs as any;
+
+  // Basic validation
+  if (!typedArgs.clusterName || typeof typedArgs.clusterName !== 'string') {
+    throw new McpError(ErrorCode.InvalidParams, 'clusterName is required and must be a string');
+  }
+  if (!typedArgs.jobType || typeof typedArgs.jobType !== 'string') {
+    throw new McpError(ErrorCode.InvalidParams, 'jobType is required and must be a string');
+  }
+  if (!typedArgs.jobConfig || typeof typedArgs.jobConfig !== 'object') {
+    throw new McpError(ErrorCode.InvalidParams, 'jobConfig is required and must be an object');
+  }
+
+  const { clusterName, jobType, jobConfig, async } = typedArgs;
+
+  try {
+    // For now, delegate to Hive query handler if it's a Hive job
+    if (jobType.toLowerCase() === 'hive') {
+      const hiveQuery = jobConfig.query || jobConfig.queryList?.queries?.[0];
+      if (hiveQuery) {
+        return handleSubmitHiveQuery({ clusterName, query: hiveQuery, async }, deps);
+      }
+    }
+
+    // For other job types, return a placeholder implementation
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Generic Dataproc job submission for type "${jobType}" is not yet fully implemented. Currently only Hive jobs are supported via submit_hive_query.`,
+        },
+      ],
+    };
+
+  } catch (error) {
+    logger.error('Failed to submit Dataproc job:', error);
+    throw new McpError(
+      ErrorCode.InternalError,
+      `Failed to submit Dataproc job: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  }
+}
+
+/**
+ * Get job status (enhanced version of get_query_status)
+ */
+export async function handleGetJobStatus(args: any, deps: JobHandlerDependencies) {
+  // For now, delegate to the existing query status handler
+  return handleGetQueryStatus(args, deps);
+}
+
+/**
+ * Get job results (enhanced version of get_query_results)
+ */
+export async function handleGetJobResults(args: any, deps: JobHandlerDependencies) {
+  // For now, delegate to the existing query results handler
+  return handleGetQueryResults(args, deps);
+}

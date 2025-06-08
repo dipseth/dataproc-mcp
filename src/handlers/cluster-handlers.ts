@@ -13,6 +13,8 @@ import {
   DeleteClusterSchema,
 } from '../validation/schemas.js';
 import { createCluster, deleteCluster, listClusters, getCluster } from '../services/cluster.js';
+import * as fs from 'fs';
+import * as yaml from 'js-yaml';
 import { DefaultParameterManager } from '../services/default-params.js';
 import { ResponseFilter } from '../services/response-filter.js';
 import { KnowledgeIndexer } from '../services/knowledge-indexer.js';
@@ -652,4 +654,183 @@ export async function handleDeleteCluster(args: any, _deps: HandlerDependencies)
       },
     ],
   };
+}
+
+/**
+ * Create cluster from YAML configuration file
+ */
+export async function handleCreateClusterFromYaml(args: any, deps: HandlerDependencies) {
+  // Apply security middleware
+  SecurityMiddleware.checkRateLimit(`create_cluster_from_yaml:${JSON.stringify(args)}`);
+
+  // Sanitize input
+  const sanitizedArgs = SecurityMiddleware.sanitizeObject(args);
+
+  // Basic validation
+  const typedArgs = sanitizedArgs as any;
+  if (!typedArgs.yamlPath || typeof typedArgs.yamlPath !== 'string') {
+    throw new McpError(ErrorCode.InvalidParams, 'yamlPath is required and must be a string');
+  }
+
+  const { yamlPath, overrides } = typedArgs;
+
+  try {
+    // Read and parse YAML file
+    const yamlContent = fs.readFileSync(yamlPath, 'utf8');
+    const clusterConfig = yaml.load(yamlContent) as any;
+
+    // Apply overrides if provided
+    if (overrides && typeof overrides === 'object') {
+      Object.assign(clusterConfig, overrides);
+    }
+
+    // Extract cluster name from config or generate one
+    const clusterName = clusterConfig.clusterName || `cluster-${Date.now()}`;
+
+    // Use existing cluster creation logic
+    return handleStartDataprocCluster({ clusterName, clusterConfig }, deps);
+
+  } catch (error) {
+    logger.error('Failed to create cluster from YAML:', error);
+    throw new McpError(
+      ErrorCode.InternalError,
+      `Failed to create cluster from YAML: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  }
+}
+
+/**
+ * Create cluster from profile
+ */
+export async function handleCreateClusterFromProfile(args: any, deps: HandlerDependencies) {
+  // Apply security middleware
+  SecurityMiddleware.checkRateLimit(`create_cluster_from_profile:${JSON.stringify(args)}`);
+
+  // Sanitize input
+  const sanitizedArgs = SecurityMiddleware.sanitizeObject(args);
+
+  // Basic validation
+  const typedArgs = sanitizedArgs as any;
+  if (!typedArgs.profileName || typeof typedArgs.profileName !== 'string') {
+    throw new McpError(ErrorCode.InvalidParams, 'profileName is required and must be a string');
+  }
+  if (!typedArgs.clusterName || typeof typedArgs.clusterName !== 'string') {
+    throw new McpError(ErrorCode.InvalidParams, 'clusterName is required and must be a string');
+  }
+
+  const { profileName, clusterName, overrides } = typedArgs;
+
+  try {
+    // Load profile configuration
+    if (!deps.profileManager) {
+      throw new McpError(ErrorCode.InternalError, 'Profile manager not available');
+    }
+
+    const profile = await deps.profileManager.getProfile(profileName);
+    if (!profile) {
+      throw new McpError(ErrorCode.InvalidParams, `Profile not found: ${profileName}`);
+    }
+
+    // Get cluster config from profile
+    let clusterConfig = (profile as any).config || {};
+
+    // Apply overrides if provided
+    if (overrides && typeof overrides === 'object') {
+      clusterConfig = { ...clusterConfig, ...overrides };
+    }
+
+    // Use existing cluster creation logic
+    return handleStartDataprocCluster({ clusterName, clusterConfig }, deps);
+
+  } catch (error) {
+    logger.error('Failed to create cluster from profile:', error);
+    throw new McpError(
+      ErrorCode.InternalError,
+      `Failed to create cluster from profile: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  }
+}
+
+/**
+ * Get Zeppelin notebook URL for a cluster
+ */
+export async function handleGetZeppelinUrl(args: any, deps: HandlerDependencies) {
+  // Apply security middleware
+  SecurityMiddleware.checkRateLimit(`get_zeppelin_url:${JSON.stringify(args)}`);
+
+  // Sanitize input
+  const sanitizedArgs = SecurityMiddleware.sanitizeObject(args);
+
+  // Basic validation
+  const typedArgs = sanitizedArgs as any;
+  if (!typedArgs.clusterName || typeof typedArgs.clusterName !== 'string') {
+    throw new McpError(ErrorCode.InvalidParams, 'clusterName is required and must be a string');
+  }
+
+  const { clusterName } = typedArgs;
+
+  try {
+    // Get default parameters if not provided
+    let projectId: string | undefined;
+    let region: string | undefined;
+
+    if (deps.defaultParamManager) {
+      try {
+        projectId = deps.defaultParamManager.getParameterValue('projectId') as string;
+      } catch (error) {
+        // Ignore error, will be caught by validation below
+      }
+      
+      try {
+        region = deps.defaultParamManager.getParameterValue('region') as string;
+      } catch (error) {
+        // Ignore error, will be caught by validation below
+      }
+    }
+
+    // Validate required parameters after defaults
+    if (!projectId || !region) {
+      throw new McpError(ErrorCode.InvalidParams, 'Missing required parameters: projectId, region');
+    }
+
+    // Get cluster details to check if Zeppelin is enabled
+    const cluster = await getCluster(projectId, region, clusterName);
+    
+    if (!cluster) {
+      throw new McpError(ErrorCode.InvalidParams, `Cluster not found: ${clusterName}`);
+    }
+
+    // Check if Zeppelin is enabled in the cluster configuration
+    const zeppelinEnabled = (cluster as any).config?.softwareConfig?.optionalComponents?.includes('ZEPPELIN');
+    
+    if (!zeppelinEnabled) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Zeppelin is not enabled on cluster ${clusterName}. To enable Zeppelin, recreate the cluster with ZEPPELIN in the optional components.`,
+          },
+        ],
+      };
+    }
+
+    // Construct Zeppelin URL
+    const zeppelinUrl = `https://${clusterName}-m.${region}.c.${projectId}.internal:8080`;
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Zeppelin notebook URL for cluster ${clusterName}:\n${zeppelinUrl}\n\nNote: This URL is accessible from within the VPC or through appropriate firewall rules.`,
+        },
+      ],
+    };
+
+  } catch (error) {
+    logger.error('Failed to get Zeppelin URL:', error);
+    throw new McpError(
+      ErrorCode.InternalError,
+      `Failed to get Zeppelin URL: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  }
 }
