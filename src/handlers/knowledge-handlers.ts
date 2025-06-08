@@ -227,12 +227,12 @@ export async function handleGetClusterInsights(args: any, deps: KnowledgeHandler
   try {
     // Try dynamic insights first, fallback to legacy
     let response = '📊 **Cluster Discovery Insights**\n\n';
-    
+
     // Use dynamic insights
     const dynamicInsights = await deps.knowledgeIndexer.getDynamicClusterInsights();
-    
+
     response += `🏗️  **Total Clusters**: ${dynamicInsights.totalDocuments}\n\n`;
-    
+
     // Show top field analysis
     if (dynamicInsights.fieldAnalysis.length > 0) {
       response += `🔍 **Dynamic Field Analysis**:\n`;
@@ -241,7 +241,7 @@ export async function handleGetClusterInsights(args: any, deps: KnowledgeHandler
       });
       response += '\n';
     }
-    
+
     // Show patterns
     if (dynamicInsights.patterns.length > 0) {
       response += `📈 **Detected Patterns**:\n`;
@@ -253,7 +253,7 @@ export async function handleGetClusterInsights(args: any, deps: KnowledgeHandler
       });
       response += '\n';
     }
-    
+
     // Show recommendations
     if (dynamicInsights.recommendations.length > 0) {
       response += `💡 **Recommendations**:\n`;
@@ -370,9 +370,9 @@ export async function handleGetJobAnalytics(args: any, deps: KnowledgeHandlerDep
     // Use dynamic analytics
     let response = '📈 **Job Submission Analytics**\n\n';
     const dynamicAnalytics = await deps.knowledgeIndexer.getDynamicJobAnalytics();
-    
+
     response += `🚀 **Total Jobs**: ${dynamicAnalytics.totalDocuments}\n\n`;
-    
+
     // Show top field analysis
     if (dynamicAnalytics.fieldAnalysis.length > 0) {
       response += `🔍 **Dynamic Field Analysis**:\n`;
@@ -384,7 +384,7 @@ export async function handleGetJobAnalytics(args: any, deps: KnowledgeHandlerDep
       });
       response += '\n';
     }
-    
+
     // Show patterns
     if (dynamicAnalytics.patterns.length > 0) {
       response += `📈 **Detected Patterns**:\n`;
@@ -396,7 +396,7 @@ export async function handleGetJobAnalytics(args: any, deps: KnowledgeHandlerDep
       });
       response += '\n';
     }
-    
+
     // Show recommendations
     if (dynamicAnalytics.recommendations.length > 0) {
       response += `💡 **Recommendations**:\n`;

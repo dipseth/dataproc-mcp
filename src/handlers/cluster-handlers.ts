@@ -689,7 +689,6 @@ export async function handleCreateClusterFromYaml(args: any, deps: HandlerDepend
 
     // Use existing cluster creation logic
     return handleStartDataprocCluster({ clusterName, clusterConfig }, deps);
-
   } catch (error) {
     logger.error('Failed to create cluster from YAML:', error);
     throw new McpError(
@@ -741,7 +740,6 @@ export async function handleCreateClusterFromProfile(args: any, deps: HandlerDep
 
     // Use existing cluster creation logic
     return handleStartDataprocCluster({ clusterName, clusterConfig }, deps);
-
   } catch (error) {
     logger.error('Failed to create cluster from profile:', error);
     throw new McpError(
@@ -780,7 +778,7 @@ export async function handleGetZeppelinUrl(args: any, deps: HandlerDependencies)
       } catch (error) {
         // Ignore error, will be caught by validation below
       }
-      
+
       try {
         region = deps.defaultParamManager.getParameterValue('region') as string;
       } catch (error) {
@@ -795,14 +793,16 @@ export async function handleGetZeppelinUrl(args: any, deps: HandlerDependencies)
 
     // Get cluster details to check if Zeppelin is enabled
     const cluster = await getCluster(projectId, region, clusterName);
-    
+
     if (!cluster) {
       throw new McpError(ErrorCode.InvalidParams, `Cluster not found: ${clusterName}`);
     }
 
     // Check if Zeppelin is enabled in the cluster configuration
-    const zeppelinEnabled = (cluster as any).config?.softwareConfig?.optionalComponents?.includes('ZEPPELIN');
-    
+    const zeppelinEnabled = (cluster as any).config?.softwareConfig?.optionalComponents?.includes(
+      'ZEPPELIN'
+    );
+
     if (!zeppelinEnabled) {
       return {
         content: [
@@ -825,7 +825,6 @@ export async function handleGetZeppelinUrl(args: any, deps: HandlerDependencies)
         },
       ],
     };
-
   } catch (error) {
     logger.error('Failed to get Zeppelin URL:', error);
     throw new McpError(

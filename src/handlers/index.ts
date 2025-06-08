@@ -156,7 +156,7 @@ export function getSupportedToolNames(): string[] {
 export const handlerSummary = {
   total: getSupportedToolNames().length,
   cluster: 8, // Added create_cluster_from_yaml, create_cluster_from_profile, get_zeppelin_url
-  job: 7,    // Added submit_dataproc_job, get_job_status, get_job_results
+  job: 7, // Added submit_dataproc_job, get_job_status, get_job_results
   profile: 2,
   knowledge: 4,
 };
