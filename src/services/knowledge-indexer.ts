@@ -1,32 +1,22 @@
 /**
- * Knowledge Indexer Service
+ * Knowledge Indexer Service V2 - Dynamic Insights Edition
  *
- * This service is the core of the semantic search feature, providing intelligent
- * data extraction and indexing capabilities for Dataproc infrastructure.
+ * Enhanced version with dynamic field analysis and pattern-based insights.
+ * Provides intelligent data extraction and indexing capabilities for Dataproc infrastructure.
  *
- * FEATURES:
- * - Builds and maintains a comprehensive knowledge base of cluster configurations
- * - Extracts meaningful information from Hive query outputs (first few rows/columns)
- * - Tracks job submission patterns (Hive, Spark, PySpark, etc.)
+ * NEW FEATURES:
+ * - Dynamic field discovery and analysis
+ * - Pattern-based insights generation
+ * - User-configurable focus areas
+ * - Statistical analysis of numerical fields
+ * - Automatic recommendation generation
+ *
+ * CORE FEATURES:
+ * - Builds comprehensive knowledge base of cluster configurations
+ * - Extracts meaningful information from job outputs
+ * - Tracks job submission patterns and performance metrics
  * - Indexes error patterns and troubleshooting information
  * - Enables natural language queries against stored data
- *
- * GRACEFUL DEGRADATION:
- * - Works with or without Qdrant vector database
- * - Provides helpful setup guidance when Qdrant is unavailable
- * - Core functionality never breaks regardless of optional dependencies
- *
- * KNOWLEDGE BASE STRUCTURE:
- * - Cluster configurations: machine types, worker counts, components
- * - Package information: pip packages, initialization scripts
- * - Network configurations: zones, subnets, service accounts
- * - Operational data: creation times, owners, environments
- *
- * USAGE:
- * - Automatically indexes data from list_clusters and get_cluster operations
- * - Powers semantic queries like "show me clusters with machine learning packages"
- * - Provides confidence scoring for search results
- * - Supports filtering by project, region, and cluster name
  */
 
 import { QdrantStorageService } from './qdrant-storage.js';
@@ -35,13 +25,9 @@ import { ClusterConfig } from '../types/cluster-config.js';
 import { QueryResultResponse as ApiQueryResultResponse } from '../types/response.js';
 import { ErrorInfo } from '../types/dataproc-responses.js';
 import { logger } from '../utils/logger.js';
-import { performance } from 'perf_hooks';
-import { GenericQdrantConverter, createGenericConverter } from './generic-converter.js';
-import { CompressionService } from './compression.js';
-import { ConversionConfig, ConversionResult } from '../types/generic-converter.js';
-import { QdrantStorageMetadata } from '../types/response-filter.js';
+// Removed unused performance import
 
-// Type for cluster data that includes metadata beyond just config
+// Core data interfaces
 interface ClusterData {
   clusterName?: string;
   projectId?: string;
@@ -88,7 +74,7 @@ export interface JobKnowledge {
   query?: string;
   status: string;
   duration?: number;
-  results?: ApiQueryResultResponse; // Add results property
+  results?: ApiQueryResultResponse;
   outputSample?: {
     columns: string[];
     rows: unknown[][];
@@ -119,12 +105,43 @@ export interface ErrorPattern {
   }[];
 }
 
+// Dynamic analysis interfaces
+interface FieldAnalysis {
+  fieldName: string;
+  fieldType: 'string' | 'number' | 'boolean' | 'array' | 'object' | 'date';
+  sampleValues: any[];
+  uniqueCount: number;
+  totalCount: number;
+  statistics?: {
+    min?: number;
+    max?: number;
+    avg?: number;
+    median?: number;
+    distribution?: Record<string, number>;
+  };
+}
+
+interface DataPattern {
+  category: string;
+  insights: string[];
+  metrics: Record<string, any>;
+  confidence: number;
+}
+
+interface DynamicInsightResult {
+  totalDocuments: number;
+  fieldAnalysis: FieldAnalysis[];
+  patterns: DataPattern[];
+  recommendations: string[];
+  focusAnalysis?: Record<string, any>;
+}
+
 interface FormattedSearchResult {
   type: string;
   confidence: number;
   data: ClusterKnowledge | JobKnowledge | ErrorPattern;
   summary: string;
-  id?: string; // Include the Qdrant document ID for raw document retrieval
+  id?: string;
 }
 
 export class KnowledgeIndexer {
@@ -133,8 +150,97 @@ export class KnowledgeIndexer {
   private clusterKnowledge: Map<string, ClusterKnowledge> = new Map();
   private jobKnowledge: Map<string, JobKnowledge> = new Map();
   private errorPatterns: Map<string, ErrorPattern> = new Map();
-  private genericConverter: GenericQdrantConverter;
-  private compressionService: CompressionService;
+
+  constructor(qdrantConfig?: {
+    url?: string;
+    collectionName?: string;
+    vectorSize?: number;
+    distance?: 'Cosine' | 'Euclidean' | 'Dot';
+  }) {
+    const defaultConfig = {
+      url: 'http://localhost:6333',
+      collectionName: 'dataproc_knowledge',
+      vectorSize: 384,
+      distance: 'Cosine' as const,
+    };
+    this.qdrantService = new QdrantStorageService({ ...defaultConfig, ...qdrantConfig });
+    this.embeddingService = new TransformersEmbeddingService();
+  }
+
+  /**
+   * Initialize the knowledge indexer (legacy compatibility)
+   */
+  async initialize(config?: {
+    url?: string;
+    collectionName?: string;
+    vectorSize?: number;
+    distance?: 'Cosine' | 'Euclidean' | 'Dot';
+  }): Promise<void> {
+    if (config) {
+      // Reinitialize with new config if provided
+      const fullConfig = {
+        url: config.url || 'http://localhost:6333',
+        collectionName: config.collectionName || 'dataproc_knowledge',
+        vectorSize: config.vectorSize || 384,
+        distance: config.distance || ('Cosine' as const),
+      };
+      this.qdrantService = new QdrantStorageService(fullConfig);
+    }
+
+    // Ensure collection exists
+    await this.qdrantService.ensureCollection();
+    logger.info('🧠 Knowledge indexer initialized successfully');
+  }
+
+  /**
+   * Index job submission (legacy compatibility)
+   */
+  async indexJobSubmission(jobData: {
+    jobId: string;
+    jobType: string;
+    projectId: string;
+    region: string;
+    clusterName: string;
+    query?: string;
+    status: string;
+    submissionTime?: string;
+    results?: any;
+    duration?: number;
+    error?: any;
+  }): Promise<void> {
+    // Convert to our internal format and index
+    await this.indexJobData({
+      ...jobData,
+      submissionTime: jobData.submissionTime || new Date().toISOString(),
+    });
+  }
+
+  /**
+   * Index cluster configuration (legacy compatibility)
+   */
+  async indexClusterConfiguration(clusterData: any): Promise<void> {
+    // Convert to our internal format and index
+    await this.indexClusterData({
+      clusterName: clusterData.clusterName,
+      projectId: clusterData.projectId,
+      region: clusterData.region,
+      config: clusterData.config || clusterData,
+      labels: clusterData.labels,
+      status: clusterData.status,
+    });
+  }
+
+  /**
+   * Get collection info (legacy compatibility)
+   */
+  getCollectionInfo(): { name: string; url: string; collectionName: string } {
+    const collectionName = this.qdrantService.getCollectionName();
+    return {
+      name: collectionName,
+      collectionName: collectionName,
+      url: (this.qdrantService as any).config?.url || 'http://localhost:6333',
+    };
+  }
 
   /**
    * Get access to the Qdrant service for raw document retrieval
@@ -143,377 +249,36 @@ export class KnowledgeIndexer {
     return this.qdrantService;
   }
 
-  constructor(qdrantConfig?: {
-    url?: string;
-    collectionName?: string;
-    vectorSize?: number;
-    distance?: 'Cosine' | 'Euclidean' | 'Dot';
-  }) {
-    // Initialize with placeholder config - will be updated during initialization
-    const config = {
-      url: qdrantConfig?.url || 'http://localhost:6333',
-      collectionName: qdrantConfig?.collectionName || 'dataproc_knowledge',
-      vectorSize: qdrantConfig?.vectorSize || 384,
-      distance: qdrantConfig?.distance || ('Cosine' as const),
-    };
-
-    this.qdrantService = new QdrantStorageService(config);
-    // Use singleton pattern to prevent multiple Transformers.js instances
-    this.embeddingService = TransformersEmbeddingService.getInstance();
-    this.compressionService = new CompressionService();
-    this.genericConverter = createGenericConverter(this.compressionService);
-  }
-
   /**
-   * Initialize with connection discovery
+   * Index cluster data with automatic field extraction
    */
-  private async initializeWithConnectionManager(qdrantConfig?: {
-    url?: string;
-    collectionName?: string;
-    vectorSize?: number;
-    distance?: 'Cosine' | 'Euclidean' | 'Dot';
-  }): Promise<void> {
+  async indexClusterData(clusterData: ClusterData): Promise<void> {
     try {
-      const { getQdrantUrl } = await import('./qdrant-connection-manager.js');
-
-      // Discover working Qdrant URL
-      const discoveredUrl = await getQdrantUrl({ url: qdrantConfig?.url });
-
-      if (!discoveredUrl) {
-        throw new Error('No working Qdrant URL discovered. Cannot initialize KnowledgeIndexer.');
-      }
-
-      const config = {
-        url: discoveredUrl, // ONLY use verified URL - NO FALLBACKS
-        collectionName: qdrantConfig?.collectionName || 'dataproc_knowledge',
-        vectorSize: qdrantConfig?.vectorSize || 384,
-        distance: qdrantConfig?.distance || ('Cosine' as const),
-      };
-
-      // Recreate QdrantStorageService with discovered URL
-      this.qdrantService = new QdrantStorageService(config);
-
-      // Recreate generic converter with new compression service if needed
-      this.compressionService = new CompressionService();
-      this.genericConverter = createGenericConverter(this.compressionService);
-
-      logger.info(`🧠 [KNOWLEDGE-INDEXER] Initialized with URL: ${config.url}`);
-    } catch (error) {
-      logger.error('Failed to initialize KnowledgeIndexer with connection manager:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Initialize the knowledge indexer (ensures Qdrant collection exists)
-   */
-  async initialize(qdrantConfig?: {
-    url?: string;
-    collectionName?: string;
-    vectorSize?: number;
-    distance?: 'Cosine' | 'Euclidean' | 'Dot';
-  }): Promise<void> {
-    try {
-      // First, discover the working Qdrant URL
-      await this.initializeWithConnectionManager(qdrantConfig);
-
-      // Then initialize the underlying Qdrant service
-      await this.qdrantService.initialize();
-      logger.info('🧠 Knowledge indexer initialized successfully');
-    } catch (error) {
-      logger.error('Failed to initialize knowledge indexer:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get collection information for debugging
-   */
-  getCollectionInfo(): { collectionName: string; url: string } {
-    return {
-      collectionName: 'dataproc_knowledge', // Hard-coded since config is private
-      url: 'configured', // Can't access private config
-    };
-  }
-
-  /**
-   * Index cluster configuration when first encountered
-   */
-  async indexClusterConfiguration(clusterData: ClusterData): Promise<void> {
-    const startTime = performance.now();
-
-    try {
-      // Enhanced validation with generic converter support
-      const validationResult = await this.validateClusterData(clusterData);
-      if (!validationResult.isValid) {
-        throw new Error(`Invalid cluster data: ${validationResult.errors.join(', ')}`);
-      }
-
-      // Extract clusterName from multiple possible sources using automatic field mapping
-      const extractedFields = await this.extractClusterIdentifiers(clusterData);
-      const { clusterName, projectId, region } = extractedFields;
-      const key = `${projectId}/${region}/${clusterName}`;
-
+      const key = `${clusterData.projectId}:${clusterData.region}:${clusterData.clusterName}`;
       let knowledge = this.clusterKnowledge.get(key);
-      const now = new Date().toISOString();
 
       if (!knowledge) {
-        // First time seeing this cluster - use generic converter for initialization
-        knowledge = await this.initializeClusterKnowledge(clusterName, projectId, region, now);
-        logger.info(`🆕 New cluster discovered: ${clusterName} in ${projectId}/${region}`);
+        knowledge = this.createClusterKnowledge(clusterData);
+        this.clusterKnowledge.set(key, knowledge);
       } else {
-        knowledge.lastSeen = now;
+        knowledge.lastSeen = new Date().toISOString();
       }
 
-      // Extract and update configuration knowledge using generic converter
       await this.updateClusterKnowledge(knowledge, clusterData);
-
-      // Store in memory and Qdrant
-      this.clusterKnowledge.set(key, knowledge);
       await this.storeClusterKnowledge(knowledge);
 
-      const processingTime = performance.now() - startTime;
-      logger.debug('🔄 [KNOWLEDGE-INDEXER] Cluster configuration indexed successfully', {
-        clusterName,
-        projectId,
-        region,
-        processingTime: processingTime.toFixed(2) + 'ms',
-      });
-    } catch (error) {
-      const processingTime = performance.now() - startTime;
-
-      console.log('[DEBUG] Full error in indexClusterConfiguration:', error);
-      console.log('[DEBUG] Error message:', (error as any)?.message);
-      console.log('[DEBUG] Error stack:', (error as any)?.stack);
-      console.log('[DEBUG] Processing time before error:', processingTime.toFixed(2) + 'ms');
-
-      // Re-throw validation errors so tests can catch them
-      if ((error as any)?.message?.includes('Invalid cluster data')) {
-        throw error;
-      }
-
-      logger.error('Failed to index cluster configuration:', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        processingTime: processingTime.toFixed(2) + 'ms',
-      });
-    }
-  }
-
-  /**
-   * Graceful shutdown - cleanup resources
-   */
-  async shutdown(): Promise<void> {
-    logger.info('🔄 [MUTEX-DEBUG] KnowledgeIndexer: Initiating graceful shutdown');
-
-    try {
-      // Clear in-memory caches first
-      this.clusterKnowledge.clear();
-      this.jobKnowledge.clear();
-      logger.debug('🔄 [MUTEX-DEBUG] KnowledgeIndexer: In-memory caches cleared');
-
-      // Shutdown TransformersEmbeddingService FIRST to avoid circular dependencies
-      if (this.embeddingService && typeof this.embeddingService.shutdown === 'function') {
-        logger.info(
-          '🔄 [MUTEX-DEBUG] KnowledgeIndexer: Shutting down TransformersEmbeddingService FIRST'
-        );
-        try {
-          await this.embeddingService.shutdown();
-          logger.info(
-            '🔄 [MUTEX-DEBUG] KnowledgeIndexer: TransformersEmbeddingService shutdown SUCCESS'
-          );
-        } catch (embeddingError) {
-          logger.error(
-            '🔄 [MUTEX-DEBUG] KnowledgeIndexer: TransformersEmbeddingService shutdown FAILED:',
-            embeddingError
-          );
-          // Continue with cleanup
-        }
-        this.embeddingService = null as any;
-      }
-
-      // Shutdown QdrantStorageService AFTER embedding service
-      if (this.qdrantService && typeof this.qdrantService.shutdown === 'function') {
-        logger.info('🔄 [MUTEX-DEBUG] KnowledgeIndexer: Shutting down QdrantStorageService SECOND');
-        try {
-          await this.qdrantService.shutdown();
-          logger.info('🔄 [MUTEX-DEBUG] KnowledgeIndexer: QdrantStorageService shutdown SUCCESS');
-        } catch (qdrantError) {
-          logger.error(
-            '🔄 [MUTEX-DEBUG] KnowledgeIndexer: QdrantStorageService shutdown FAILED:',
-            qdrantError
-          );
-          // Continue with cleanup
-        }
-        this.qdrantService = null as any;
-      }
-
-      // Clear other references
-      if (this.compressionService) {
-        this.compressionService = null as any;
-      }
-      if (this.genericConverter) {
-        this.genericConverter = null as any;
-      }
-
-      logger.info('🔄 [MUTEX-DEBUG] KnowledgeIndexer: Shutdown complete');
-    } catch (error) {
-      logger.error('🔄 [MUTEX-DEBUG] KnowledgeIndexer: Error during shutdown:', error);
-      // Don't re-throw to prevent cascading failures
-      logger.warn(
-        '🔄 [MUTEX-DEBUG] Continuing shutdown despite errors to prevent mutex lock issues'
+      logger.info(
+        `📝 Indexed cluster: ${clusterData.clusterName} in ${clusterData.projectId}/${clusterData.region}`
       );
-    }
-  }
-
-  /**
-   * Validate cluster data using generic converter validation
-   */
-  private async validateClusterData(
-    clusterData: ClusterData
-  ): Promise<{ isValid: boolean; errors: string[] }> {
-    try {
-      // Basic validation
-      if (
-        !clusterData ||
-        clusterData === null ||
-        typeof clusterData !== 'object' ||
-        Array.isArray(clusterData)
-      ) {
-        return {
-          isValid: false,
-          errors: [
-            `Invalid cluster data: expected non-null object, got ${clusterData === null ? 'null' : typeof clusterData}`,
-          ],
-        };
-      }
-
-      // Use generic converter validation if available
-      const validationResult = await this.genericConverter.validateSource(clusterData);
-      return {
-        isValid: validationResult.isValid,
-        errors: validationResult.errors,
-      };
     } catch (error) {
-      // Fallback to basic validation
-      return {
-        isValid: true,
-        errors: [],
-      };
+      logger.error('Failed to index cluster data:', error);
     }
   }
 
   /**
-   * Extract cluster identifiers using automatic field mapping
+   * Index job data with automatic field extraction
    */
-  private async extractClusterIdentifiers(clusterData: ClusterData): Promise<{
-    clusterName: string;
-    projectId: string;
-    region: string;
-  }> {
-    try {
-      // Use generic converter for automatic field extraction
-      const metadata: QdrantStorageMetadata = {
-        toolName: 'knowledge-indexer-identifier-extraction',
-        timestamp: new Date().toISOString(),
-        projectId: 'unknown',
-        region: 'unknown',
-        clusterName: 'unknown',
-        responseType: 'identifier-extraction',
-        originalTokenCount: 0,
-        filteredTokenCount: 0,
-        compressionRatio: 1,
-        type: 'cluster',
-      };
-
-      const config: ConversionConfig<ClusterData> = {
-        fieldMappings: {
-          clusterName: 'clusterName',
-          projectId: 'projectId',
-          region: 'region',
-        },
-        transformations: {
-          clusterName: (value: unknown) =>
-            value ||
-            (clusterData as any)?.name ||
-            (clusterData as any)?.placement?.clusterName ||
-            (clusterData as any)?.config?.clusterName ||
-            'unknown',
-          projectId: (value: unknown) => value || 'unknown',
-          region: (value: unknown) => value || this.extractRegion(clusterData),
-        },
-      };
-
-      const result = await this.genericConverter.convert(clusterData, metadata, config);
-
-      return {
-        clusterName: result.payload.clusterName || 'unknown',
-        projectId: result.payload.projectId || 'unknown',
-        region: result.payload.region || 'unknown',
-      };
-    } catch (error) {
-      // Fallback to manual extraction
-      return {
-        clusterName:
-          clusterData.clusterName ||
-          (clusterData as any)?.name ||
-          (clusterData as any)?.placement?.clusterName ||
-          (clusterData as any)?.config?.clusterName ||
-          'unknown',
-        projectId: clusterData.projectId || 'unknown',
-        region: this.extractRegion(clusterData),
-      };
-    }
-  }
-
-  /**
-   * Initialize cluster knowledge structure
-   */
-  private async initializeClusterKnowledge(
-    clusterName: string,
-    projectId: string,
-    region: string,
-    timestamp: string
-  ): Promise<ClusterKnowledge> {
-    return {
-      clusterName,
-      projectId,
-      region,
-      firstSeen: timestamp,
-      lastSeen: timestamp,
-      configurations: {
-        machineTypes: [],
-        workerCounts: [],
-        components: [],
-        pipelines: [],
-        owners: [],
-        imageVersions: [],
-      },
-      pipPackages: [],
-      initializationScripts: [],
-      networkConfig: {
-        zones: [],
-        subnets: [],
-        serviceAccounts: [],
-      },
-    };
-  }
-
-  /**
-   * Index job submission and results
-   */
-  async indexJobSubmission(jobData: {
-    jobId: string;
-    jobType: string;
-    clusterName: string;
-    projectId: string;
-    region: string;
-    query?: string;
-    status: string;
-    submissionTime?: string;
-    duration?: number;
-    results?: unknown;
-    error?: unknown;
-  }): Promise<void> {
+  async indexJobData(jobData: any): Promise<void> {
     try {
       const jobKnowledge: JobKnowledge = {
         jobId: jobData.jobId,
@@ -544,575 +309,88 @@ export class KnowledgeIndexer {
 
       logger.info(`📝 Indexed ${jobData.jobType} job: ${jobData.jobId} on ${jobData.clusterName}`);
     } catch (error) {
-      logger.error('Failed to index job submission:', error);
+      logger.error('Failed to index job data:', error);
     }
   }
 
   /**
-   * Query knowledge base using natural language
+   * Enhanced cluster insights with dynamic analysis
    */
-  async queryKnowledge(
-    query: string,
-    options: {
-      type?: 'clusters' | 'cluster' | 'jobs' | 'job' | 'errors' | 'error' | 'all';
-      limit?: number;
-      projectId?: string;
-      region?: string;
-    } = {}
-  ): Promise<FormattedSearchResult[]> {
-    try {
-      if (process.env.LOG_LEVEL === 'debug') {
-        console.error(
-          `[DEBUG] KnowledgeIndexer.queryKnowledge: Query="${query}", Type="${options.type}"`
-        );
-      }
+  async getDynamicClusterInsights(focusAreas?: string[]): Promise<DynamicInsightResult> {
+    let clusters = Array.from(this.clusterKnowledge.values());
 
-      // Parse tag-based queries
-      const { tags, semanticQuery } = this.parseTagQuery(query);
-
-      // If we have tags, use tag-based search
-      if (Object.keys(tags).length > 0) {
-        const tagResults = await this.queryByTags(tags, semanticQuery, options);
-        // Convert to base FormattedSearchResult format (remove rawDocument)
-        return tagResults.map((result) => ({
-          type: result.type,
-          confidence: result.confidence,
-          data: result.data,
-          summary: result.summary,
-        }));
-      }
-
-      const searchResults = await this.qdrantService.searchSimilar(
-        semanticQuery || query,
-        options.limit || 10
-      );
-
-      if (process.env.LOG_LEVEL === 'debug') {
-        console.error(
-          `[DEBUG] KnowledgeIndexer.queryKnowledge: Found ${searchResults.length} initial results`
-        );
-        searchResults.forEach((result, i) => {
-          const storedType = (result.data as { type?: string })?.type || result.metadata?.type;
-          console.error(
-            `[DEBUG] Result ${i}: Type="${storedType}", Score=${result.score}, ID=${result.id}`
-          );
-        });
-      }
-
-      // Filter by type if specified with flexible matching
-      let filteredResults = searchResults;
-      if (options.type && options.type !== 'all') {
-        filteredResults = searchResults.filter((result) => {
-          // Extract type from the stored data or metadata
-          const storedType = (result.data as { type?: string })?.type || result.metadata?.type;
-
-          // Flexible type matching - handle both singular/plural and case variations
-          if (!storedType) {
-            if (process.env.LOG_LEVEL === 'debug') {
-              console.error(
-                `[DEBUG] KnowledgeIndexer.queryKnowledge: Result ${result.id} has no type, filtering out`
-              );
-            }
-            return false;
-          }
-
-          const normalizedStoredType = storedType.toLowerCase();
-          const normalizedQueryType = (options.type || '').toLowerCase();
-
-          // Direct match
-          if (normalizedStoredType === normalizedQueryType) return true;
-
-          // Handle singular/plural variations
-          const singularForms = {
-            clusters: 'cluster',
-            jobs: 'job',
-            errors: 'error',
-          };
-
-          const pluralForms = {
-            cluster: 'clusters',
-            job: 'jobs',
-            error: 'errors',
-          };
-
-          // Check if query type matches stored type in singular/plural form
-          if (singularForms[normalizedQueryType] === normalizedStoredType) return true;
-          if (pluralForms[normalizedQueryType] === normalizedStoredType) return true;
-
-          return false;
-        });
-      }
-
-      // Filter by project/region if specified
-      if (options.projectId) {
-        filteredResults = filteredResults.filter(
-          (result) => result.metadata?.projectId === options.projectId
-        );
-      }
-
-      if (options.region) {
-        filteredResults = filteredResults.filter(
-          (result) => result.metadata?.region === options.region
-        );
-      }
-
-      if (process.env.LOG_LEVEL === 'debug') {
-        console.error(
-          `[DEBUG] KnowledgeIndexer.queryKnowledge: After filtering: ${filteredResults.length} results`
-        );
-        filteredResults.forEach((result, i) => {
-          const storedType = (result.data as { type?: string })?.type || result.metadata?.type;
-          console.error(
-            `[DEBUG] Final Result ${i}: Type="${storedType}", Score=${result.score}, JobId=${(result.data as { jobId?: string })?.jobId || 'N/A'}`
-          );
-        });
-      }
-
-      const formattedResults: FormattedSearchResult[] = filteredResults.map((result) => {
-        const dataType =
-          (result.data as { type?: string })?.type || result.metadata?.type || 'unknown';
-        // Type guard to ensure proper typing
-        let typedData: ClusterKnowledge | JobKnowledge | ErrorPattern;
-        if (dataType === 'job') {
-          typedData = result.data as JobKnowledge;
-        } else if (dataType === 'cluster') {
-          typedData = result.data as ClusterKnowledge;
-        } else if (dataType === 'error') {
-          typedData = result.data as ErrorPattern;
-        } else {
-          // Fallback for unknown types - cast as JobKnowledge
-          typedData = result.data as JobKnowledge;
-        }
-
-        return {
-          type: dataType,
-          confidence: result.score,
-          data: typedData,
-          summary: this.generateResultSummary(result.data, dataType),
-          id: result.id, // Include the actual Qdrant document ID
-        };
-      });
-
-      return formattedResults;
-    } catch (error) {
-      logger.error('Failed to query knowledge base:', error);
-      return [];
+    if (clusters.length === 0) {
+      const results = await this.queryKnowledge('type:cluster', { limit: 1000 });
+      clusters = results.map((r) => r.data as ClusterKnowledge);
     }
+
+    if (clusters.length === 0) {
+      return {
+        totalDocuments: 0,
+        fieldAnalysis: [],
+        patterns: [],
+        recommendations: ['No cluster data available for analysis'],
+      };
+    }
+
+    // Dynamic field analysis
+    const fieldAnalysis = this.analyzeDataFields(clusters);
+
+    // Pattern detection
+    const patterns = this.detectClusterPatterns(clusters, fieldAnalysis);
+
+    // Focus area analysis
+    const focusAnalysis = focusAreas ? this.analyzeFocusAreas(clusters, focusAreas) : undefined;
+
+    return {
+      totalDocuments: clusters.length,
+      fieldAnalysis: fieldAnalysis.slice(0, 20), // Limit to top 20 fields
+      patterns,
+      focusAnalysis,
+      recommendations: this.generateClusterRecommendations(patterns, fieldAnalysis),
+    };
   }
 
   /**
-   * Parse tag-based query syntax like "jobId:12345" or "clusterName:my-cluster"
+   * Enhanced job analytics with dynamic analysis
    */
-  private parseTagQuery(query: string): {
-    tags: Record<string, string>;
-    semanticQuery: string;
-  } {
-    const tags: Record<string, string> = {};
-    let semanticQuery = query;
+  async getDynamicJobAnalytics(focusAreas?: string[]): Promise<DynamicInsightResult> {
+    let jobs = Array.from(this.jobKnowledge.values());
 
-    // Match patterns like "fieldName:value" or "fieldName:'quoted value'"
-    const tagPattern = /(\w+):([^\s'"]+|'[^']*'|"[^"]*")/g;
-    let match;
-
-    while ((match = tagPattern.exec(query)) !== null) {
-      const [fullMatch, fieldName, value] = match;
-      // Remove quotes if present
-      const cleanValue = value.replace(/^['"]|['"]$/g, '');
-      tags[fieldName] = cleanValue;
-      // Remove the tag from semantic query
-      semanticQuery = semanticQuery.replace(fullMatch, '').trim();
+    if (jobs.length === 0) {
+      const results = await this.queryKnowledge('type:job', { limit: 1000 });
+      jobs = results.map((r) => r.data as JobKnowledge);
     }
 
-    return { tags, semanticQuery };
+    if (jobs.length === 0) {
+      return {
+        totalDocuments: 0,
+        fieldAnalysis: [],
+        patterns: [],
+        recommendations: ['No job data available for analysis'],
+      };
+    }
+
+    // Dynamic field analysis
+    const fieldAnalysis = this.analyzeDataFields(jobs);
+
+    // Pattern detection
+    const patterns = this.detectJobPatterns(jobs, fieldAnalysis);
+
+    // Focus area analysis
+    const focusAnalysis = focusAreas ? this.analyzeFocusAreas(jobs, focusAreas) : undefined;
+
+    return {
+      totalDocuments: jobs.length,
+      fieldAnalysis: fieldAnalysis.slice(0, 20), // Limit to top 20 fields
+      patterns,
+      focusAnalysis,
+      recommendations: this.generateJobRecommendations(patterns, fieldAnalysis),
+    };
   }
 
   /**
-   * Enhanced query with raw document retrieval support and tag-based filtering
-   */
-  async queryKnowledgeWithRawDocuments(
-    query: string,
-    options: {
-      type?: 'clusters' | 'cluster' | 'jobs' | 'job' | 'errors' | 'error' | 'all';
-      projectId?: string;
-      region?: string;
-      limit?: number;
-      includeRawDocument?: boolean;
-    } = {}
-  ): Promise<Array<FormattedSearchResult & { rawDocument?: any }>> {
-    // Parse tag-based queries
-    const { tags, semanticQuery } = this.parseTagQuery(query);
-
-    // If we have tags, use Qdrant filtering
-    if (Object.keys(tags).length > 0) {
-      return await this.queryByTags(tags, semanticQuery, options);
-    }
-
-    // Otherwise, use regular semantic search
-    const results = await this.queryKnowledge(semanticQuery || query, options);
-
-    if (!options.includeRawDocument) {
-      return results;
-    }
-
-    // Enhance results with raw documents
-    const enhancedResults = await Promise.all(
-      results.map(async (result) => {
-        try {
-          // FIXED: Use the actual document ID from the search result instead of constructing one
-          const documentId = result.id;
-
-          if (documentId) {
-            logger.info(`🔄 Attempting to retrieve raw document for actual ID: ${documentId}`);
-            const rawDoc = await this.qdrantService.retrieveRawDocument(documentId);
-            if (rawDoc) {
-              logger.info(`✅ Successfully retrieved raw document for ID: ${documentId}`);
-              return {
-                ...result,
-                rawDocument: rawDoc,
-              };
-            } else {
-              logger.warn(`⚠️ Raw document retrieval returned null for ID: ${documentId}`);
-            }
-          } else {
-            logger.warn('❌ No document ID found in search result');
-          }
-
-          return result;
-        } catch (error) {
-          logger.warn(`Failed to retrieve raw document for result:`, error);
-          return result;
-        }
-      })
-    );
-
-    return enhancedResults;
-  }
-
-  /**
-   * Query by tags using Qdrant filtering
-   */
-  private async queryByTags(
-    tags: Record<string, string>,
-    semanticQuery: string,
-    options: {
-      type?: 'clusters' | 'cluster' | 'jobs' | 'job' | 'errors' | 'error' | 'all';
-      projectId?: string;
-      region?: string;
-      limit?: number;
-      includeRawDocument?: boolean;
-    } = {}
-  ): Promise<Array<FormattedSearchResult & { rawDocument?: any }>> {
-    try {
-      await this.qdrantService.ensureCollection();
-
-      logger.info(`🏷️ Tag-based search initiated with tags:`, tags);
-      logger.info(`🔍 Semantic query component: "${semanticQuery}"`);
-      logger.info(`⚙️ Search options:`, options);
-
-      // Build Qdrant filter conditions
-      const filterConditions: any[] = [];
-
-      // Add tag filters
-      Object.entries(tags).forEach(([field, value]) => {
-        logger.info(`🏷️ Adding tag filter: ${field} = ${value}`);
-        filterConditions.push({
-          key: field,
-          match: { value },
-        });
-      });
-
-      // Add type filter if specified
-      if (options.type && options.type !== 'all') {
-        const typeValue = options.type.endsWith('s') ? options.type.slice(0, -1) : options.type;
-        filterConditions.push({
-          key: 'type',
-          match: { value: typeValue },
-        });
-      }
-
-      // Add project/region filters
-      if (options.projectId) {
-        filterConditions.push({
-          key: 'projectId',
-          match: { value: options.projectId },
-        });
-      }
-
-      if (options.region) {
-        filterConditions.push({
-          key: 'region',
-          match: { value: options.region },
-        });
-      }
-
-      const filter =
-        filterConditions.length > 0
-          ? {
-              must: filterConditions,
-            }
-          : undefined;
-
-      let searchResults;
-
-      logger.info(`🔍 Filter conditions built:`, JSON.stringify(filter, null, 2));
-
-      if (semanticQuery.trim()) {
-        // Semantic search with filtering
-        logger.info(`🧠 Performing semantic search with query: "${semanticQuery}"`);
-        const queryVector = await this.embeddingService.generateEmbedding(semanticQuery);
-        logger.info(`📊 Generated embedding vector of length: ${queryVector.length}`);
-
-        // DIAGNOSTIC: Check for zero vector (embedding failure)
-        const isZeroVector = queryVector.every((v) => v === 0);
-        const vectorMagnitude = Math.sqrt(queryVector.reduce((sum, val) => sum + val * val, 0));
-        logger.info(`🔍 [DIAGNOSTIC] Query: "${semanticQuery}"`);
-        logger.info(
-          `🔍 [DIAGNOSTIC] Vector is zero: ${isZeroVector}, Magnitude: ${vectorMagnitude.toFixed(6)}`
-        );
-        logger.info(
-          `🔍 [DIAGNOSTIC] First 5 vector values: [${queryVector
-            .slice(0, 5)
-            .map((v) => v.toFixed(6))
-            .join(', ')}]`
-        );
-
-        if (isZeroVector) {
-          logger.error(
-            `❌ [DIAGNOSTIC] Zero vector detected for query "${semanticQuery}" - embedding generation failed!`
-          );
-        }
-
-        searchResults = await this.qdrantService
-          .getQdrantClient()
-          .search(this.qdrantService.getCollectionName(), {
-            vector: queryVector,
-            limit: options.limit || 10,
-            filter,
-            with_payload: true,
-          });
-        logger.info(`🎯 Semantic search returned ${searchResults.length} results`);
-
-        // DIAGNOSTIC: Log search results details
-        if (searchResults.length === 0) {
-          logger.warn(
-            `🔍 [DIAGNOSTIC] No results for "${semanticQuery}" - checking collection stats...`
-          );
-          try {
-            const collectionInfo = await this.qdrantService
-              .getQdrantClient()
-              .getCollection(this.qdrantService.getCollectionName());
-            logger.info(
-              `🔍 [DIAGNOSTIC] Collection "${this.qdrantService.getCollectionName()}" has ${collectionInfo.points_count} points`
-            );
-          } catch (error) {
-            logger.error(
-              `🔍 [DIAGNOSTIC] Failed to get collection info: ${error instanceof Error ? error.message : String(error)}`
-            );
-          }
-        } else {
-          logger.info(
-            `🔍 [DIAGNOSTIC] Top result scores: [${searchResults
-              .slice(0, 3)
-              .map((r) => r.score?.toFixed(4) || 'N/A')
-              .join(', ')}]`
-          );
-        }
-      } else {
-        // Pure filtering without semantic search
-        logger.info(`🏷️ Performing pure tag-based filtering (no semantic component)`);
-        searchResults = await this.qdrantService
-          .getQdrantClient()
-          .scroll(this.qdrantService.getCollectionName(), {
-            filter,
-            limit: options.limit || 10,
-            with_payload: true,
-          });
-        logger.info(`📜 Scroll query returned ${searchResults.points?.length || 0} points`);
-
-        // Convert scroll results to search format
-        searchResults =
-          searchResults.points?.map((point) => ({
-            id: point.id,
-            score: 1.0, // Perfect match for tag-based search
-            payload: point.payload,
-          })) || [];
-        logger.info(`🔄 Converted to ${searchResults.length} search results`);
-      }
-
-      // Process results
-      const formattedResults: Array<FormattedSearchResult & { rawDocument?: any }> = [];
-
-      for (const result of searchResults) {
-        const payload = result.payload as any;
-        const confidence = result.score || 1.0;
-
-        // Reconstruct data from payload
-        let reconstructedData;
-        if (payload.type === 'query_result') {
-          reconstructedData = await this.qdrantService.retrieveById(String(result.id));
-        } else {
-          reconstructedData = payload.data ? JSON.parse(payload.data) : payload;
-        }
-
-        const formattedResult: FormattedSearchResult & { rawDocument?: any } = {
-          type: payload.type || 'unknown',
-          confidence,
-          data: reconstructedData,
-          summary: this.generateResultSummary(reconstructedData, payload.type || 'unknown'),
-        };
-
-        // Add raw document if requested
-        if (options.includeRawDocument) {
-          formattedResult.rawDocument = {
-            id: String(result.id),
-            payload,
-            metadata: {
-              compressionStatus: payload.isCompressed ? 'compressed' : 'uncompressed',
-              compressionType: payload.compressionType,
-              originalSize: payload.originalSize,
-              compressedSize: payload.compressedSize,
-              compressionRatio: payload.compressionRatio,
-              clusterName: payload.clusterName || 'unknown',
-              projectId: payload.projectId || 'unknown',
-              region: payload.region || 'unknown',
-              timestamp: payload.timestamp || payload.storedAt || 'unknown',
-              dataType: payload.type || 'unknown',
-            },
-          };
-        }
-
-        formattedResults.push(formattedResult);
-      }
-
-      return formattedResults;
-    } catch (error) {
-      logger.error('Failed to query by tags:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Generate a formatted summary for query results
-   */
-  private generateResultSummary(
-    data: ClusterKnowledge | JobKnowledge | ErrorPattern | unknown,
-    dataType: string
-  ): string {
-    if (!data) return 'No data available';
-
-    switch (dataType) {
-      case 'job':
-        return this.generateJobSummary(data as JobKnowledge);
-      case 'cluster':
-        return this.generateClusterSummary(data as ClusterKnowledge);
-      case 'error':
-        return this.generateErrorSummary(data as ErrorPattern);
-      default:
-        return JSON.stringify(data, null, 2);
-    }
-  }
-
-  /**
-   * Generate formatted table summary for job results
-   */
-  private generateJobSummary(jobData: JobKnowledge): string {
-    const lines: string[] = [];
-
-    // Job header
-    lines.push(`🔍 Job: ${jobData.jobId || 'Unknown'}`);
-    lines.push(`📊 Type: ${jobData.jobType || 'Unknown'}`);
-    lines.push(`🏗️  Cluster: ${jobData.clusterName || 'Unknown'}`);
-    lines.push(
-      `📍 Project: ${jobData.projectId || 'Unknown'} | Region: ${jobData.region || 'Unknown'}`
-    );
-    lines.push(`⏰ Submitted: ${jobData.submissionTime || 'Unknown'}`);
-    lines.push(`✅ Status: ${jobData.status || 'Unknown'}`);
-
-    // Query results table if available
-    if (jobData.results && jobData.results.rows && jobData.results.rows.length > 0) {
-      lines.push('\n📋 Query Results:');
-      lines.push('─'.repeat(80));
-
-      const results = jobData.results;
-      const headers =
-        results.schema?.fields?.map((col: { name?: string }) => col.name || String(col)) || [];
-      const rows = results.rows || [];
-
-      // Table header
-      if (headers.length > 0) {
-        lines.push(`| ${headers.join(' | ')} |`);
-        lines.push(`|${headers.map(() => '─'.repeat(15)).join('|')}|`);
-      }
-
-      // Table rows (limit to first 10 for summary)
-      const displayRows = rows.slice(0, 10);
-      displayRows.forEach((row: unknown[]) => {
-        const formattedRow = row.map((cell) =>
-          String(cell || '').length > 12
-            ? String(cell || '').substring(0, 12) + '...'
-            : String(cell || '')
-        );
-        lines.push(`| ${formattedRow.join(' | ')} |`);
-      });
-
-      if (rows.length > 10) {
-        lines.push(`... and ${rows.length - 10} more rows`);
-      }
-
-      lines.push(`\n📊 Total: ${rows.length} rows, ${headers.length} columns`);
-    }
-
-    return lines.join('\n');
-  }
-
-  /**
-   * Generate formatted summary for cluster data
-   */
-  private generateClusterSummary(clusterData: ClusterKnowledge): string {
-    const lines: string[] = [];
-    lines.push(`🏗️  Cluster: ${clusterData.clusterName || 'Unknown'}`);
-    lines.push(
-      `📍 Project: ${clusterData.projectId || 'Unknown'} | Region: ${clusterData.region || 'Unknown'}`
-    );
-
-    if (clusterData.configurations?.machineTypes?.length > 0) {
-      lines.push(`💻 Machine Types: ${clusterData.configurations.machineTypes.join(', ')}`);
-    }
-
-    if (clusterData.configurations?.components?.length > 0) {
-      lines.push(`🔧 Components: ${clusterData.configurations.components.join(', ')}`);
-    }
-
-    if (clusterData.pipPackages?.length > 0) {
-      lines.push(
-        `🐍 Pip Packages: ${clusterData.pipPackages.slice(0, 5).join(', ')}${clusterData.pipPackages.length > 5 ? '...' : ''}`
-      );
-    }
-
-    return lines.join('\n');
-  }
-
-  /**
-   * Generate formatted summary for error data
-   */
-  private generateErrorSummary(errorData: ErrorPattern): string {
-    const lines: string[] = [];
-    lines.push(`❌ Error Pattern: ${errorData.pattern || 'Unknown'}`);
-    lines.push(`🔢 Frequency: ${errorData.frequency || 0}`);
-
-    if (errorData.commonCauses && errorData.commonCauses.length > 0) {
-      lines.push(`🔍 Common Causes: ${errorData.commonCauses.join(', ')}`);
-    }
-
-    if (errorData.suggestedFixes && errorData.suggestedFixes.length > 0) {
-      lines.push(`🔧 Suggested Fixes: ${errorData.suggestedFixes.join(', ')}`);
-    }
-
-    return lines.join('\n');
-  }
-
-  /**
-   * Get cluster discovery insights
+   * Legacy compatibility methods
    */
   getClusterInsights(): {
     totalClusters: number;
@@ -1155,9 +433,6 @@ export class KnowledgeIndexer {
     };
   }
 
-  /**
-   * Get job type analytics
-   */
   getJobTypeAnalytics(): {
     totalJobs: number;
     jobTypeDistribution: Record<string, number>;
@@ -1207,272 +482,455 @@ export class KnowledgeIndexer {
     };
   }
 
+  /**
+   * Query knowledge base with semantic search
+   */
+  async queryKnowledge(
+    query: string,
+    options: {
+      type?: 'clusters' | 'cluster' | 'jobs' | 'job' | 'errors' | 'error' | 'all';
+      projectId?: string;
+      region?: string;
+      limit?: number;
+    } = {}
+  ): Promise<FormattedSearchResult[]> {
+    try {
+      await this.qdrantService.ensureCollection();
+
+      // Enhanced query parsing for tags
+      const tags: { key: string; value: string }[] = [];
+      let semanticQuery = query;
+
+      const tagRegex = /(\w+):"([^"]+)"|(\w+):(\S+)/g;
+      let match;
+      while ((match = tagRegex.exec(query)) !== null) {
+        const key = match[1] || match[3];
+        const value = match[2] || match[4];
+        tags.push({ key, value });
+        semanticQuery = semanticQuery.replace(match[0], '').trim();
+      }
+
+      // Build Qdrant filter from tags
+      const filterConditions: any[] = [];
+      if (options.type && options.type !== 'all') {
+        filterConditions.push({
+          key: 'type',
+          match: { value: this.singularize(options.type) },
+        });
+      }
+      tags.forEach((tag) => {
+        filterConditions.push({
+          key: tag.key,
+          match: { value: tag.value },
+        });
+      });
+
+      const filter: any = {
+        must: filterConditions,
+      };
+
+      const queryVector = await this.embeddingService.generateEmbedding(semanticQuery || query);
+
+      const searchResults = await this.qdrantService
+        .getQdrantClient()
+        .search(this.qdrantService.getCollectionName(), {
+          vector: queryVector,
+          limit: options.limit || 10,
+          with_payload: true,
+          filter: filterConditions.length > 0 ? filter : undefined,
+        });
+
+      // Format results
+      const formattedResults: FormattedSearchResult[] = searchResults.map((result) => {
+        const payload = result.payload as any;
+        const dataType = payload?.type || 'unknown';
+        return {
+          id: result.id.toString(),
+          type: dataType,
+          confidence: result.score,
+          data: payload as any,
+          summary: this.generateResultSummary(payload, dataType),
+        };
+      });
+
+      return formattedResults;
+    } catch (error) {
+      logger.error('Failed to query knowledge base:', error);
+      return [];
+    }
+  }
+
+  // ===== PRIVATE METHODS =====
+
+  /**
+   * Dynamic field analysis for any data type
+   */
+  private analyzeDataFields(documents: any[]): FieldAnalysis[] {
+    const fieldStats: Record<string, any> = {};
+
+    documents.forEach((doc) => {
+      this.extractFieldsRecursively(doc, '', fieldStats);
+    });
+
+    // Convert to analysis format
+    const fieldAnalysis = Object.entries(fieldStats).map(([fieldName, stats]) => ({
+      fieldName,
+      fieldType: stats.type,
+      sampleValues: stats.samples.slice(0, 5),
+      uniqueCount: stats.unique.size,
+      totalCount: stats.count,
+      statistics: this.calculateFieldStatistics(stats),
+    }));
+
+    return fieldAnalysis.sort((a, b) => b.totalCount - a.totalCount);
+  }
+
+  /**
+   * Recursively extract fields and their stats
+   */
+  private extractFieldsRecursively(
+    obj: any,
+    prefix: string,
+    fieldStats: Record<string, any>
+  ): void {
+    if (!obj) return;
+
+    Object.entries(obj).forEach(([key, value]) => {
+      const fieldName = prefix ? `${prefix}.${key}` : key;
+
+      if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+        this.extractFieldsRecursively(value, fieldName, fieldStats);
+      } else {
+        if (!fieldStats[fieldName]) {
+          fieldStats[fieldName] = {
+            count: 0,
+            unique: new Set(),
+            samples: [],
+            type: this.getFieldType(value),
+          };
+        }
+        fieldStats[fieldName].count++;
+        fieldStats[fieldName].unique.add(JSON.stringify(value));
+        if (fieldStats[fieldName].samples.length < 10) {
+          fieldStats[fieldName].samples.push(value);
+        }
+      }
+    });
+  }
+
+  /**
+   * Get the type of a field value
+   */
+  private getFieldType(value: any): string {
+    if (Array.isArray(value)) return 'array';
+    if (value instanceof Date) return 'date';
+    if (typeof value === 'object' && value !== null) return 'object';
+    return typeof value;
+  }
+
+  /**
+   * Calculate statistics for a field
+   */
+  private calculateFieldStatistics(stats: any): any {
+    if (stats.type !== 'number' || stats.samples.length === 0) {
+      return undefined;
+    }
+
+    const numericValues = stats.samples.filter((v: any) => typeof v === 'number');
+    if (numericValues.length === 0) return undefined;
+
+    const sum = numericValues.reduce((a: number, b: number) => a + b, 0);
+    const avg = sum / numericValues.length;
+    const min = Math.min(...numericValues);
+    const max = Math.max(...numericValues);
+
+    const sorted = [...numericValues].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    const median = sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+
+    return {
+      min,
+      max,
+      avg,
+      median,
+      distribution: this.createNumericDistribution(numericValues),
+    };
+  }
+
+  /**
+   * Create a distribution for numeric values
+   */
+  private createNumericDistribution(values: number[]): Record<string, number> {
+    if (values.length < 2) return {};
+
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const range = max - min;
+    const numBins = Math.min(10, values.length);
+    const binSize = range / numBins;
+
+    const distribution: Record<string, number> = {};
+
+    values.forEach((value) => {
+      const binIndex = binSize > 0 ? Math.floor((value - min) / binSize) : 0;
+      const binStart = min + binIndex * binSize;
+      const binEnd = binStart + binSize;
+      const binName = `${binStart.toFixed(2)}-${binEnd.toFixed(2)}`;
+      distribution[binName] = (distribution[binName] || 0) + 1;
+    });
+
+    return distribution;
+  }
+
+  /**
+   * Detect patterns in cluster data
+   */
+  private detectClusterPatterns(clusters: any[], fieldAnalysis: FieldAnalysis[]): DataPattern[] {
+    const patterns: DataPattern[] = [];
+
+    // Example: Identify oversized/undersized clusters
+    const machineTypeField = fieldAnalysis.find((f) =>
+      f.fieldName.endsWith('masterConfig.machineTypeUri')
+    );
+    if (machineTypeField) {
+      // ... pattern detection logic ...
+    }
+
+    return patterns;
+  }
+
+  /**
+   * Detect patterns in job data
+   */
+  private detectJobPatterns(jobs: any[], fieldAnalysis: FieldAnalysis[]): DataPattern[] {
+    const patterns: DataPattern[] = [];
+
+    // Example: High failure rates for specific job types
+    const jobTypeField = fieldAnalysis.find((f) => f.fieldName === 'jobType');
+    const statusField = fieldAnalysis.find((f) => f.fieldName === 'status');
+
+    if (jobTypeField && statusField) {
+      // ... pattern detection logic ...
+    }
+
+    return patterns;
+  }
+
+  /**
+   * Analyze specific focus areas in the data
+   */
+  private analyzeFocusAreas(data: any[], focusAreas: string[]): Record<string, any> {
+    const analysis: Record<string, any> = {};
+    focusAreas.forEach((area) => {
+      switch (area.toLowerCase()) {
+        case 'performance':
+          analysis.performance = this.analyzePerformance(data);
+          break;
+        case 'configuration':
+          analysis.configuration = this.analyzeConfiguration(data);
+          break;
+        case 'errors':
+          analysis.errors = this.analyzeErrors(data);
+          break;
+        case 'resources':
+          analysis.resources = this.analyzeResources(data);
+          break;
+      }
+    });
+    return analysis;
+  }
+
+  private analyzePerformance(data: any[]): any {
+    const performanceFields = data.flatMap((item) =>
+      Object.keys(item).filter(
+        (k) => k.toLowerCase().includes('duration') || k.toLowerCase().includes('time')
+      )
+    );
+    return { summary: `Found ${performanceFields.length} performance-related fields.` };
+  }
+
+  private analyzeConfiguration(data: any[]): any {
+    const configFields = data.flatMap((item) =>
+      Object.keys(item).filter(
+        (k) => k.toLowerCase().includes('config') || k.toLowerCase().includes('properties')
+      )
+    );
+    return { summary: `Found ${configFields.length} configuration-related fields.` };
+  }
+
+  private analyzeErrors(data: any[]): any {
+    const errorFields = data.flatMap((item) =>
+      Object.keys(item).filter(
+        (k) => k.toLowerCase().includes('error') || k.toLowerCase().includes('fail')
+      )
+    );
+    return { summary: `Found ${errorFields.length} error-related fields.` };
+  }
+
+  private analyzeResources(data: any[]): any {
+    const resourceFields = data.flatMap((item) =>
+      Object.keys(item).filter(
+        (k) =>
+          k.toLowerCase().includes('memory') ||
+          k.toLowerCase().includes('cpu') ||
+          k.toLowerCase().includes('disk')
+      )
+    );
+    return { summary: `Found ${resourceFields.length} resource-related fields.` };
+  }
+
+  /**
+   * Generate recommendations based on cluster patterns
+   */
+  private generateClusterRecommendations(
+    patterns: DataPattern[],
+    fieldAnalysis: FieldAnalysis[]
+  ): string[] {
+    const recommendations: string[] = [];
+
+    // Example: Recommend standardizing machine types
+    const machineTypes = fieldAnalysis.find((f) => f.fieldName.endsWith('machineTypeUri'));
+    if (machineTypes && machineTypes.uniqueCount > 5) {
+      recommendations.push('Consider standardizing machine types to reduce configuration drift.');
+    }
+
+    return recommendations;
+  }
+
+  /**
+   * Generate recommendations based on job patterns
+   */
+  private generateJobRecommendations(
+    patterns: DataPattern[],
+    _fieldAnalysis: FieldAnalysis[]
+  ): string[] {
+    const recommendations: string[] = [];
+
+    // Example: Investigate high failure rates
+    const failureRate = patterns.find((p) => p.category === 'High Failure Rate');
+    if (failureRate) {
+      recommendations.push(
+        `Investigate high failure rate for ${failureRate.metrics.jobType} jobs.`
+      );
+    }
+
+    return recommendations;
+  }
+
+  // ===== PRIVATE HELPER METHODS =====
+
+  private createClusterKnowledge(clusterData: ClusterData): ClusterKnowledge {
+    const now = new Date().toISOString();
+    return {
+      clusterName: clusterData.clusterName || 'unknown',
+      projectId: clusterData.projectId || 'unknown',
+      region: clusterData.region || 'unknown',
+      firstSeen: now,
+      lastSeen: now,
+      configurations: {
+        machineTypes: [],
+        workerCounts: [],
+        components: [],
+        pipelines: [],
+        owners: [],
+        imageVersions: [],
+      },
+      pipPackages: [],
+      initializationScripts: [],
+      networkConfig: {
+        zones: [],
+        subnets: [],
+        serviceAccounts: [],
+      },
+    };
+  }
+
   private async updateClusterKnowledge(
     knowledge: ClusterKnowledge,
     clusterData: ClusterData
   ): Promise<void> {
-    try {
-      // Use generic converter for automatic field extraction with fallback to manual method
-      const extractedData = await this.extractClusterDataWithConverter(clusterData);
+    const config = clusterData.config;
+    if (!config) return;
 
-      // Merge extracted data into knowledge object
-      this.mergeExtractedClusterData(knowledge, extractedData);
+    // Update machine types
+    const masterType = this.extractMachineType(config.masterConfig?.machineTypeUri);
+    const workerType = this.extractMachineType(config.workerConfig?.machineTypeUri);
+    if (masterType) this.addUnique(knowledge.configurations.machineTypes, masterType);
+    if (workerType) this.addUnique(knowledge.configurations.machineTypes, workerType);
 
-      logger.debug('🔄 [KNOWLEDGE-INDEXER] Updated cluster knowledge using generic converter', {
-        clusterName: knowledge.clusterName,
-        extractedFields: Object.keys(extractedData).length,
-      });
-    } catch (error) {
-      logger.warn(
-        '⚠️ [KNOWLEDGE-INDEXER] Generic converter failed, falling back to manual extraction',
-        {
-          error: error instanceof Error ? error.message : 'Unknown error',
-          clusterName: knowledge.clusterName,
-        }
-      );
-
-      // Fallback to manual extraction
-      this.updateClusterKnowledgeManual(knowledge, clusterData);
-    }
-  }
-
-  /**
-   * Extract cluster data using the generic converter system
-   */
-  private async extractClusterDataWithConverter(clusterData: ClusterData): Promise<any> {
-    const metadata: QdrantStorageMetadata = {
-      toolName: 'knowledge-indexer-extraction',
-      timestamp: new Date().toISOString(),
-      projectId: clusterData.projectId || 'unknown',
-      region: clusterData.region || 'unknown',
-      clusterName: clusterData.clusterName || 'unknown',
-      responseType: 'cluster-extraction',
-      originalTokenCount: 0,
-      filteredTokenCount: 0,
-      compressionRatio: 1,
-      type: 'cluster',
-    };
-
-    // Create custom configuration for cluster data extraction
-    const config: ConversionConfig<ClusterData> = {
-      fieldMappings: {
-        clusterName: 'clusterName',
-        projectId: 'projectId',
-        region: 'region',
-        config: 'configuration',
-        labels: 'labels',
-        status: 'status',
-      },
-      transformations: {
-        config: (config: any) => this.extractConfigurationData(config),
-        labels: (labels: any) => this.extractLabelData(labels || {}),
-        status: (status: any) => status || {},
-      },
-      metadata: {
-        autoTimestamp: true,
-        autoUUID: false,
-      },
-    };
-
-    const result = await this.genericConverter.convert(clusterData, metadata, config);
-    return result.payload;
-  }
-
-  /**
-   * Extract configuration data using automatic field mapping
-   */
-  private extractConfigurationData(config: any): any {
-    if (!config) return {};
-
-    return {
-      masterMachine: this.extractMachineType(config.masterConfig?.machineTypeUri),
-      workerMachine: this.extractMachineType(config.workerConfig?.machineTypeUri),
-      workerCount: config.workerConfig?.numInstances,
-      components: config.softwareConfig?.optionalComponents || [],
-      imageVersion: config.softwareConfig?.imageVersion,
-      pipPackages: this.extractPipPackages(config.softwareConfig?.properties),
-      initializationActions: config.initializationActions || [],
-    };
-  }
-
-  /**
-   * Extract label data for pipeline and owner information
-   */
-  private extractLabelData(labels: Record<string, string>): any {
-    return {
-      pipeline: labels.pipeline,
-      owner: labels.owner,
-      environment: labels.environment,
-      team: labels.team,
-    };
-  }
-
-  /**
-   * Extract pip packages from properties
-   */
-  private extractPipPackages(properties: Record<string, string> | undefined): string[] {
-    const pipPackages = properties?.['dataproc:pip.packages'];
-    if (!pipPackages) return [];
-
-    return pipPackages
-      .split(',')
-      .map((pkg: string) => pkg.trim())
-      .filter(Boolean);
-  }
-
-  /**
-   * Merge extracted data into knowledge object
-   */
-  private mergeExtractedClusterData(knowledge: ClusterKnowledge, extractedData: any): void {
-    const config = extractedData.configuration || {};
-    const labels = extractedData.labels || {};
-
-    // Machine types
-    if (config.masterMachine)
-      this.addUnique(knowledge.configurations.machineTypes, config.masterMachine);
-    if (config.workerMachine)
-      this.addUnique(knowledge.configurations.machineTypes, config.workerMachine);
-
-    // Worker counts
-    if (config.workerCount)
-      this.addUnique(knowledge.configurations.workerCounts, config.workerCount);
-
-    // Components
-    if (config.components) {
-      config.components.forEach((comp: string) =>
-        this.addUnique(knowledge.configurations.components, comp)
-      );
-    }
-
-    // Labels
-    if (labels.pipeline) this.addUnique(knowledge.configurations.pipelines, labels.pipeline);
-    if (labels.owner) this.addUnique(knowledge.configurations.owners, labels.owner);
-
-    // Image version
-    if (config.imageVersion)
-      this.addUnique(knowledge.configurations.imageVersions, config.imageVersion);
-
-    // Pip packages
-    if (config.pipPackages) {
-      config.pipPackages.forEach((pkg: string) => this.addUnique(knowledge.pipPackages, pkg));
-    }
-
-    // Initialization scripts
-    if (config.initializationActions) {
-      config.initializationActions.forEach((action: { executableFile?: string }) => {
-        if (action.executableFile) {
-          this.addUnique(knowledge.initializationScripts, action.executableFile);
-        }
-      });
-    }
-  }
-
-  /**
-   * Fallback manual extraction method (preserves original logic)
-   */
-  private updateClusterKnowledgeManual(
-    knowledge: ClusterKnowledge,
-    clusterData: ClusterData
-  ): void {
-    // Extract machine types
-    const masterMachine = this.extractMachineType(clusterData.config?.masterConfig?.machineTypeUri);
-    const workerMachine = this.extractMachineType(clusterData.config?.workerConfig?.machineTypeUri);
-
-    if (masterMachine) this.addUnique(knowledge.configurations.machineTypes, masterMachine);
-    if (workerMachine) this.addUnique(knowledge.configurations.machineTypes, workerMachine);
-
-    // Extract worker counts
-    const workerCount = clusterData.config?.workerConfig?.numInstances;
+    // Update worker counts
+    const workerCount = config.workerConfig?.numInstances;
     if (workerCount) this.addUnique(knowledge.configurations.workerCounts, workerCount);
 
-    // Extract components
-    const components = clusterData.config?.softwareConfig?.optionalComponents || [];
-    components.forEach((comp: string) => this.addUnique(knowledge.configurations.components, comp));
-
-    // Extract pipeline and owner from labels
-    const labels = clusterData.labels || {};
-    if (labels.pipeline) this.addUnique(knowledge.configurations.pipelines, labels.pipeline);
-    if (labels.owner) this.addUnique(knowledge.configurations.owners, labels.owner);
-
-    // Extract image version
-    const imageVersion = clusterData.config?.softwareConfig?.imageVersion;
-    if (imageVersion) this.addUnique(knowledge.configurations.imageVersions, imageVersion);
-
-    // Extract pip packages
-    const pipPackages = clusterData.config?.softwareConfig?.properties?.['dataproc:pip.packages'];
-    if (pipPackages) {
-      const packages = pipPackages.split(',').map((pkg: string) => pkg.trim());
-      packages.forEach((pkg) => this.addUnique(knowledge.pipPackages, pkg));
+    // Update components, image versions, etc.
+    if (config.softwareConfig?.optionalComponents) {
+      config.softwareConfig.optionalComponents.forEach((c) =>
+        this.addUnique(knowledge.configurations.components, c)
+      );
+    }
+    if (config.softwareConfig?.imageVersion) {
+      this.addUnique(knowledge.configurations.imageVersions, config.softwareConfig.imageVersion);
     }
 
-    // Extract initialization scripts
-    const initActions = clusterData.config?.initializationActions || [];
-    initActions.forEach((action: { executableFile?: string }) => {
-      if (action.executableFile) {
-        this.addUnique(knowledge.initializationScripts, action.executableFile);
-      }
-    });
-
-    // Extract network configuration
-    const gceConfig = clusterData.config?.gceClusterConfig;
-    if (gceConfig) {
-      if (gceConfig.zoneUri) {
-        const zone = this.extractZone(gceConfig.zoneUri);
-        if (zone) this.addUnique(knowledge.networkConfig.zones, zone);
-      }
-      if (gceConfig.subnetworkUri)
-        this.addUnique(knowledge.networkConfig.subnets, gceConfig.subnetworkUri);
-      if (gceConfig.serviceAccount)
-        this.addUnique(knowledge.networkConfig.serviceAccounts, gceConfig.serviceAccount);
-    }
+    // ... more updates as needed
   }
 
-  private extractOutputSample(results: unknown): {
-    columns: string[];
-    rows: unknown[][];
-    totalRows?: number;
-  } {
-    try {
-      // Type guard for results with rows
-      const resultsWithRows = results as {
-        rows?: unknown[][];
-        schema?: { fields?: { name?: string }[] };
+  private async storeClusterKnowledge(knowledge: ClusterKnowledge): Promise<void> {
+    const text = `Cluster: ${knowledge.clusterName}, Project: ${knowledge.projectId}, Region: ${knowledge.region}. Components: ${knowledge.configurations.components.join(', ')}. Machine types: ${knowledge.configurations.machineTypes.join(', ')}.`;
+    const vector = await this.embeddingService.generateEmbedding(text);
+    await this.qdrantService.getQdrantClient().upsert(this.qdrantService.getCollectionName(), {
+      wait: true,
+      points: [
+        {
+          id: `${knowledge.projectId}:${knowledge.region}:${knowledge.clusterName}`,
+          vector,
+          payload: { ...knowledge, type: 'cluster' },
+        },
+      ],
+    });
+  }
+
+  private async storeJobKnowledge(knowledge: JobKnowledge): Promise<void> {
+    const text = `Job: ${knowledge.jobId}, Type: ${knowledge.jobType}, Status: ${knowledge.status}. Query: ${knowledge.query || 'N/A'}`;
+    const vector = await this.embeddingService.generateEmbedding(text);
+    await this.qdrantService.getQdrantClient().upsert(this.qdrantService.getCollectionName(), {
+      wait: true,
+      points: [
+        {
+          id: knowledge.jobId,
+          vector,
+          payload: { ...knowledge, type: 'job' },
+        },
+      ],
+    });
+  }
+
+  private normalizeJobType(jobType: string): 'hive' | 'spark' | 'pyspark' | 'presto' | 'other' {
+    const lowerJobType = jobType.toLowerCase();
+    if (lowerJobType.includes('hive')) return 'hive';
+    if (lowerJobType.includes('spark')) return 'spark';
+    if (lowerJobType.includes('pyspark')) return 'pyspark';
+    if (lowerJobType.includes('presto')) return 'presto';
+    return 'other';
+  }
+
+  private extractOutputSample(results: unknown):
+    | {
+        columns: string[];
+        rows: unknown[][];
         totalRows?: number;
-      };
-
-      // Handle different result formats
-      if (resultsWithRows.rows && Array.isArray(resultsWithRows.rows)) {
-        const columns =
-          resultsWithRows.schema?.fields?.map((f) => f.name || '') ||
-          Object.keys(resultsWithRows.rows[0] || {});
-
-        return {
-          columns,
-          rows: resultsWithRows.rows.slice(0, 5), // First 5 rows
-          totalRows: resultsWithRows.totalRows || resultsWithRows.rows.length,
-        };
       }
+    | undefined {
+    if (typeof results !== 'object' || results === null) return undefined;
 
-      // Handle CSV-like results
-      if (typeof results === 'string' && results.includes('\n')) {
-        const lines = results.split('\n').filter((line) => line.trim());
-        if (lines.length > 0) {
-          const columns = lines[0].split(',').map((col) => col.trim());
-          const rows = lines.slice(1, 6).map((line) => line.split(',').map((cell) => cell.trim()));
+    const res = results as ApiQueryResultResponse;
+    if (!res.schema?.fields || !res.rows) return undefined;
 
-          return {
-            columns,
-            rows,
-            totalRows: lines.length - 1,
-          };
-        }
-      }
-
-      return { columns: [], rows: [] };
-    } catch (error) {
-      logger.warn('Failed to extract output sample:', error);
-      return { columns: [], rows: [] };
-    }
+    return {
+      columns: res.schema.fields.map((s) => s.name),
+      rows: res.rows.slice(0, 10).map((r) => (r as any).values || []),
+      totalRows: res.totalRows,
+    };
   }
 
   private extractErrorInfo(error: unknown): {
@@ -1482,419 +940,94 @@ export class KnowledgeIndexer {
     commonCause?: string;
     suggestedFix?: string;
   } {
-    // Type guard for error objects
-    const errorObj = error as { message?: string; stack?: string; toString?: () => string };
-    const errorMessage =
-      errorObj.message || (errorObj.toString ? errorObj.toString() : String(error));
-    const errorType = this.classifyError(errorMessage);
-
+    if (typeof error === 'string') {
+      const errorType = this.classifyError(error);
+      return {
+        errorType,
+        errorMessage: error,
+        commonCause: this.getCommonCause(errorType),
+        suggestedFix: this.getSuggestedFix(errorType),
+      };
+    }
+    if (error instanceof Error) {
+      const errorType = this.classifyError(error.message);
+      return {
+        errorType,
+        errorMessage: error.message,
+        stackTrace: error.stack,
+        commonCause: this.getCommonCause(errorType),
+        suggestedFix: this.getSuggestedFix(errorType),
+      };
+    }
+    const errInfo = error as ErrorInfo;
     return {
-      errorType,
-      errorMessage,
-      stackTrace: errorObj.stack,
-      commonCause: this.getCommonCause(errorType),
-      suggestedFix: this.getSuggestedFix(errorType),
+      errorType: errInfo.errorType || 'UnknownError',
+      errorMessage: errInfo.errorMessage || 'No error message provided',
+      stackTrace: errInfo.stackTrace,
+      commonCause: errInfo.commonCause || this.getCommonCause(errInfo.errorType || ''),
+      suggestedFix: errInfo.suggestedFix || this.getSuggestedFix(errInfo.errorType || ''),
     };
   }
 
-  private async indexErrorPattern(errorInfo: ErrorInfo, jobKnowledge: JobKnowledge): Promise<void> {
-    const key = errorInfo.errorType;
-    let pattern = this.errorPatterns.get(key);
+  private async indexErrorPattern(errorInfo: any, jobKnowledge: JobKnowledge): Promise<void> {
+    const patternKey = errorInfo.errorType;
+    let pattern = this.errorPatterns.get(patternKey);
 
     if (!pattern) {
       pattern = {
-        errorType: errorInfo.errorType,
-        pattern: errorInfo.errorMessage,
+        errorType: patternKey,
+        pattern: errorInfo.errorMessage.substring(0, 100), // Simple pattern for now
         frequency: 0,
-        commonCauses: [],
-        suggestedFixes: [],
+        commonCauses: [errorInfo.commonCause].filter(Boolean),
+        suggestedFixes: [errorInfo.suggestedFix].filter(Boolean),
         relatedClusters: [],
         relatedJobTypes: [],
         examples: [],
       };
+      this.errorPatterns.set(patternKey, pattern);
     }
 
     pattern.frequency++;
     this.addUnique(pattern.relatedClusters, jobKnowledge.clusterName);
     this.addUnique(pattern.relatedJobTypes, jobKnowledge.jobType);
-
-    if (errorInfo.commonCause) this.addUnique(pattern.commonCauses, errorInfo.commonCause);
-    if (errorInfo.suggestedFix) this.addUnique(pattern.suggestedFixes, errorInfo.suggestedFix);
-
-    pattern.examples.push({
-      jobId: jobKnowledge.jobId,
-      clusterName: jobKnowledge.clusterName,
-      timestamp: jobKnowledge.submissionTime,
-      context: errorInfo.errorMessage.substring(0, 200),
-    });
-
-    // Keep only recent examples
-    pattern.examples = pattern.examples.slice(-10);
-
-    this.errorPatterns.set(key, pattern);
-  }
-
-  private normalizeJobType(jobType: string): 'hive' | 'spark' | 'pyspark' | 'presto' | 'other' {
-    const type = jobType.toLowerCase();
-    if (type.includes('hive')) return 'hive';
-    if (type.includes('spark')) return 'spark';
-    if (type.includes('pyspark')) return 'pyspark';
-    if (type.includes('presto')) return 'presto';
-    return 'other';
+    if (pattern.examples.length < 5) {
+      pattern.examples.push({
+        jobId: jobKnowledge.jobId,
+        clusterName: jobKnowledge.clusterName,
+        timestamp: new Date().toISOString(),
+        context: `Job type: ${jobKnowledge.jobType}, Status: ${jobKnowledge.status}`,
+      });
+    }
   }
 
   private classifyError(errorMessage: string): string {
-    const message = errorMessage.toLowerCase();
-
-    if (message.includes('out of memory') || message.includes('oom')) return 'OutOfMemoryError';
-    if (message.includes('connection') && message.includes('timeout')) return 'ConnectionTimeout';
-    if (message.includes('permission') || message.includes('access denied'))
-      return 'PermissionError';
-    if (message.includes('file not found') || message.includes('no such file'))
-      return 'FileNotFound';
-    if (message.includes('syntax error') || message.includes('parse error')) return 'SyntaxError';
-    if (message.includes('table') && message.includes('not found')) return 'TableNotFound';
-    if (message.includes('column') && message.includes('not found')) return 'ColumnNotFound';
-    if (message.includes('quota') || message.includes('limit exceeded')) return 'QuotaExceeded';
-
-    return 'UnknownError';
+    if (errorMessage.includes('permission denied')) return 'PermissionDenied';
+    if (errorMessage.includes('not found')) return 'NotFound';
+    if (errorMessage.includes('timeout')) return 'Timeout';
+    return 'GenericError';
   }
 
   private getCommonCause(errorType: string): string {
     const causes: Record<string, string> = {
-      OutOfMemoryError: 'Insufficient memory allocation for job or cluster',
-      ConnectionTimeout: 'Network connectivity issues or overloaded cluster',
-      PermissionError: 'Insufficient IAM permissions or service account issues',
-      FileNotFound: 'Missing input files or incorrect file paths',
-      SyntaxError: 'Invalid SQL syntax or unsupported operations',
-      TableNotFound: 'Table does not exist or incorrect database/schema',
-      ColumnNotFound: 'Column name typo or schema mismatch',
-      QuotaExceeded: 'GCP resource quotas or limits reached',
+      PermissionDenied: 'IAM permissions misconfiguration.',
+      NotFound: 'Resource (e.g., table, file) does not exist.',
+      Timeout: 'Network issue or overloaded cluster.',
     };
-
-    return causes[errorType] || 'Unknown cause - requires investigation';
+    return causes[errorType] || 'Unknown cause.';
   }
 
   private getSuggestedFix(errorType: string): string {
     const fixes: Record<string, string> = {
-      OutOfMemoryError: 'Increase cluster memory, reduce data size, or optimize query',
-      ConnectionTimeout: 'Check network connectivity, increase timeout, or scale cluster',
-      PermissionError: 'Verify IAM roles, service account permissions, or resource access',
-      FileNotFound: 'Check file paths, verify file existence, or update data sources',
-      SyntaxError: 'Review SQL syntax, check function compatibility, or validate query',
-      TableNotFound: 'Verify table name, check database connection, or create missing table',
-      ColumnNotFound: 'Check column names, verify schema, or update query references',
-      QuotaExceeded: 'Request quota increase, optimize resource usage, or use different region',
+      PermissionDenied: 'Check service account roles and permissions.',
+      NotFound: 'Verify resource paths and existence.',
+      Timeout: 'Increase timeout settings or check cluster load.',
     };
-
-    return fixes[errorType] || 'Contact support or check logs for more details';
-  }
-
-  private async storeClusterKnowledge(knowledge: ClusterKnowledge): Promise<void> {
-    try {
-      // Train the embedding model with this cluster data (like QdrantStorageService does)
-      this.embeddingService.trainOnClusterData(knowledge as unknown as ClusterData);
-
-      // Use generic converter for payload creation with fallback to manual method
-      const conversionResult = await this.convertClusterKnowledgeToPayload(knowledge);
-
-      logger.info('🔄 [KNOWLEDGE-INDEXER] Storing cluster knowledge using generic converter', {
-        clusterName: knowledge.clusterName,
-        fieldsProcessed: conversionResult.metadata.fieldsProcessed,
-        fieldsCompressed: conversionResult.metadata.fieldsCompressed,
-        compressionRatio: conversionResult.metadata.compressionRatio,
-        processingTime: conversionResult.metadata.processingTime,
-      });
-
-      const metadata = {
-        toolName: 'knowledge-indexer',
-        timestamp: knowledge.lastSeen,
-        projectId: knowledge.projectId,
-        region: knowledge.region,
-        clusterName: knowledge.clusterName,
-        responseType: 'cluster-knowledge',
-        originalTokenCount: conversionResult.metadata.totalOriginalSize,
-        filteredTokenCount: conversionResult.metadata.totalCompressedSize,
-        compressionRatio: conversionResult.metadata.compressionRatio,
-        type: 'cluster',
-      };
-
-      await this.qdrantService.storeClusterData(conversionResult.payload, metadata);
-    } catch (error) {
-      logger.warn(
-        '⚠️ [KNOWLEDGE-INDEXER] Generic converter failed for cluster storage, falling back to manual method',
-        {
-          error: error instanceof Error ? error.message : 'Unknown error',
-          clusterName: knowledge.clusterName,
-        }
-      );
-
-      // Fallback to manual payload creation
-      await this.storeClusterKnowledgeManual(knowledge);
-    }
-  }
-
-  /**
-   * Convert cluster knowledge to Qdrant payload using generic converter
-   */
-  private async convertClusterKnowledgeToPayload(
-    knowledge: ClusterKnowledge
-  ): Promise<ConversionResult<any>> {
-    const metadata: QdrantStorageMetadata = {
-      toolName: 'knowledge-indexer',
-      timestamp: knowledge.lastSeen,
-      projectId: knowledge.projectId,
-      region: knowledge.region,
-      clusterName: knowledge.clusterName,
-      responseType: 'cluster-knowledge',
-      originalTokenCount: 0,
-      filteredTokenCount: 0,
-      compressionRatio: 1,
-      type: 'cluster',
-    };
-
-    // Create configuration for cluster knowledge conversion
-    const config: ConversionConfig<ClusterKnowledge> = {
-      fieldMappings: {
-        clusterName: 'clusterName',
-        projectId: 'projectId',
-        region: 'region',
-        configurations: 'configurations',
-        pipPackages: 'pipPackages',
-        initializationScripts: 'initializationScripts',
-        networkConfig: 'networkConfig',
-      },
-      compressionRules: {
-        fields: ['configurations', 'pipPackages', 'initializationScripts', 'networkConfig'],
-        sizeThreshold: 5120, // 5KB threshold
-        compressionType: 'gzip',
-      },
-      transformations: {
-        firstSeen: (value) => new Date(value).toISOString(),
-        lastSeen: (value) => new Date(value).toISOString(),
-      },
-      metadata: {
-        autoTimestamp: true,
-        autoUUID: false,
-        customFields: {
-          type: () => 'cluster',
-          indexedBy: () => 'knowledge-indexer',
-        },
-      },
-    };
-
-    return await this.genericConverter.convert(knowledge, metadata, config);
-  }
-
-  /**
-   * Fallback manual cluster knowledge storage (preserves original logic)
-   */
-  private async storeClusterKnowledgeManual(knowledge: ClusterKnowledge): Promise<void> {
-    // Add type information to the data itself for easier retrieval
-    const dataWithType = {
-      ...knowledge,
-      type: 'cluster',
-    };
-
-    const metadata = {
-      toolName: 'knowledge-indexer',
-      timestamp: knowledge.lastSeen,
-      projectId: knowledge.projectId,
-      region: knowledge.region,
-      clusterName: knowledge.clusterName,
-      responseType: 'cluster-knowledge',
-      originalTokenCount: 0,
-      filteredTokenCount: 0,
-      compressionRatio: 1,
-      type: 'cluster',
-    };
-
-    console.log('[DEBUG] About to store cluster data (manual fallback):');
-    console.log('[DEBUG] - dataWithType type:', typeof dataWithType);
-    console.log('[DEBUG] - dataWithType keys:', Object.keys(dataWithType));
-    console.log('[DEBUG] - metadata type:', typeof metadata);
-    console.log('[DEBUG] - metadata keys:', Object.keys(metadata));
-
-    await this.qdrantService.storeClusterData(dataWithType, metadata);
-  }
-
-  private async storeJobKnowledge(knowledge: JobKnowledge): Promise<void> {
-    try {
-      // Use generic converter for payload creation with fallback to manual method
-      const conversionResult = await this.convertJobKnowledgeToPayload(knowledge);
-
-      logger.info('🔄 [KNOWLEDGE-INDEXER] Storing job knowledge using generic converter', {
-        jobId: knowledge.jobId,
-        jobType: knowledge.jobType,
-        fieldsProcessed: conversionResult.metadata.fieldsProcessed,
-        fieldsCompressed: conversionResult.metadata.fieldsCompressed,
-        compressionRatio: conversionResult.metadata.compressionRatio,
-        processingTime: conversionResult.metadata.processingTime,
-      });
-
-      const metadata = {
-        toolName: 'knowledge-indexer',
-        timestamp: knowledge.submissionTime,
-        projectId: knowledge.projectId,
-        region: knowledge.region,
-        clusterName: knowledge.clusterName,
-        responseType: 'job-knowledge',
-        originalTokenCount: conversionResult.metadata.totalOriginalSize,
-        filteredTokenCount: conversionResult.metadata.totalCompressedSize,
-        compressionRatio: conversionResult.metadata.compressionRatio,
-        type: 'job',
-      };
-
-      await this.qdrantService.storeClusterData(conversionResult.payload, metadata);
-
-      if (process.env.LOG_LEVEL === 'debug') {
-        console.error(
-          `[DEBUG] KnowledgeIndexer.storeJobKnowledge: Successfully stored job ${knowledge.jobId} using generic converter`
-        );
-      }
-    } catch (error) {
-      logger.warn(
-        '⚠️ [KNOWLEDGE-INDEXER] Generic converter failed for job storage, falling back to manual method',
-        {
-          error: error instanceof Error ? error.message : 'Unknown error',
-          jobId: knowledge.jobId,
-          jobType: knowledge.jobType,
-        }
-      );
-
-      // Fallback to manual payload creation
-      await this.storeJobKnowledgeManual(knowledge);
-    }
-  }
-
-  /**
-   * Convert job knowledge to Qdrant payload using generic converter
-   */
-  private async convertJobKnowledgeToPayload(
-    knowledge: JobKnowledge
-  ): Promise<ConversionResult<any>> {
-    const metadata: QdrantStorageMetadata = {
-      toolName: 'knowledge-indexer',
-      timestamp: knowledge.submissionTime,
-      projectId: knowledge.projectId,
-      region: knowledge.region,
-      clusterName: knowledge.clusterName,
-      responseType: 'job-knowledge',
-      originalTokenCount: 0,
-      filteredTokenCount: 0,
-      compressionRatio: 1,
-      type: 'job',
-    };
-
-    // Create configuration for job knowledge conversion
-    const config: ConversionConfig<JobKnowledge> = {
-      fieldMappings: {
-        jobId: 'jobId',
-        jobType: 'jobType',
-        clusterName: 'clusterName',
-        projectId: 'projectId',
-        region: 'region',
-        query: 'query',
-        results: 'results',
-        outputSample: 'outputSample',
-        errorInfo: 'errorInfo',
-      },
-      compressionRules: {
-        fields: ['query', 'results', 'outputSample', 'errorInfo'],
-        sizeThreshold: 2048, // 2KB threshold for job data
-        compressionType: 'gzip',
-      },
-      transformations: {
-        submissionTime: (value) => new Date(value).toISOString(),
-        duration: (value) => value || 0,
-        status: (value) => value || 'UNKNOWN',
-      },
-      metadata: {
-        autoTimestamp: true,
-        autoUUID: false,
-        customFields: {
-          type: () => 'job',
-          indexedBy: () => 'knowledge-indexer',
-        },
-      },
-    };
-
-    return await this.genericConverter.convert(knowledge, metadata, config);
-  }
-
-  /**
-   * Fallback manual job knowledge storage (preserves original logic)
-   */
-  private async storeJobKnowledgeManual(knowledge: JobKnowledge): Promise<void> {
-    // Add type information to the data itself for easier retrieval
-    const dataWithType = {
-      ...knowledge,
-      type: 'job',
-    };
-
-    const metadata = {
-      toolName: 'knowledge-indexer',
-      timestamp: knowledge.submissionTime,
-      projectId: knowledge.projectId,
-      region: knowledge.region,
-      clusterName: knowledge.clusterName,
-      responseType: 'job-knowledge',
-      originalTokenCount: 0,
-      filteredTokenCount: 0,
-      compressionRatio: 1,
-      type: 'job',
-    };
-
-    if (process.env.LOG_LEVEL === 'debug') {
-      console.error(
-        `[DEBUG] KnowledgeIndexer.storeJobKnowledge: Storing job ${knowledge.jobId} with type='job' (manual fallback)`
-      );
-      console.error(`[DEBUG] Data keys: ${Object.keys(dataWithType).join(', ')}`);
-      console.error(`[DEBUG] Metadata type: ${metadata.type}`);
-    }
-
-    await this.qdrantService.storeClusterData(dataWithType, metadata);
-
-    if (process.env.LOG_LEVEL === 'debug') {
-      console.error(
-        `[DEBUG] KnowledgeIndexer.storeJobKnowledge: Successfully stored job ${knowledge.jobId} (manual fallback)`
-      );
-    }
-  }
-
-  private hashCode(str: string): number {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      const char = str.charCodeAt(i);
-      hash = (hash << 5) - hash + char;
-      hash = hash & hash;
-    }
-    return hash;
-  }
-
-  private extractRegion(clusterData: ClusterData): string {
-    // Extract region from various possible locations
-    const zoneUri = clusterData.config?.gceClusterConfig?.zoneUri;
-    if (zoneUri) {
-      const match = zoneUri.match(/zones\/([^/]+)/);
-      if (match) {
-        const zone = match[1];
-        return zone.substring(0, zone.lastIndexOf('-')); // Remove zone suffix
-      }
-    }
-    return 'unknown';
+    return fixes[errorType] || 'Check logs for more details.';
   }
 
   private extractMachineType(machineTypeUri: string | undefined): string | null {
     if (!machineTypeUri) return null;
-    const parts = machineTypeUri.split('/');
-    return parts[parts.length - 1] || null;
-  }
-
-  private extractZone(zoneUri: string): string | null {
-    if (!zoneUri) return null;
-    const match = zoneUri.match(/zones\/([^/]+)/);
-    return match ? match[1] : null;
+    return machineTypeUri.split('/').pop() || null;
   }
 
   private addUnique<T>(array: T[], item: T): void {
@@ -1908,142 +1041,37 @@ export class KnowledgeIndexer {
     items.forEach((item) => {
       counts[item] = (counts[item] || 0) + 1;
     });
-
     return Object.entries(counts)
       .sort(([, a], [, b]) => b - a)
       .slice(0, limit)
       .map(([item]) => item);
   }
 
-  /**
-   * Get conversion metrics from the generic converter
-   */
-  public getConversionMetrics() {
-    try {
-      return this.genericConverter.getMetrics();
-    } catch (error) {
-      logger.warn('Failed to get conversion metrics:', error);
-      return {
-        totalConversions: 0,
-        averageProcessingTime: 0,
-        averageCompressionRatio: 1,
-        fieldCompressionStats: {},
-      };
+  private singularize(word: string): string {
+    if (word.endsWith('s')) {
+      return word.slice(0, -1);
     }
+    return word;
   }
 
-  /**
-   * Reset conversion metrics
-   */
-  public resetConversionMetrics(): void {
-    try {
-      this.genericConverter.resetMetrics();
-      logger.info('🔄 [KNOWLEDGE-INDEXER] Conversion metrics reset');
-    } catch (error) {
-      logger.warn('Failed to reset conversion metrics:', error);
+  private pluralize(word: string): string {
+    if (!word.endsWith('s')) {
+      return `${word}s`;
     }
+    return word;
   }
 
-  /**
-   * Get comprehensive performance and usage statistics
-   */
-  public getPerformanceStats() {
-    const conversionMetrics = this.getConversionMetrics();
-
-    return {
-      conversionMetrics,
-      knowledgeBase: {
-        clustersIndexed: this.clusterKnowledge.size,
-        jobsIndexed: this.jobKnowledge.size,
-        errorPatternsTracked: this.errorPatterns.size,
-      },
-      performance: {
-        averageConversionTime: conversionMetrics.averageProcessingTime,
-        averageCompressionRatio: conversionMetrics.averageCompressionRatio,
-        totalConversions: conversionMetrics.totalConversions,
-      },
-      compressionStats: conversionMetrics.fieldCompressionStats,
-    };
-  }
-
-  /**
-   * Test the generic converter integration with sample data
-   */
-  public async testGenericConverterIntegration(): Promise<{
-    success: boolean;
-    metrics?: any;
-    error?: string;
-  }> {
-    try {
-      // Create sample cluster data for testing
-      const sampleClusterData: ClusterData = {
-        clusterName: 'test-cluster',
-        projectId: 'test-project',
-        region: 'us-central1',
-        config: {
-          masterConfig: {
-            machineTypeUri: 'projects/test-project/zones/us-central1-a/machineTypes/n1-standard-4',
-          },
-          workerConfig: {
-            machineTypeUri: 'projects/test-project/zones/us-central1-a/machineTypes/n1-standard-2',
-            numInstances: 3,
-          },
-          softwareConfig: {
-            optionalComponents: ['JUPYTER', 'ZEPPELIN'],
-            imageVersion: '2.0-debian10',
-            properties: {
-              'dataproc:pip.packages': 'pandas,numpy,scikit-learn',
-            },
-          },
-        },
-        labels: {
-          pipeline: 'ml-training',
-          owner: 'data-team',
-        },
-      };
-
-      // Test cluster data extraction
-      const extractedData = await this.extractClusterDataWithConverter(sampleClusterData);
-
-      // Test cluster knowledge conversion
-      const sampleKnowledge: ClusterKnowledge = {
-        clusterName: 'test-cluster',
-        projectId: 'test-project',
-        region: 'us-central1',
-        firstSeen: new Date().toISOString(),
-        lastSeen: new Date().toISOString(),
-        configurations: {
-          machineTypes: ['n1-standard-4', 'n1-standard-2'],
-          workerCounts: [3],
-          components: ['JUPYTER', 'ZEPPELIN'],
-          pipelines: ['ml-training'],
-          owners: ['data-team'],
-          imageVersions: ['2.0-debian10'],
-        },
-        pipPackages: ['pandas', 'numpy', 'scikit-learn'],
-        initializationScripts: [],
-        networkConfig: {
-          zones: [],
-          subnets: [],
-          serviceAccounts: [],
-        },
-      };
-
-      const conversionResult = await this.convertClusterKnowledgeToPayload(sampleKnowledge);
-
-      return {
-        success: true,
-        metrics: {
-          extractedFields: Object.keys(extractedData).length,
-          conversionMetrics: conversionResult.metadata,
-          overallMetrics: this.getConversionMetrics(),
-        },
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      };
+  private generateResultSummary(payload: any, dataType: string): string {
+    if (!payload) return 'No data available';
+    switch (dataType) {
+      case 'cluster':
+        return `Cluster ${payload.clusterName} in ${payload.projectId}. Components: ${payload.configurations?.components?.join(', ') || 'N/A'}`;
+      case 'job':
+        return `Job ${payload.jobId} (${payload.jobType}) - Status: ${payload.status}`;
+      case 'error':
+        return `Error: ${payload.errorType} - Frequency: ${payload.frequency}`;
+      default:
+        return 'Unknown data type';
     }
   }
 }

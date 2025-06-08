@@ -5,14 +5,20 @@
 
 import {
   handleStartDataprocCluster,
+  handleCreateClusterFromYaml,
+  handleCreateClusterFromProfile,
   handleListClusters,
   handleGetCluster,
   handleDeleteCluster,
+  handleGetZeppelinUrl,
 } from './cluster-handlers.js';
 import {
   handleSubmitHiveQuery,
+  handleSubmitDataprocJob,
   handleGetQueryStatus,
+  handleGetJobStatus,
   handleGetQueryResults,
+  handleGetJobResults,
   handleCheckActiveJobs,
 } from './job-handlers.js';
 import {
@@ -61,6 +67,10 @@ export async function handleToolCall(toolName: string, args: any, deps: AllHandl
     // Cluster handlers
     case 'start_dataproc_cluster':
       return handleStartDataprocCluster(args, deps);
+    case 'create_cluster_from_yaml':
+      return handleCreateClusterFromYaml(args, deps);
+    case 'create_cluster_from_profile':
+      return handleCreateClusterFromProfile(args, deps);
     case 'list_clusters':
       return handleListClusters(args, deps);
     case 'get_cluster':
@@ -69,14 +79,22 @@ export async function handleToolCall(toolName: string, args: any, deps: AllHandl
       return handleDeleteCluster(args, deps);
     case 'list_tracked_clusters':
       return handleListTrackedClusters(args, deps);
+    case 'get_zeppelin_url':
+      return handleGetZeppelinUrl(args, deps);
 
     // Job handlers
     case 'submit_hive_query':
       return handleSubmitHiveQuery(args, deps);
+    case 'submit_dataproc_job':
+      return handleSubmitDataprocJob(args, deps);
     case 'get_query_status':
       return handleGetQueryStatus(args, deps);
+    case 'get_job_status':
+      return handleGetJobStatus(args, deps);
     case 'get_query_results':
       return handleGetQueryResults(args, deps);
+    case 'get_job_results':
+      return handleGetJobResults(args, deps);
     case 'check_active_jobs':
       return handleCheckActiveJobs(args, deps);
 
@@ -116,6 +134,7 @@ export function getSupportedToolNames(): string[] {
     // Job tools
     'submit_hive_query',
     'get_query_status',
+    'get_job_status',
     'get_query_results',
     'check_active_jobs',
 
@@ -136,8 +155,8 @@ export function getSupportedToolNames(): string[] {
  */
 export const handlerSummary = {
   total: getSupportedToolNames().length,
-  cluster: 5,
-  job: 4,
+  cluster: 8, // Added create_cluster_from_yaml, create_cluster_from_profile, get_zeppelin_url
+  job: 7, // Added submit_dataproc_job, get_job_status, get_job_results
   profile: 2,
   knowledge: 4,
 };

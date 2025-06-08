@@ -466,27 +466,250 @@ export class QdrantStorageService {
         return null;
       }
 
-      // Handle new structured format
-      if (payload.type === 'query_result' && 'schema' in payload) {
-        return await this.reconstructQueryResult(payload as QdrantQueryResultPayload);
-      } else if (payload.type === 'cluster' && 'clusterConfig' in payload) {
-        return await this.reconstructClusterData(payload as QdrantClusterPayload);
-      } else if (payload.type === 'job' && 'jobId' in payload) {
-        return await this.reconstructJobData(payload as QdrantJobPayload);
-      } else if (payload.data) {
-        // Legacy format - decompress if needed
-        return await this.compressionService.decompressIfNeeded(
-          payload.data,
-          payload.isCompressed || false,
-          payload.compressionType
-        );
-      }
-
-      return payload;
+      // Robust data reconstruction with comprehensive type handling
+      return await this.reconstructDataRobustly(payload, id);
     } catch (error) {
       console.error('Failed to retrieve data from Qdrant:', error);
       return null;
     }
+  }
+
+  /**
+   * Robust data reconstruction that handles all types and ensures everything has a type
+   */
+  private async reconstructDataRobustly(payload: any, id: string): Promise<any> {
+    try {
+      // Step 1: Determine the correct type with intelligent detection
+      const detectedType = this.detectDataType(payload);
+
+      // Step 2: Attempt structured reconstruction based on detected type
+      let reconstructedData = await this.attemptStructuredReconstruction(payload, detectedType);
+
+      // Step 3: If structured reconstruction fails, try legacy format
+      if (!reconstructedData && payload.data) {
+        reconstructedData = await this.attemptLegacyReconstruction(payload);
+      }
+
+      // Step 4: If all else fails, return raw payload with type correction
+      if (!reconstructedData) {
+        reconstructedData = await this.createFallbackData(payload, detectedType);
+      }
+
+      // Step 5: Ensure the result always has a type
+      if (reconstructedData && typeof reconstructedData === 'object') {
+        reconstructedData.type = detectedType;
+        reconstructedData.reconstructionMethod = this.getReconstructionMethod(payload);
+        reconstructedData.qdrantId = id;
+      }
+
+      return reconstructedData;
+    } catch (error) {
+      console.error(`Failed to reconstruct data for ID ${id}:`, error);
+      return {
+        type: 'unknown',
+        error: 'Reconstruction failed',
+        originalPayload: payload,
+        qdrantId: id,
+        reconstructionMethod: 'error_fallback',
+      };
+    }
+  }
+
+  /**
+   * Intelligent type detection based on payload structure and content
+   */
+  private detectDataType(payload: any): string {
+    // Priority 1: Explicit type in payload
+    if (payload.type) {
+      return payload.type;
+    }
+
+    // Priority 2: Detect by structure signatures
+    if ('schema' in payload && 'rows' in payload) {
+      return 'query_result';
+    }
+
+    if ('clusterConfig' in payload || 'clusterName' in payload) {
+      return 'cluster';
+    }
+
+    if ('jobId' in payload || 'jobType' in payload) {
+      return 'job';
+    }
+
+    if ('errorType' in payload || 'errorMessage' in payload) {
+      return 'error';
+    }
+
+    // Priority 3: Detect by tool name in metadata
+    if (payload.toolName && typeof payload.toolName === 'string') {
+      if (
+        payload.toolName.includes('cluster') ||
+        payload.toolName === 'get_cluster' ||
+        payload.toolName === 'list_clusters'
+      ) {
+        return 'cluster';
+      }
+      if (
+        payload.toolName.includes('job') ||
+        payload.toolName.includes('hive') ||
+        payload.toolName.includes('spark')
+      ) {
+        return 'job';
+      }
+      if (payload.toolName.includes('query')) {
+        return 'query_result';
+      }
+    }
+
+    // Priority 4: Detect by response type
+    if (payload.responseType && typeof payload.responseType === 'string') {
+      if (payload.responseType.includes('cluster')) {
+        return 'cluster';
+      }
+      if (payload.responseType.includes('job')) {
+        return 'job';
+      }
+      if (payload.responseType.includes('query')) {
+        return 'query_result';
+      }
+    }
+
+    // Priority 5: Analyze data content if available
+    if (payload.data) {
+      try {
+        const dataStr =
+          typeof payload.data === 'string' ? payload.data : JSON.stringify(payload.data);
+        if (dataStr.includes('clusterName') || dataStr.includes('clusterUuid')) {
+          return 'cluster';
+        }
+        if (dataStr.includes('jobId') || dataStr.includes('jobType')) {
+          return 'job';
+        }
+        if (dataStr.includes('schema') && dataStr.includes('rows')) {
+          return 'query_result';
+        }
+      } catch (e) {
+        // Ignore parsing errors
+      }
+    }
+
+    return 'unknown';
+  }
+
+  /**
+   * Attempt structured reconstruction based on detected type
+   */
+  private async attemptStructuredReconstruction(payload: any, type: string): Promise<any> {
+    try {
+      switch (type) {
+        case 'query_result':
+          if ('schema' in payload) {
+            return await this.reconstructQueryResult(payload as QdrantQueryResultPayload);
+          }
+          break;
+
+        case 'cluster':
+          if ('clusterConfig' in payload) {
+            return await this.reconstructClusterData(payload as QdrantClusterPayload);
+          }
+          break;
+
+        case 'job':
+          if ('jobId' in payload) {
+            return await this.reconstructJobData(payload as QdrantJobPayload);
+          }
+          break;
+
+        default:
+          // For unknown types, try to reconstruct as generic data
+          return await this.reconstructGenericData(payload);
+      }
+    } catch (error) {
+      console.warn(`Structured reconstruction failed for type ${type}:`, error);
+    }
+
+    return null;
+  }
+
+  /**
+   * Attempt legacy format reconstruction
+   */
+  private async attemptLegacyReconstruction(payload: any): Promise<any> {
+    try {
+      return await this.compressionService.decompressIfNeeded(
+        payload.data,
+        payload.isCompressed || false,
+        payload.compressionType
+      );
+    } catch (error) {
+      console.warn('Legacy reconstruction failed:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Create fallback data when all reconstruction methods fail
+   */
+  private async createFallbackData(payload: any, type: string): Promise<any> {
+    return {
+      type,
+      fallbackData: true,
+      availableFields: Object.keys(payload),
+      metadata: {
+        projectId: payload.projectId,
+        region: payload.region,
+        clusterName: payload.clusterName,
+        jobId: payload.jobId,
+        toolName: payload.toolName,
+        responseType: payload.responseType,
+        timestamp: payload.timestamp,
+        storedAt: payload.storedAt,
+      },
+      rawPayload: payload,
+    };
+  }
+
+  /**
+   * Reconstruct generic data for unknown types
+   */
+  private async reconstructGenericData(payload: any): Promise<any> {
+    const result: any = {
+      type: payload.type || 'generic',
+      timestamp: payload.timestamp,
+      storedAt: payload.storedAt,
+      toolName: payload.toolName,
+      responseType: payload.responseType,
+    };
+
+    // Copy all non-system fields
+    const systemFields = ['isCompressed', 'compressionType', 'originalSize', 'compressedSize'];
+    for (const [key, value] of Object.entries(payload)) {
+      if (!systemFields.includes(key) && value !== undefined) {
+        result[key] = value;
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Get the reconstruction method used
+   */
+  private getReconstructionMethod(payload: any): string {
+    if ('schema' in payload && 'rows' in payload) {
+      return 'structured_query_result';
+    }
+    if ('clusterConfig' in payload) {
+      return 'structured_cluster';
+    }
+    if ('jobId' in payload && 'jobType' in payload) {
+      return 'structured_job';
+    }
+    if (payload.data) {
+      return 'legacy_decompression';
+    }
+    return 'fallback_generic';
   }
 
   /**

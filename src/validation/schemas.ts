@@ -136,8 +136,8 @@ export const DeleteClusterSchema = z.object({
 });
 
 export const SubmitHiveQuerySchema = z.object({
-  projectId: ProjectIdSchema,
-  region: RegionSchema,
+  projectId: ProjectIdSchema.optional(),
+  region: RegionSchema.optional(),
   clusterName: ClusterNameSchema,
   query: z
     .string()
