@@ -115,3 +115,4 @@ state/*
 scripts/copy-config-to-desktop.sh
 src/services/qdrantpayloadexample.json
 tests/manual/state/*
+dataproc-tools-test-results*.json
