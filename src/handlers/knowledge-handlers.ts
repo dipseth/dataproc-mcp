@@ -225,42 +225,50 @@ export async function handleGetClusterInsights(args: any, deps: KnowledgeHandler
   }
 
   try {
-    // Get cluster insights from knowledge indexer
-    const insights = await deps.knowledgeIndexer.getClusterInsights();
-
-    SecurityMiddleware.auditLog('Cluster insights completed', {
-      tool: 'get_cluster_insights',
-      clusterCount: insights.totalClusters,
-    });
-
+    // Try dynamic insights first, fallback to legacy
     let response = '📊 **Cluster Discovery Insights**\n\n';
-    response += `🏗️  **Total Clusters**: ${insights.totalClusters}\n`;
-    response += `🏢 **Projects**: ${insights.uniqueProjects}\n`;
-    response += `🌍 **Regions**: ${insights.uniqueRegions}\n\n`;
-
-    if (insights.commonMachineTypes.length > 0) {
-      response += `🖥️  **Machine Types**:\n`;
-      insights.commonMachineTypes.slice(0, 10).forEach((mt) => {
-        response += `   • ${mt}\n`;
+    
+    // Use dynamic insights
+    const dynamicInsights = await deps.knowledgeIndexer.getDynamicClusterInsights();
+    
+    response += `🏗️  **Total Clusters**: ${dynamicInsights.totalDocuments}\n\n`;
+    
+    // Show top field analysis
+    if (dynamicInsights.fieldAnalysis.length > 0) {
+      response += `🔍 **Dynamic Field Analysis**:\n`;
+      dynamicInsights.fieldAnalysis.slice(0, 5).forEach((field) => {
+        response += `   • ${field.fieldName} (${field.fieldType}): ${field.uniqueCount} unique values\n`;
       });
-      if (insights.commonMachineTypes.length > 10) {
-        response += `   ... and ${insights.commonMachineTypes.length - 10} more\n`;
-      }
       response += '\n';
     }
-
-    if (insights.commonComponents.length > 0) {
-      response += `🔧 **Components**:\n`;
-      insights.commonComponents.slice(0, 10).forEach((comp) => {
-        response += `   • ${comp}\n`;
+    
+    // Show patterns
+    if (dynamicInsights.patterns.length > 0) {
+      response += `📈 **Detected Patterns**:\n`;
+      dynamicInsights.patterns.forEach((pattern) => {
+        response += `   **${pattern.category}** (${(pattern.confidence * 100).toFixed(0)}% confidence):\n`;
+        pattern.insights.forEach((insight) => {
+          response += `     • ${insight}\n`;
+        });
       });
-      if (insights.commonComponents.length > 10) {
-        response += `   ... and ${insights.commonComponents.length - 10} more\n`;
-      }
+      response += '\n';
+    }
+    
+    // Show recommendations
+    if (dynamicInsights.recommendations.length > 0) {
+      response += `💡 **Recommendations**:\n`;
+      dynamicInsights.recommendations.forEach((rec) => {
+        response += `   • ${rec}\n`;
+      });
       response += '\n';
     }
 
     response += `📅 **Last Updated**: ${new Date().toISOString()}`;
+
+    SecurityMiddleware.auditLog('Cluster insights completed', {
+      tool: 'get_cluster_insights',
+      responseLength: response.length,
+    });
 
     return {
       content: [
@@ -359,48 +367,51 @@ export async function handleGetJobAnalytics(args: any, deps: KnowledgeHandlerDep
   }
 
   try {
-    // Get job analytics from knowledge indexer
-    const analytics = await deps.knowledgeIndexer.getJobTypeAnalytics();
-
-    SecurityMiddleware.auditLog('Job analytics completed', {
-      tool: 'get_job_analytics',
-      analyticsAvailable: !!analytics,
-    });
-
+    // Use dynamic analytics
     let response = '📈 **Job Submission Analytics**\n\n';
-
-    if (analytics && typeof analytics === 'object') {
-      const jobTypeDistribution = analytics.jobTypeDistribution || {};
-      const totalJobs =
-        analytics.totalJobs ||
-        Object.values(jobTypeDistribution).reduce(
-          (sum: number, count: any) => sum + (typeof count === 'number' ? count : 0),
-          0
-        );
-
-      response += `🚀 **Total Jobs**: ${totalJobs}\n`;
-      response += `📊 **Success Rate**: ${(analytics.successRate * 100).toFixed(1)}%\n\n`;
-
-      if (Object.keys(jobTypeDistribution).length > 0) {
-        response += `🔧 **Job Types**:\n`;
-        Object.entries(jobTypeDistribution).forEach(([type, count]) => {
-          response += `   • ${type}: ${count} jobs\n`;
+    const dynamicAnalytics = await deps.knowledgeIndexer.getDynamicJobAnalytics();
+    
+    response += `🚀 **Total Jobs**: ${dynamicAnalytics.totalDocuments}\n\n`;
+    
+    // Show top field analysis
+    if (dynamicAnalytics.fieldAnalysis.length > 0) {
+      response += `🔍 **Dynamic Field Analysis**:\n`;
+      dynamicAnalytics.fieldAnalysis.slice(0, 5).forEach((field) => {
+        response += `   • ${field.fieldName} (${field.fieldType}): ${field.uniqueCount} unique values\n`;
+        if (field.statistics?.avg) {
+          response += `     Average: ${field.statistics.avg.toFixed(2)}\n`;
+        }
+      });
+      response += '\n';
+    }
+    
+    // Show patterns
+    if (dynamicAnalytics.patterns.length > 0) {
+      response += `📈 **Detected Patterns**:\n`;
+      dynamicAnalytics.patterns.forEach((pattern) => {
+        response += `   **${pattern.category}** (${(pattern.confidence * 100).toFixed(0)}% confidence):\n`;
+        pattern.insights.forEach((insight) => {
+          response += `     • ${insight}\n`;
         });
-        response += '\n';
-      }
-
-      if (analytics.commonErrors && analytics.commonErrors.length > 0) {
-        response += `⚠️  **Common Errors**:\n`;
-        analytics.commonErrors.slice(0, 5).forEach((error: any) => {
-          response += `   • ${error.pattern} (${error.frequency || 'unknown'} occurrences)\n`;
-        });
-        response += '\n';
-      }
-    } else {
-      response += `⚠️ **Analytics data not available**\n\n`;
+      });
+      response += '\n';
+    }
+    
+    // Show recommendations
+    if (dynamicAnalytics.recommendations.length > 0) {
+      response += `💡 **Recommendations**:\n`;
+      dynamicAnalytics.recommendations.forEach((rec) => {
+        response += `   • ${rec}\n`;
+      });
+      response += '\n';
     }
 
     response += `📅 **Last Updated**: ${new Date().toISOString()}`;
+
+    SecurityMiddleware.auditLog('Job analytics completed', {
+      tool: 'get_job_analytics',
+      responseLength: response.length,
+    });
 
     return {
       content: [
