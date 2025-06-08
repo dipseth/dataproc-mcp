@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- semantic-release-changelog -->
 
+## [4.2.0](https://github.com/dipseth/dataproc-mcp/compare/v4.1.0...v4.2.0) (2025-06-08)
+
+
+### 🚀 Features
+
+* add comprehensive dataproc tools testing and fix critical get_zeppelin_url bug ([8aaa5d8](https://github.com/dipseth/dataproc-mcp/commit/8aaa5d80a3506fb951fd3ae3aa00510454eb82c6))
+
+
+### 🐛 Bug Fixes
+
+* **knowledge:** resolve collection mismatch between storage and retrieval ([77d8c56](https://github.com/dipseth/dataproc-mcp/commit/77d8c568df4fca7e7badbd012925387cfa58df68))
+
+
+### 📚 Documentation
+
+* update documentation for v4.1.0 ([d94e33e](https://github.com/dipseth/dataproc-mcp/commit/d94e33e80a041e08cd200bd0ac9e988080a3252c))
+
 ## [4.1.0](https://github.com/dipseth/dataproc-mcp/compare/v4.0.0...v4.1.0) (2025-06-07)
 
 
