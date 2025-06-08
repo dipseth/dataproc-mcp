@@ -549,7 +549,6 @@ export async function handleSubmitDataprocJob(args: any, deps: JobHandlerDepende
         },
       ],
     };
-
   } catch (error) {
     logger.error('Failed to submit Dataproc job:', error);
     throw new McpError(

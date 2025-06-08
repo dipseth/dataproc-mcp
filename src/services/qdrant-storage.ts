@@ -481,27 +481,27 @@ export class QdrantStorageService {
     try {
       // Step 1: Determine the correct type with intelligent detection
       const detectedType = this.detectDataType(payload);
-      
+
       // Step 2: Attempt structured reconstruction based on detected type
       let reconstructedData = await this.attemptStructuredReconstruction(payload, detectedType);
-      
+
       // Step 3: If structured reconstruction fails, try legacy format
       if (!reconstructedData && payload.data) {
         reconstructedData = await this.attemptLegacyReconstruction(payload);
       }
-      
+
       // Step 4: If all else fails, return raw payload with type correction
       if (!reconstructedData) {
         reconstructedData = await this.createFallbackData(payload, detectedType);
       }
-      
+
       // Step 5: Ensure the result always has a type
       if (reconstructedData && typeof reconstructedData === 'object') {
         reconstructedData.type = detectedType;
         reconstructedData.reconstructionMethod = this.getReconstructionMethod(payload);
         reconstructedData.qdrantId = id;
       }
-      
+
       return reconstructedData;
     } catch (error) {
       console.error(`Failed to reconstruct data for ID ${id}:`, error);
@@ -510,7 +510,7 @@ export class QdrantStorageService {
         error: 'Reconstruction failed',
         originalPayload: payload,
         qdrantId: id,
-        reconstructionMethod: 'error_fallback'
+        reconstructionMethod: 'error_fallback',
       };
     }
   }
@@ -523,37 +523,45 @@ export class QdrantStorageService {
     if (payload.type) {
       return payload.type;
     }
-    
+
     // Priority 2: Detect by structure signatures
     if ('schema' in payload && 'rows' in payload) {
       return 'query_result';
     }
-    
+
     if ('clusterConfig' in payload || 'clusterName' in payload) {
       return 'cluster';
     }
-    
+
     if ('jobId' in payload || 'jobType' in payload) {
       return 'job';
     }
-    
+
     if ('errorType' in payload || 'errorMessage' in payload) {
       return 'error';
     }
-    
+
     // Priority 3: Detect by tool name in metadata
     if (payload.toolName && typeof payload.toolName === 'string') {
-      if (payload.toolName.includes('cluster') || payload.toolName === 'get_cluster' || payload.toolName === 'list_clusters') {
+      if (
+        payload.toolName.includes('cluster') ||
+        payload.toolName === 'get_cluster' ||
+        payload.toolName === 'list_clusters'
+      ) {
         return 'cluster';
       }
-      if (payload.toolName.includes('job') || payload.toolName.includes('hive') || payload.toolName.includes('spark')) {
+      if (
+        payload.toolName.includes('job') ||
+        payload.toolName.includes('hive') ||
+        payload.toolName.includes('spark')
+      ) {
         return 'job';
       }
       if (payload.toolName.includes('query')) {
         return 'query_result';
       }
     }
-    
+
     // Priority 4: Detect by response type
     if (payload.responseType && typeof payload.responseType === 'string') {
       if (payload.responseType.includes('cluster')) {
@@ -566,11 +574,12 @@ export class QdrantStorageService {
         return 'query_result';
       }
     }
-    
+
     // Priority 5: Analyze data content if available
     if (payload.data) {
       try {
-        const dataStr = typeof payload.data === 'string' ? payload.data : JSON.stringify(payload.data);
+        const dataStr =
+          typeof payload.data === 'string' ? payload.data : JSON.stringify(payload.data);
         if (dataStr.includes('clusterName') || dataStr.includes('clusterUuid')) {
           return 'cluster';
         }
@@ -584,7 +593,7 @@ export class QdrantStorageService {
         // Ignore parsing errors
       }
     }
-    
+
     return 'unknown';
   }
 
@@ -599,19 +608,19 @@ export class QdrantStorageService {
             return await this.reconstructQueryResult(payload as QdrantQueryResultPayload);
           }
           break;
-          
+
         case 'cluster':
           if ('clusterConfig' in payload) {
             return await this.reconstructClusterData(payload as QdrantClusterPayload);
           }
           break;
-          
+
         case 'job':
           if ('jobId' in payload) {
             return await this.reconstructJobData(payload as QdrantJobPayload);
           }
           break;
-          
+
         default:
           // For unknown types, try to reconstruct as generic data
           return await this.reconstructGenericData(payload);
@@ -619,7 +628,7 @@ export class QdrantStorageService {
     } catch (error) {
       console.warn(`Structured reconstruction failed for type ${type}:`, error);
     }
-    
+
     return null;
   }
 
@@ -655,9 +664,9 @@ export class QdrantStorageService {
         toolName: payload.toolName,
         responseType: payload.responseType,
         timestamp: payload.timestamp,
-        storedAt: payload.storedAt
+        storedAt: payload.storedAt,
       },
-      rawPayload: payload
+      rawPayload: payload,
     };
   }
 
@@ -670,9 +679,9 @@ export class QdrantStorageService {
       timestamp: payload.timestamp,
       storedAt: payload.storedAt,
       toolName: payload.toolName,
-      responseType: payload.responseType
+      responseType: payload.responseType,
     };
-    
+
     // Copy all non-system fields
     const systemFields = ['isCompressed', 'compressionType', 'originalSize', 'compressedSize'];
     for (const [key, value] of Object.entries(payload)) {
@@ -680,7 +689,7 @@ export class QdrantStorageService {
         result[key] = value;
       }
     }
-    
+
     return result;
   }
 

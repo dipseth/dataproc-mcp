@@ -161,7 +161,7 @@ export class KnowledgeIndexer {
       url: 'http://localhost:6333',
       collectionName: 'dataproc_knowledge',
       vectorSize: 384,
-      distance: 'Cosine' as const
+      distance: 'Cosine' as const,
     };
     this.qdrantService = new QdrantStorageService({ ...defaultConfig, ...qdrantConfig });
     this.embeddingService = new TransformersEmbeddingService();
@@ -182,11 +182,11 @@ export class KnowledgeIndexer {
         url: config.url || 'http://localhost:6333',
         collectionName: config.collectionName || 'dataproc_knowledge',
         vectorSize: config.vectorSize || 384,
-        distance: config.distance || 'Cosine' as const
+        distance: config.distance || ('Cosine' as const),
       };
       this.qdrantService = new QdrantStorageService(fullConfig);
     }
-    
+
     // Ensure collection exists
     await this.qdrantService.ensureCollection();
     logger.info('🧠 Knowledge indexer initialized successfully');
@@ -211,7 +211,7 @@ export class KnowledgeIndexer {
     // Convert to our internal format and index
     await this.indexJobData({
       ...jobData,
-      submissionTime: jobData.submissionTime || new Date().toISOString()
+      submissionTime: jobData.submissionTime || new Date().toISOString(),
     });
   }
 
@@ -226,7 +226,7 @@ export class KnowledgeIndexer {
       region: clusterData.region,
       config: clusterData.config || clusterData,
       labels: clusterData.labels,
-      status: clusterData.status
+      status: clusterData.status,
     });
   }
 
@@ -238,7 +238,7 @@ export class KnowledgeIndexer {
     return {
       name: collectionName,
       collectionName: collectionName,
-      url: (this.qdrantService as any).config?.url || 'http://localhost:6333'
+      url: (this.qdrantService as any).config?.url || 'http://localhost:6333',
     };
   }
 
@@ -267,7 +267,9 @@ export class KnowledgeIndexer {
       await this.updateClusterKnowledge(knowledge, clusterData);
       await this.storeClusterKnowledge(knowledge);
 
-      logger.info(`📝 Indexed cluster: ${clusterData.clusterName} in ${clusterData.projectId}/${clusterData.region}`);
+      logger.info(
+        `📝 Indexed cluster: ${clusterData.clusterName} in ${clusterData.projectId}/${clusterData.region}`
+      );
     } catch (error) {
       logger.error('Failed to index cluster data:', error);
     }
@@ -316,10 +318,10 @@ export class KnowledgeIndexer {
    */
   async getDynamicClusterInsights(focusAreas?: string[]): Promise<DynamicInsightResult> {
     let clusters = Array.from(this.clusterKnowledge.values());
-    
+
     if (clusters.length === 0) {
       const results = await this.queryKnowledge('type:cluster', { limit: 1000 });
-      clusters = results.map(r => r.data as ClusterKnowledge);
+      clusters = results.map((r) => r.data as ClusterKnowledge);
     }
 
     if (clusters.length === 0) {
@@ -327,16 +329,16 @@ export class KnowledgeIndexer {
         totalDocuments: 0,
         fieldAnalysis: [],
         patterns: [],
-        recommendations: ['No cluster data available for analysis']
+        recommendations: ['No cluster data available for analysis'],
       };
     }
 
     // Dynamic field analysis
     const fieldAnalysis = this.analyzeDataFields(clusters);
-    
+
     // Pattern detection
     const patterns = this.detectClusterPatterns(clusters, fieldAnalysis);
-    
+
     // Focus area analysis
     const focusAnalysis = focusAreas ? this.analyzeFocusAreas(clusters, focusAreas) : undefined;
 
@@ -345,7 +347,7 @@ export class KnowledgeIndexer {
       fieldAnalysis: fieldAnalysis.slice(0, 20), // Limit to top 20 fields
       patterns,
       focusAnalysis,
-      recommendations: this.generateClusterRecommendations(patterns, fieldAnalysis)
+      recommendations: this.generateClusterRecommendations(patterns, fieldAnalysis),
     };
   }
 
@@ -354,10 +356,10 @@ export class KnowledgeIndexer {
    */
   async getDynamicJobAnalytics(focusAreas?: string[]): Promise<DynamicInsightResult> {
     let jobs = Array.from(this.jobKnowledge.values());
-    
+
     if (jobs.length === 0) {
       const results = await this.queryKnowledge('type:job', { limit: 1000 });
-      jobs = results.map(r => r.data as JobKnowledge);
+      jobs = results.map((r) => r.data as JobKnowledge);
     }
 
     if (jobs.length === 0) {
@@ -365,16 +367,16 @@ export class KnowledgeIndexer {
         totalDocuments: 0,
         fieldAnalysis: [],
         patterns: [],
-        recommendations: ['No job data available for analysis']
+        recommendations: ['No job data available for analysis'],
       };
     }
 
     // Dynamic field analysis
     const fieldAnalysis = this.analyzeDataFields(jobs);
-    
+
     // Pattern detection
     const patterns = this.detectJobPatterns(jobs, fieldAnalysis);
-    
+
     // Focus area analysis
     const focusAnalysis = focusAreas ? this.analyzeFocusAreas(jobs, focusAreas) : undefined;
 
@@ -383,7 +385,7 @@ export class KnowledgeIndexer {
       fieldAnalysis: fieldAnalysis.slice(0, 20), // Limit to top 20 fields
       patterns,
       focusAnalysis,
-      recommendations: this.generateJobRecommendations(patterns, fieldAnalysis)
+      recommendations: this.generateJobRecommendations(patterns, fieldAnalysis),
     };
   }
 
@@ -516,7 +518,7 @@ export class KnowledgeIndexer {
           match: { value: this.singularize(options.type) },
         });
       }
-      tags.forEach(tag => {
+      tags.forEach((tag) => {
         filterConditions.push({
           key: tag.key,
           match: { value: tag.value },
@@ -526,7 +528,7 @@ export class KnowledgeIndexer {
       const filter: any = {
         must: filterConditions,
       };
-      
+
       const queryVector = await this.embeddingService.generateEmbedding(semanticQuery || query);
 
       const searchResults = await this.qdrantService
@@ -565,8 +567,8 @@ export class KnowledgeIndexer {
    */
   private analyzeDataFields(documents: any[]): FieldAnalysis[] {
     const fieldStats: Record<string, any> = {};
-    
-    documents.forEach(doc => {
+
+    documents.forEach((doc) => {
       this.extractFieldsRecursively(doc, '', fieldStats);
     });
 
@@ -577,7 +579,7 @@ export class KnowledgeIndexer {
       sampleValues: stats.samples.slice(0, 5),
       uniqueCount: stats.unique.size,
       totalCount: stats.count,
-      statistics: this.calculateFieldStatistics(stats)
+      statistics: this.calculateFieldStatistics(stats),
     }));
 
     return fieldAnalysis.sort((a, b) => b.totalCount - a.totalCount);
@@ -586,12 +588,16 @@ export class KnowledgeIndexer {
   /**
    * Recursively extract fields and their stats
    */
-  private extractFieldsRecursively(obj: any, prefix: string, fieldStats: Record<string, any>): void {
+  private extractFieldsRecursively(
+    obj: any,
+    prefix: string,
+    fieldStats: Record<string, any>
+  ): void {
     if (!obj) return;
 
     Object.entries(obj).forEach(([key, value]) => {
       const fieldName = prefix ? `${prefix}.${key}` : key;
-      
+
       if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
         this.extractFieldsRecursively(value, fieldName, fieldStats);
       } else {
@@ -600,7 +606,7 @@ export class KnowledgeIndexer {
             count: 0,
             unique: new Set(),
             samples: [],
-            type: this.getFieldType(value)
+            type: this.getFieldType(value),
           };
         }
         fieldStats[fieldName].count++;
@@ -637,7 +643,7 @@ export class KnowledgeIndexer {
     const avg = sum / numericValues.length;
     const min = Math.min(...numericValues);
     const max = Math.max(...numericValues);
-    
+
     const sorted = [...numericValues].sort((a, b) => a - b);
     const mid = Math.floor(sorted.length / 2);
     const median = sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
@@ -647,7 +653,7 @@ export class KnowledgeIndexer {
       max,
       avg,
       median,
-      distribution: this.createNumericDistribution(numericValues)
+      distribution: this.createNumericDistribution(numericValues),
     };
   }
 
@@ -656,23 +662,23 @@ export class KnowledgeIndexer {
    */
   private createNumericDistribution(values: number[]): Record<string, number> {
     if (values.length < 2) return {};
-    
+
     const min = Math.min(...values);
     const max = Math.max(...values);
     const range = max - min;
     const numBins = Math.min(10, values.length);
     const binSize = range / numBins;
-    
+
     const distribution: Record<string, number> = {};
-    
-    values.forEach(value => {
+
+    values.forEach((value) => {
       const binIndex = binSize > 0 ? Math.floor((value - min) / binSize) : 0;
       const binStart = min + binIndex * binSize;
       const binEnd = binStart + binSize;
       const binName = `${binStart.toFixed(2)}-${binEnd.toFixed(2)}`;
       distribution[binName] = (distribution[binName] || 0) + 1;
     });
-    
+
     return distribution;
   }
 
@@ -683,7 +689,9 @@ export class KnowledgeIndexer {
     const patterns: DataPattern[] = [];
 
     // Example: Identify oversized/undersized clusters
-    const machineTypeField = fieldAnalysis.find(f => f.fieldName.endsWith('masterConfig.machineTypeUri'));
+    const machineTypeField = fieldAnalysis.find((f) =>
+      f.fieldName.endsWith('masterConfig.machineTypeUri')
+    );
     if (machineTypeField) {
       // ... pattern detection logic ...
     }
@@ -698,8 +706,8 @@ export class KnowledgeIndexer {
     const patterns: DataPattern[] = [];
 
     // Example: High failure rates for specific job types
-    const jobTypeField = fieldAnalysis.find(f => f.fieldName === 'jobType');
-    const statusField = fieldAnalysis.find(f => f.fieldName === 'status');
+    const jobTypeField = fieldAnalysis.find((f) => f.fieldName === 'jobType');
+    const statusField = fieldAnalysis.find((f) => f.fieldName === 'status');
 
     if (jobTypeField && statusField) {
       // ... pattern detection logic ...
@@ -713,7 +721,7 @@ export class KnowledgeIndexer {
    */
   private analyzeFocusAreas(data: any[], focusAreas: string[]): Record<string, any> {
     const analysis: Record<string, any> = {};
-    focusAreas.forEach(area => {
+    focusAreas.forEach((area) => {
       switch (area.toLowerCase()) {
         case 'performance':
           analysis.performance = this.analyzePerformance(data);
@@ -733,32 +741,39 @@ export class KnowledgeIndexer {
   }
 
   private analyzePerformance(data: any[]): any {
-    const performanceFields = data.flatMap(item => 
-      Object.keys(item).filter(k => k.toLowerCase().includes('duration') || k.toLowerCase().includes('time'))
+    const performanceFields = data.flatMap((item) =>
+      Object.keys(item).filter(
+        (k) => k.toLowerCase().includes('duration') || k.toLowerCase().includes('time')
+      )
     );
     return { summary: `Found ${performanceFields.length} performance-related fields.` };
   }
 
   private analyzeConfiguration(data: any[]): any {
-    const configFields = data.flatMap(item => 
-      Object.keys(item).filter(k => k.toLowerCase().includes('config') || k.toLowerCase().includes('properties'))
+    const configFields = data.flatMap((item) =>
+      Object.keys(item).filter(
+        (k) => k.toLowerCase().includes('config') || k.toLowerCase().includes('properties')
+      )
     );
     return { summary: `Found ${configFields.length} configuration-related fields.` };
   }
 
   private analyzeErrors(data: any[]): any {
-    const errorFields = data.flatMap(item => 
-      Object.keys(item).filter(k => k.toLowerCase().includes('error') || k.toLowerCase().includes('fail'))
+    const errorFields = data.flatMap((item) =>
+      Object.keys(item).filter(
+        (k) => k.toLowerCase().includes('error') || k.toLowerCase().includes('fail')
+      )
     );
     return { summary: `Found ${errorFields.length} error-related fields.` };
   }
 
   private analyzeResources(data: any[]): any {
-    const resourceFields = data.flatMap(item => 
-      Object.keys(item).filter(k => 
-        k.toLowerCase().includes('memory') || 
-        k.toLowerCase().includes('cpu') || 
-        k.toLowerCase().includes('disk')
+    const resourceFields = data.flatMap((item) =>
+      Object.keys(item).filter(
+        (k) =>
+          k.toLowerCase().includes('memory') ||
+          k.toLowerCase().includes('cpu') ||
+          k.toLowerCase().includes('disk')
       )
     );
     return { summary: `Found ${resourceFields.length} resource-related fields.` };
@@ -767,11 +782,14 @@ export class KnowledgeIndexer {
   /**
    * Generate recommendations based on cluster patterns
    */
-  private generateClusterRecommendations(patterns: DataPattern[], fieldAnalysis: FieldAnalysis[]): string[] {
+  private generateClusterRecommendations(
+    patterns: DataPattern[],
+    fieldAnalysis: FieldAnalysis[]
+  ): string[] {
     const recommendations: string[] = [];
-    
+
     // Example: Recommend standardizing machine types
-    const machineTypes = fieldAnalysis.find(f => f.fieldName.endsWith('machineTypeUri'));
+    const machineTypes = fieldAnalysis.find((f) => f.fieldName.endsWith('machineTypeUri'));
     if (machineTypes && machineTypes.uniqueCount > 5) {
       recommendations.push('Consider standardizing machine types to reduce configuration drift.');
     }
@@ -782,13 +800,18 @@ export class KnowledgeIndexer {
   /**
    * Generate recommendations based on job patterns
    */
-  private generateJobRecommendations(patterns: DataPattern[], _fieldAnalysis: FieldAnalysis[]): string[] {
+  private generateJobRecommendations(
+    patterns: DataPattern[],
+    _fieldAnalysis: FieldAnalysis[]
+  ): string[] {
     const recommendations: string[] = [];
 
     // Example: Investigate high failure rates
-    const failureRate = patterns.find(p => p.category === 'High Failure Rate');
+    const failureRate = patterns.find((p) => p.category === 'High Failure Rate');
     if (failureRate) {
-      recommendations.push(`Investigate high failure rate for ${failureRate.metrics.jobType} jobs.`);
+      recommendations.push(
+        `Investigate high failure rate for ${failureRate.metrics.jobType} jobs.`
+      );
     }
 
     return recommendations;
@@ -822,7 +845,10 @@ export class KnowledgeIndexer {
     };
   }
 
-  private async updateClusterKnowledge(knowledge: ClusterKnowledge, clusterData: ClusterData): Promise<void> {
+  private async updateClusterKnowledge(
+    knowledge: ClusterKnowledge,
+    clusterData: ClusterData
+  ): Promise<void> {
     const config = clusterData.config;
     if (!config) return;
 
@@ -838,19 +864,21 @@ export class KnowledgeIndexer {
 
     // Update components, image versions, etc.
     if (config.softwareConfig?.optionalComponents) {
-      config.softwareConfig.optionalComponents.forEach(c => this.addUnique(knowledge.configurations.components, c));
+      config.softwareConfig.optionalComponents.forEach((c) =>
+        this.addUnique(knowledge.configurations.components, c)
+      );
     }
     if (config.softwareConfig?.imageVersion) {
       this.addUnique(knowledge.configurations.imageVersions, config.softwareConfig.imageVersion);
     }
-    
+
     // ... more updates as needed
   }
 
   private async storeClusterKnowledge(knowledge: ClusterKnowledge): Promise<void> {
     const text = `Cluster: ${knowledge.clusterName}, Project: ${knowledge.projectId}, Region: ${knowledge.region}. Components: ${knowledge.configurations.components.join(', ')}. Machine types: ${knowledge.configurations.machineTypes.join(', ')}.`;
     const vector = await this.embeddingService.generateEmbedding(text);
-    await this.qdrantService.getQdrantClient().upsert(this.qdrantService.getCollectionName(),{
+    await this.qdrantService.getQdrantClient().upsert(this.qdrantService.getCollectionName(), {
       wait: true,
       points: [
         {
@@ -858,7 +886,7 @@ export class KnowledgeIndexer {
           vector,
           payload: { ...knowledge, type: 'cluster' },
         },
-      ]
+      ],
     });
   }
 
@@ -873,7 +901,7 @@ export class KnowledgeIndexer {
           vector,
           payload: { ...knowledge, type: 'job' },
         },
-      ]
+      ],
     });
   }
 
@@ -886,20 +914,22 @@ export class KnowledgeIndexer {
     return 'other';
   }
 
-  private extractOutputSample(results: unknown): {
-    columns: string[];
-    rows: unknown[][];
-    totalRows?: number;
-  } | undefined {
+  private extractOutputSample(results: unknown):
+    | {
+        columns: string[];
+        rows: unknown[][];
+        totalRows?: number;
+      }
+    | undefined {
     if (typeof results !== 'object' || results === null) return undefined;
-    
+
     const res = results as ApiQueryResultResponse;
     if (!res.schema?.fields || !res.rows) return undefined;
 
     return {
-      columns: res.schema.fields.map(s => s.name),
-      rows: res.rows.slice(0, 10).map(r => (r as any).values || []),
-      totalRows: res.totalRows
+      columns: res.schema.fields.map((s) => s.name),
+      rows: res.rows.slice(0, 10).map((r) => (r as any).values || []),
+      totalRows: res.totalRows,
     };
   }
 
@@ -1008,7 +1038,7 @@ export class KnowledgeIndexer {
 
   private getTopItems(items: string[], limit: number): string[] {
     const counts: Record<string, number> = {};
-    items.forEach(item => {
+    items.forEach((item) => {
       counts[item] = (counts[item] || 0) + 1;
     });
     return Object.entries(counts)
