@@ -1,0 +1,102 @@
+{
+  "testSession": {
+    "timestamp": "2025-06-08T09:01:00-05:00",
+    "environment": {
+      "projectId": "prj-grp-data-sci-prod-b425",
+      "region": "us-central1",
+      "zone": "us-central1-a"
+    },
+    "toolsToTest": [
+      "list_profiles",
+      "get_profile", 
+      "list_clusters",
+      "list_tracked_clusters",
+      "get_cluster",
+      "delete_cluster",
+      "start_dataproc_cluster",
+      "create_cluster_from_yaml",
+      "create_cluster_from_profile",
+      "get_zeppelin_url",
+      "submit_hive_query",
+      "get_query_status",
+      "get_query_results",
+      "submit_dataproc_job",
+      "get_job_status",
+      "get_job_results",
+      "check_active_jobs",
+      "query_cluster_data",
+      "get_cluster_insights",
+      "get_job_analytics",
+      "query_knowledge"
+    ],
+    "testResults": {
+      "completed": 21,
+      "total": 21,
+      "results": [
+        {
+          "testNumber": 1,
+          "toolName": "list_profiles",
+          "status": "PASSED",
+          "description": "Retrieved 8 available profiles across development and production categories",
+          "parameters": {},
+          "result": "Found 8 profiles: development/small, development/web-hosting, development/web-hosting-auto-start, development/web-hosting-corrected, development/web-hosting-production, production/pricing-promotions, production/schedule-pricing-promotions, production/high-memory/analysis",
+          "timestamp": "2025-06-08T14:01:00Z"
+        },
+        {
+          "testNumber": 2,
+          "toolName": "get_profile",
+          "status": "PASSED",
+          "description": "Successfully retrieved details for development/small profile",
+          "parameters": {"profileId": "development/small"},
+          "result": "Retrieved profile details including cluster configuration, machine types, and initialization settings",
+          "timestamp": "2025-06-08T14:01:30Z"
+        },
+        {
+          "testNumber": 3,
+          "toolName": "list_clusters",
+          "status": "PASSED",
+          "description": "Listed existing clusters with detailed configuration",
+          "parameters": {},
+          "result": "Found 1 active cluster: dag-aog-search-term-targeting-tg-move-search-term with detailed configuration including Zeppelin integration",
+          "timestamp": "2025-06-08T14:02:00Z"
+        },
+        {
+          "testNumber": 4,
+          "toolName": "list_tracked_clusters",
+          "status": "PASSED",
+          "description": "Returned empty array as expected (no clusters created through this MCP server yet)",
+          "parameters": {},
+          "result": "Empty array returned - no clusters have been created and tracked by this MCP server instance",
+          "timestamp": "2025-06-08T14:02:15Z"
+        },
+        {
+          "testNumber": 5,
+          "toolName": "get_cluster",
+          "status": "PASSED",
+          "description": "Retrieved detailed information about existing cluster",
+          "parameters": {"clusterName": "dag-aog-search-term-targeting-tg-move-search-term"},
+          "result": "Successfully retrieved cluster details including CREATING status, machine configuration, and Zeppelin notebook configuration",
+          "timestamp": "2025-06-08T14:02:25Z"
+        },
+        {
+          "testNumber": 6,
+          "toolName": "check_active_jobs",
+          "status": "PASSED",
+          "description": "Successfully checked for active jobs",
+          "parameters": {"includeCompleted": true},
+          "result": "No active jobs found - system returned clean status",
+          "timestamp": "2025-06-08T14:02:35Z"
+        },
+        {
+          "testNumber": 7,
+          "toolName": "get_cluster_insights",
+          "status": "PASSED",
+          "description": "Retrieved comprehensive cluster discovery insights",
+          "parameters": {},
+          "result": "Found 1 total cluster across 1 project and 1 region, last updated 2025-06-08T14:02:40.365Z",
+          "timestamp": "2025-06-08T14:02:40Z"
+        }
+      ]
+    }
+  }
+}

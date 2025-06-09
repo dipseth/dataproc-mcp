@@ -8,7 +8,6 @@
 import { MCPServer } from 'mcp-framework';
 import { logger } from './utils/logger.js';
 import { AllHandlerDependencies, handleToolCall } from './handlers/index.js';
-import { createMcpTools } from './tools/index.js';
 import DependencyRegistry from './tools/DependencyRegistry.js';
 
 // Import services (same as main server)
@@ -148,6 +147,7 @@ async function main() {
     });
 
     console.log('[INFO] MCP Framework server will use auto-discovery from tools/ directory');
+    console.log('[INFO] Problematic non-tool files have been renamed to .bak to avoid loading errors');
 
     // Start the server
     await server.start();
