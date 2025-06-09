@@ -7,6 +7,94 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- semantic-release-changelog -->
 
+## 1.0.0 (2025-06-09)
+
+
+### ⚠ BREAKING CHANGES
+
+* Enhanced release detection may trigger releases for previously undetected conventional commits
+* None (fully backward compatible)
+* Complete production readiness implementation
+
+Major features:
+- Comprehensive CI/CD pipeline with GitHub Actions workflows
+- Advanced security middleware and credential management
+- Intelligent default parameter injection system
+- Enhanced error handling and validation schemas
+- Production-ready testing suite with unit, integration, and e2e tests
+- Automated release management with semantic versioning
+- Complete documentation and community support infrastructure
+
+Technical improvements:
+- Resolved all 26 critical ESLint errors for code quality compliance
+- Fixed TypeScript compatibility issues with Node.js experimental features
+- Implemented proper import/export resolution across all modules
+- Added comprehensive security scanning and vulnerability management
+- Enhanced MCP protocol implementation with robust error handling
+
+This release establishes the foundation for a production-ready MCP server
+with enterprise-grade reliability, security, and maintainability.
+
+### 🚀 Features
+
+* 🧠 Knowledge Base Semantic Search - Complete Implementation & Documentation ([ecdeaa1](https://github.com/dipseth/dataproc-mcp/commit/ecdeaa1dc73afe785b7dcfd980667e0cc55e3541))
+* add comprehensive dataproc tools testing and fix critical get_zeppelin_url bug ([658efb5](https://github.com/dipseth/dataproc-mcp/commit/658efb51f7e625a3db1bef0c134059b785205428))
+* add production-ready web hosting and enhanced async query tracking ([#12](https://github.com/dipseth/dataproc-mcp/issues/12)) ([618e8fd](https://github.com/dipseth/dataproc-mcp/commit/618e8fdb3e0853c58a8613b6a345d50e09ffb0b7)), closes [#11](https://github.com/dipseth/dataproc-mcp/issues/11)
+* Add profile management and cluster operations to server request handlers ([ef3feae](https://github.com/dipseth/dataproc-mcp/commit/ef3feae242bf4f97488149cb6b8e3c1e34910a68))
+* Clean logging, robust GCS output handler, and working TypeScript integration test setup. All debug/info logs now go to stderr and are controlled by LOG_LEVEL. Test runner and imports fixed for ts-node/esm. Marking project milestone. ([8975170](https://github.com/dipseth/dataproc-mcp/commit/897517076dcc4d805b06b3bc348484b6514b7f40))
+* **docs:** enable Mermaid diagram rendering in Jekyll documentation ([#24](https://github.com/dipseth/dataproc-mcp/issues/24)) ([95464d1](https://github.com/dipseth/dataproc-mcp/commit/95464d125079759d0fb868b65c18dd972e803cff))
+* enhance CI/CD pipeline with automatic PR merge publishing ([eba93bd](https://github.com/dipseth/dataproc-mcp/commit/eba93bd74843bf66f605150e084fddb6313bbc40))
+* Enhance OutputParser to support Hive table output parsing ([0c85a7a](https://github.com/dipseth/dataproc-mcp/commit/0c85a7a7d2e826ceb460a79d3226b51f6bd7d47f))
+* fix list_profiles bug and optimize response format ([#22](https://github.com/dipseth/dataproc-mcp/issues/22)) ([68137d4](https://github.com/dipseth/dataproc-mcp/commit/68137d43dfc05caffb9a8451e72e90856494cecc))
+* Implement Default Parameter Manager for environment-specific parameter handling ([e2cf6e7](https://github.com/dipseth/dataproc-mcp/commit/e2cf6e7c112a75764d7d75a950fea3b67cf6342d))
+* production-ready dataproc mcp server with comprehensive ci/cd pipeline ([ae4fa7e](https://github.com/dipseth/dataproc-mcp/commit/ae4fa7ed16283479e4cd9799ad07c3100f1da3bb))
+* **tests:** Refactor MCP resource and prompt tests to use service classes and Zod schemas ([27a52c9](https://github.com/dipseth/dataproc-mcp/commit/27a52c9972b512d8d2f5e99a840f6e07a721f9dc))
+* remove outdated cluster profiles and add new setup scripts ([7e35040](https://github.com/dipseth/dataproc-mcp/commit/7e35040355a258f14f3fbb1ad35cb97e073a2ada))
+* update MCP Client references to Roo and enhance documentation for better integration ([5d5d266](https://github.com/dipseth/dataproc-mcp/commit/5d5d266e082e20160a7903d5b068dc930598a69d))
+
+
+### 🐛 Bug Fixes
+
+* change package scope to [@dipseth](https://github.com/dipseth) for NPM publishing ([c6cb45d](https://github.com/dipseth/dataproc-mcp/commit/c6cb45d59e94626449dfd587907a43842ad58826))
+* **docs:** comprehensive GitHub Pages Jekyll documentation fixes ([8ee4919](https://github.com/dipseth/dataproc-mcp/commit/8ee49197aab9c6ca7b320d3c23ee8a67caa6b426))
+* correct package name in post-release validation ([a5bb30b](https://github.com/dipseth/dataproc-mcp/commit/a5bb30bdb7c2f6781d71f254c3bf9277e999ebd3))
+* enable Jekyll processing for GitHub Pages ([5b2975b](https://github.com/dipseth/dataproc-mcp/commit/5b2975bff0973de31a7867ad7b4e37e983407bee))
+* **docs:** fix GitHub Pages links and CI/CD workflow ([f18774e](https://github.com/dipseth/dataproc-mcp/commit/f18774eaab283d70ec555e0ccd41759874fcacb4))
+* reduce semantic-release GitHub assets to prevent conflicts ([cf9561b](https://github.com/dipseth/dataproc-mcp/commit/cf9561bee433255ea350c87b7b8e417ba4b1ad03))
+* remove duplicate config/server.json entry from .gitignore ([bb088c6](https://github.com/dipseth/dataproc-mcp/commit/bb088c63b4d9a44c851ba345fc751a12b7383d60))
+* remove invalid 'Document' from TypeDoc kindSortOrder ([3ca02e5](https://github.com/dipseth/dataproc-mcp/commit/3ca02e5ac844d5b95e82a5e3726309017f356da9))
+* **knowledge:** resolve collection mismatch between storage and retrieval ([5d9472f](https://github.com/dipseth/dataproc-mcp/commit/5d9472fecee815d13952ca14f891f5e0b1989815))
+* resolve ES module build script issue and enhance CI/CD mode ([700d1b9](https://github.com/dipseth/dataproc-mcp/commit/700d1b996aefa43700df30fb3e22adcc3c82545f))
+* resolve GitHub Actions label permissions and enhance TypeScript safety ([a1077a5](https://github.com/dipseth/dataproc-mcp/commit/a1077a56b62a018332cfd6e6b200f094973e6e7a))
+* resolve metastore configuration issue and update README ([502d088](https://github.com/dipseth/dataproc-mcp/commit/502d088657686a34b8dc5cce1f3f631bbdb3f1eb)), closes [#17](https://github.com/dipseth/dataproc-mcp/issues/17) [#17](https://github.com/dipseth/dataproc-mcp/issues/17)
+* resolve semantic-release template error in successComment ([5426e48](https://github.com/dipseth/dataproc-mcp/commit/5426e489cf4f321de1878b25da6a32ff72272c9d))
+* smart configuration path resolution for response-filter.json ([9356244](https://github.com/dipseth/dataproc-mcp/commit/93562441fabe5bc534c2af79a62a107d6112d7a3))
+* update GitHub Pages workflow and package references ([df356d2](https://github.com/dipseth/dataproc-mcp/commit/df356d288271ea554bd322404e8f93ce12eea535))
+* Update impersonateServiceAccount in server configuration for correct service account usage ([3b9ab78](https://github.com/dipseth/dataproc-mcp/commit/3b9ab7813cf61441aa0a3876f9c6504b8c4b1cdf))
+* update server.json authentication details and add to .gitignore ([bd8e596](https://github.com/dipseth/dataproc-mcp/commit/bd8e596e968b4a80fcad8b650f91a343507ef5e2))
+
+
+### 📚 Documentation
+
+* add GitHub Pages setup guide ([f6769dd](https://github.com/dipseth/dataproc-mcp/commit/f6769ddd1995d8d9bbe1f749bca60091e2347cfa))
+* Enhance README and guides with default parameter management details and user experience improvements ([5da9077](https://github.com/dipseth/dataproc-mcp/commit/5da9077c874adbc53f0bb6aa5372c5b78c6e176f))
+* fix GitHub Pages links and add comprehensive configuration section ([6f4ff9e](https://github.com/dipseth/dataproc-mcp/commit/6f4ff9eaa48145e21355412d9c19ba1c0cf33eda))
+* fix Jekyll permalinks for API_REFERENCE and index pages ([9a16ba6](https://github.com/dipseth/dataproc-mcp/commit/9a16ba617e46025ace7f30e59218de798af79529))
+* trigger documentation workflow to test Jekyll fix ([36bb2f4](https://github.com/dipseth/dataproc-mcp/commit/36bb2f48ac71b7ad73ca7d12ce7990df2147030c))
+* update documentation for v3.1.1 ([9c51b65](https://github.com/dipseth/dataproc-mcp/commit/9c51b65fc62157225bf9749b3d2dc8b467c6bea3))
+* update documentation for v3.1.2 ([d63c6bf](https://github.com/dipseth/dataproc-mcp/commit/d63c6bf5e96141d6ed23c6e7985826d6f5888bbd))
+* update documentation for v3.1.3 ([3c9b295](https://github.com/dipseth/dataproc-mcp/commit/3c9b295327083c430d7d47215955f36860fb3e4a))
+* update documentation for v4.0.0 ([16fbcef](https://github.com/dipseth/dataproc-mcp/commit/16fbcef10152d404bfe520771d66c7332dc33a4e))
+* update documentation for v4.1.0 ([19032dd](https://github.com/dipseth/dataproc-mcp/commit/19032dd6ff16a66952ac76b7bfef0e4e07ca7c0e))
+* update documentation for v4.2.0 ([82a0c25](https://github.com/dipseth/dataproc-mcp/commit/82a0c257e18b475c8056f512a4de9da4f3caed1c))
+* update MCP configuration examples to use NPM package ([da1f165](https://github.com/dipseth/dataproc-mcp/commit/da1f165fa4a65e7584a3b62aef8a5aca7508c3ee))
+* update npm version badge to use shields.io for better cache management ([d3b69da](https://github.com/dipseth/dataproc-mcp/commit/d3b69daab69c05204caedb3f6407e262a3a448e0))
+
+
+### ♻️ Code Refactoring
+
+* improve CI workflow readability and efficiency ([baff59b](https://github.com/dipseth/dataproc-mcp/commit/baff59bc1598c3b095b5ec87ac1aa5a5ce97eef3))
+
 ## [4.2.0](https://github.com/dipseth/dataproc-mcp/compare/v4.1.0...v4.2.0) (2025-06-08)
 
 
