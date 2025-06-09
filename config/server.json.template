@@ -1,0 +1,26 @@
+{
+  "projectId": "YOUR_PROJECT_ID",
+  "region": "YOUR_REGION",
+  "authentication": {
+    "type": "service_account",
+    "serviceAccountKeyPath": "path/to/your/service-account-key.json",
+    "impersonateServiceAccount": "your-service-account@your-project.iam.gserviceaccount.com"
+  },
+  "defaultParameters": {
+    "clusterConfig": {
+      "masterConfig": {
+        "numInstances": 1,
+        "machineTypeUri": "n1-standard-2"
+      },
+      "workerConfig": {
+        "numInstances": 2,
+        "machineTypeUri": "n1-standard-2"
+      }
+    }
+  },
+  "qdrant": {
+    "url": "YOUR_QDRANT_URL",
+    "apiKey": "YOUR_QDRANT_API_KEY",
+    "collectionName": "dataproc_knowledge"
+  }
+}
