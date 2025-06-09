@@ -1,0 +1,114 @@
+{
+  "@jest/globals": {
+    "current": "29.7.0",
+    "wanted": "29.7.0",
+    "latest": "30.0.0-beta.3",
+    "dependent": "dataproc-mcp",
+    "location": "/home/runner/work/dataproc-mcp/dataproc-mcp/node_modules/@jest/globals"
+  },
+  "@modelcontextprotocol/sdk": {
+    "current": "0.6.1",
+    "wanted": "0.6.1",
+    "latest": "1.12.1",
+    "dependent": "dataproc-mcp",
+    "location": "/home/runner/work/dataproc-mcp/dataproc-mcp/node_modules/@modelcontextprotocol/sdk"
+  },
+  "@semantic-release/github": {
+    "current": "9.2.6",
+    "wanted": "9.2.6",
+    "latest": "11.0.3",
+    "dependent": "dataproc-mcp",
+    "location": "/home/runner/work/dataproc-mcp/dataproc-mcp/node_modules/@semantic-release/github"
+  },
+  "@semantic-release/npm": {
+    "current": "11.0.3",
+    "wanted": "11.0.3",
+    "latest": "12.0.1",
+    "dependent": "dataproc-mcp",
+    "location": "/home/runner/work/dataproc-mcp/dataproc-mcp/node_modules/@semantic-release/npm"
+  },
+  "@types/long": {
+    "current": "5.0.0",
+    "wanted": "5.0.0",
+    "latest": "4.0.2",
+    "dependent": "dataproc-mcp",
+    "location": "/home/runner/work/dataproc-mcp/dataproc-mcp/node_modules/@types/long"
+  },
+  "@types/node": {
+    "current": "20.19.0",
+    "wanted": "20.19.0",
+    "latest": "22.15.30",
+    "dependent": "dataproc-mcp",
+    "location": "/home/runner/work/dataproc-mcp/dataproc-mcp/node_modules/@types/node"
+  },
+  "@typescript-eslint/eslint-plugin": {
+    "current": "6.21.0",
+    "wanted": "6.21.0",
+    "latest": "8.33.1",
+    "dependent": "dataproc-mcp",
+    "location": "/home/runner/work/dataproc-mcp/dataproc-mcp/node_modules/@typescript-eslint/eslint-plugin"
+  },
+  "@typescript-eslint/parser": {
+    "current": "6.21.0",
+    "wanted": "6.21.0",
+    "latest": "8.33.1",
+    "dependent": "dataproc-mcp",
+    "location": "/home/runner/work/dataproc-mcp/dataproc-mcp/node_modules/@typescript-eslint/parser"
+  },
+  "codecov": {
+    "current": "3.8.3",
+    "wanted": "3.8.3",
+    "latest": "3.8.2",
+    "dependent": "dataproc-mcp",
+    "location": "/home/runner/work/dataproc-mcp/dataproc-mcp/node_modules/codecov"
+  },
+  "conventional-changelog-conventionalcommits": {
+    "current": "7.0.2",
+    "wanted": "7.0.2",
+    "latest": "9.0.0",
+    "dependent": "dataproc-mcp",
+    "location": "/home/runner/work/dataproc-mcp/dataproc-mcp/node_modules/conventional-changelog-conventionalcommits"
+  },
+  "eslint": {
+    "current": "8.57.1",
+    "wanted": "8.57.1",
+    "latest": "9.28.0",
+    "dependent": "dataproc-mcp",
+    "location": "/home/runner/work/dataproc-mcp/dataproc-mcp/node_modules/eslint"
+  },
+  "eslint-config-prettier": {
+    "current": "9.1.0",
+    "wanted": "9.1.0",
+    "latest": "10.1.5",
+    "dependent": "dataproc-mcp",
+    "location": "/home/runner/work/dataproc-mcp/dataproc-mcp/node_modules/eslint-config-prettier"
+  },
+  "nyc": {
+    "current": "15.1.0",
+    "wanted": "15.1.0",
+    "latest": "17.1.0",
+    "dependent": "dataproc-mcp",
+    "location": "/home/runner/work/dataproc-mcp/dataproc-mcp/node_modules/nyc"
+  },
+  "semantic-release": {
+    "current": "22.0.12",
+    "wanted": "22.0.12",
+    "latest": "24.2.5",
+    "dependent": "dataproc-mcp",
+    "location": "/home/runner/work/dataproc-mcp/dataproc-mcp/node_modules/semantic-release"
+  },
+  "typedoc": {
+    "current": "0.25.13",
+    "wanted": "0.25.13",
+    "latest": "0.28.5",
+    "dependent": "dataproc-mcp",
+    "location": "/home/runner/work/dataproc-mcp/dataproc-mcp/node_modules/typedoc"
+  },
+  "typescript": {
+    "current": "5.4.5",
+    "wanted": "5.8.3",
+    "latest": "5.8.3",
+    "dependent": "dataproc-mcp",
+    "location": "/home/runner/work/dataproc-mcp/dataproc-mcp/node_modules/typescript"
+  }
+}
