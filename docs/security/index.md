@@ -66,6 +66,93 @@ Built-in rate limiting prevents abuse and ensures fair resource usage:
 
 Comprehensive credential validation and protection:
 
+#### Sensitive File Protection
+
+**⚠️ CRITICAL**: Configuration files containing sensitive information must never be committed to version control.
+
+**Protected Files:**
+- `config/server.json` - Contains authentication credentials, API keys, and project details
+- Service account key files (`.json` files with private keys)
+- Any files containing passwords, tokens, or API keys
+
+**Security Measures:**
+1. **Git Ignore Protection**: Sensitive files are listed in `.gitignore`
+2. **Template System**: Use `config/server.json.template` as a reference
+3. **History Cleanup**: If accidentally committed, use BFG Repo-Cleaner to remove from history
+
+#### Emergency: Removing Sensitive Files from Git History
+
+If sensitive files were accidentally committed and pushed to a repository:
+
+1. **Install BFG Repo-Cleaner**:
+   ```bash
+   # macOS
+   brew install bfg
+   
+   # Or download from: https://rtyley.github.io/bfg-repo-cleaner/
+   ```
+
+2. **Remove file from current commit**:
+   ```bash
+   git rm -f config/server.json
+   git commit -m "Remove sensitive configuration file"
+   ```
+
+3. **Clean entire Git history**:
+   ```bash
+   # Remove all instances of the file from history
+   bfg --delete-files server.json
+   
+   # Clean up the repository
+   git reflog expire --expire=now --all && git gc --prune=now --aggressive
+   ```
+
+4. **Force push to remote** (⚠️ **DESTRUCTIVE OPERATION**):
+   ```bash
+   # Push cleaned main branch
+   git push --force origin main
+   
+   # Push all cleaned branches
+   git push --force origin --all
+   ```
+
+5. **Post-cleanup actions**:
+   - Rotate all compromised credentials immediately
+   - Update API keys and service account keys
+   - Notify team members to re-clone the repository
+   - Monitor for any unauthorized access
+
+**⚠️ Important Notes:**
+- Force pushing rewrites Git history and affects all collaborators
+- All team members must re-clone the repository after cleanup
+- This operation cannot be undone - ensure you have backups
+- Consider contacting GitHub support for additional cache clearing
+
+#### Configuration File Setup
+
+1. **Copy the template**:
+   ```bash
+   cp config/server.json.template config/server.json
+   ```
+
+2. **Edit with your credentials**:
+   ```json
+   {
+     "projectId": "your-actual-project-id",
+     "region": "us-central1",
+     "authentication": {
+       "serviceAccountKeyPath": "/secure/path/to/your-key.json",
+       "impersonateServiceAccount": "your-sa@project.iam.gserviceaccount.com"
+     }
+   }
+   ```
+
+3. **Verify protection**:
+   ```bash
+   # Ensure file is ignored
+   git status  # Should not show config/server.json as modified
+   ```
+
 #### Service Account Key Validation
 
 - **Format Validation**: Ensures proper JSON structure and required fields
