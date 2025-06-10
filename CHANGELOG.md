@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- semantic-release-changelog -->
 
+## [4.2.2](https://github.com/dipseth/dataproc-mcp/compare/v4.2.1...v4.2.2) (2025-06-10)
+
+
+### 🐛 Bug Fixes
+
+* resolve DATAPROC_CONFIG_PATH environment variable handling ([19f039d](https://github.com/dipseth/dataproc-mcp/commit/19f039df3632dc564d43bb45ae1821d341cefebd))
+* resolve DATAPROC_CONFIG_PATH environment variable handling ([#29](https://github.com/dipseth/dataproc-mcp/issues/29)) ([b71d67a](https://github.com/dipseth/dataproc-mcp/commit/b71d67aa07e248715d7d2cb19095d50a7eea832d))
+
+
+### 📚 Documentation
+
+* update documentation for v4.2.1 ([b328461](https://github.com/dipseth/dataproc-mcp/commit/b328461fabe3c3ceab54ea7f08dd1088211eeb64))
+
 ## [4.2.1](https://github.com/dipseth/dataproc-mcp/compare/v4.2.0...v4.2.1) (2025-06-10)
 
 
