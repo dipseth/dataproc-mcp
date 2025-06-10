@@ -482,13 +482,22 @@ export class ResponseFilter {
           const conversionResult = await quickConvert(cluster, metadata, this.compressionService);
 
           // Extract essential fields from converted payload
+          // Extract status properly - always get the state string
+          let statusString = 'unknown';
+          if (conversionResult.payload.status) {
+            statusString =
+              typeof conversionResult.payload.status === 'string'
+                ? conversionResult.payload.status
+                : (conversionResult.payload.status as any)?.state || 'unknown';
+          } else if ((cluster.status as any)?.state) {
+            statusString = (cluster.status as any).state;
+          } else if (typeof cluster.status === 'string') {
+            statusString = cluster.status;
+          }
+
           const summary: ClusterSummary = {
             clusterName: conversionResult.payload.clusterName || (cluster as any).name || 'unknown',
-            status:
-              conversionResult.payload.status ||
-              (cluster.status as any)?.state ||
-              cluster.status ||
-              'unknown',
+            status: statusString,
             createTime:
               conversionResult.payload.createTime ||
               (cluster.status as any)?.stateStartTime ||
@@ -586,7 +595,9 @@ export class ResponseFilter {
 
         const summary: ClusterSummary = {
           clusterName: cluster.clusterName || (cluster as any).name || 'unknown',
-          status: (cluster.status as any)?.state || cluster.status || 'unknown',
+          status:
+            (cluster.status as any)?.state ||
+            (typeof cluster.status === 'string' ? cluster.status : 'unknown'),
           createTime:
             (cluster.status as any)?.stateStartTime ||
             cluster.createTime ||

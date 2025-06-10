@@ -45,6 +45,21 @@ export interface ProfileInfo {
    * Profile-specific parameter overrides
    */
   parameters?: Record<string, unknown>;
+
+  /**
+   * Full cluster configuration from the YAML file
+   */
+  clusterConfig?: Record<string, unknown>;
+
+  /**
+   * Region specified in the profile
+   */
+  region?: string;
+
+  /**
+   * Labels from the profile
+   */
+  labels?: Record<string, string>;
 }
 
 /**

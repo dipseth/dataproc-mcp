@@ -16,7 +16,7 @@ export class ResponseFormatter {
   /**
    * Status emoji mapping for cluster and job states
    */
-  private getStatusEmoji(status: string): string {
+  private getStatusEmoji(status: string | any): string {
     const statusMap: Record<string, string> = {
       RUNNING: '🟢',
       ACTIVE: '🟢',
@@ -34,7 +34,17 @@ export class ResponseFormatter {
       CANCELLED: '🚫',
     };
 
-    return this.config.formatting.useEmojis ? statusMap[status.toUpperCase()] || '⚫' : '';
+    // Handle both string and object status formats
+    let statusString: string;
+    if (typeof status === 'string') {
+      statusString = status;
+    } else if (status && typeof status === 'object' && status.state) {
+      statusString = status.state;
+    } else {
+      statusString = 'UNKNOWN';
+    }
+
+    return this.config.formatting.useEmojis ? statusMap[statusString.toUpperCase()] || '⚫' : '';
   }
 
   /**

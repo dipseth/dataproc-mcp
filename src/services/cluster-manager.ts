@@ -87,14 +87,22 @@ export class ClusterManager {
       throw new Error(`Profile not found: ${profileId}`);
     }
 
-    // Read the profile YAML
-    const { clusterName, config, labels } = await getDataprocConfigFromYaml(profile.path);
+    // Use the profile's cluster configuration directly (no need to re-read YAML)
+    const clusterName = profile.name;
+    const config = (profile.clusterConfig as ClusterConfig) || {};
+    const labels = profile.labels || {};
 
     if (process.env.LOG_LEVEL === 'debug') {
-      console.error('[DEBUG] ClusterManager: Profile path:', profile.path);
-      console.error('[DEBUG] ClusterManager: Loaded cluster name:', clusterName);
-      console.error('[DEBUG] ClusterManager: Loaded config:', JSON.stringify(config, null, 2));
-      console.error('[DEBUG] ClusterManager: Loaded labels:', JSON.stringify(labels, null, 2));
+      console.error('[DEBUG] ClusterManager: Profile ID:', profile.id);
+      console.error('[DEBUG] ClusterManager: Using profile cluster name:', clusterName);
+      console.error(
+        '[DEBUG] ClusterManager: Using profile config:',
+        JSON.stringify(config, null, 2)
+      );
+      console.error(
+        '[DEBUG] ClusterManager: Using profile labels:',
+        JSON.stringify(labels, null, 2)
+      );
     }
 
     // Apply overrides
