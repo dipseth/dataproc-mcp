@@ -122,13 +122,34 @@ export async function getServerConfig(configPath?: string): Promise<ServerConfig
     }
   }
 
+  // Add comprehensive diagnostic logging for configuration path resolution
+  console.error(`[DIAGNOSTIC] ===== Configuration Path Resolution =====`);
+  console.error(
+    `[DIAGNOSTIC] configPath parameter: ${configPath ? `"${configPath}"` : 'undefined'}`
+  );
+  console.error(
+    `[DIAGNOSTIC] DATAPROC_CONFIG_PATH env var: ${process.env.DATAPROC_CONFIG_PATH ? `"${process.env.DATAPROC_CONFIG_PATH}"` : 'undefined'}`
+  );
+  console.error(`[DIAGNOSTIC] Default config path: "${path.join(APP_ROOT, 'config/server.json')}"`);
+
   // Use config path from environment variable, parameter, or default (now absolute)
   const filePath =
     configPath || process.env.DATAPROC_CONFIG_PATH || path.join(APP_ROOT, 'config/server.json');
 
-  // Log the current working directory and absolute config path for debugging
-  console.error(`[DIAGNOSTIC] Server Config: Current working directory: ${process.cwd()}`);
-  console.error(`[DIAGNOSTIC] Server Config: Absolute config path: ${filePath}`);
+  // Determine which configuration source is being used
+  let configSource: string;
+  if (configPath) {
+    configSource = 'direct parameter';
+  } else if (process.env.DATAPROC_CONFIG_PATH) {
+    configSource = 'DATAPROC_CONFIG_PATH environment variable';
+  } else {
+    configSource = 'default path';
+  }
+
+  console.error(`[DIAGNOSTIC] Configuration source: ${configSource}`);
+  console.error(`[DIAGNOSTIC] Final config file path: "${filePath}"`);
+  console.error(`[DIAGNOSTIC] Current working directory: ${process.cwd()}`);
+  console.error(`[DIAGNOSTIC] Config path is absolute: ${path.isAbsolute(filePath)}`);
 
   // Store the config directory for other modules to use
   // eslint-disable-next-line no-undef
@@ -137,10 +158,24 @@ export async function getServerConfig(configPath?: string): Promise<ServerConfig
   console.error(`[DIAGNOSTIC] Server Config: Config directory: ${global.DATAPROC_CONFIG_DIR}`);
 
   try {
-    // Check if the config file exists
+    // Check if the config file exists and is readable
+    console.error(`[DIAGNOSTIC] ===== Config File Accessibility Check =====`);
     try {
-      await fs.access(filePath);
+      await fs.access(filePath, fs.constants.F_OK);
+      console.error(`[DIAGNOSTIC] Config file exists: YES`);
+
+      try {
+        await fs.access(filePath, fs.constants.R_OK);
+        console.error(`[DIAGNOSTIC] Config file is readable: YES`);
+      } catch (readError) {
+        const errorMessage = readError instanceof Error ? readError.message : String(readError);
+        console.error(`[DIAGNOSTIC] Config file is readable: NO - ${errorMessage}`);
+        throw readError;
+      }
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error(`[DIAGNOSTIC] Config file exists: NO - ${errorMessage}`);
+      console.error(`[DIAGNOSTIC] Will use default configuration with MCP overrides`);
       // Config file doesn't exist, use defaults with MCP overrides (don't auto-create)
       const defaultWithMcp = {
         profileManager: {
@@ -162,8 +197,14 @@ export async function getServerConfig(configPath?: string): Promise<ServerConfig
     }
 
     // Read the config file
+    console.error(`[DIAGNOSTIC] ===== Loading Config File =====`);
+    console.error(`[DIAGNOSTIC] Reading config from: "${filePath}"`);
     const configJson = await fs.readFile(filePath, 'utf8');
+    console.error(`[DIAGNOSTIC] Config file size: ${configJson.length} bytes`);
+
     const config = JSON.parse(configJson) as Partial<ServerConfig>;
+    console.error(`[DIAGNOSTIC] Successfully parsed config file`);
+    console.error(`[DIAGNOSTIC] Config contains keys: [${Object.keys(config).join(', ')}]`);
 
     // Merge with default config, then MCP config, then file config (priority order)
     const mergedConfig = {
@@ -184,6 +225,28 @@ export async function getServerConfig(configPath?: string): Promise<ServerConfig
       },
     };
 
+    console.error(`[DIAGNOSTIC] ===== Configuration Resolution Summary =====`);
+    console.error(`[DIAGNOSTIC] Configuration loaded successfully from: ${configSource}`);
+    console.error(`[DIAGNOSTIC] Final config file used: "${filePath}"`);
+    console.error(
+      `[DIAGNOSTIC] Profile manager root: "${mergedConfig.profileManager.rootConfigPath}"`
+    );
+    console.error(
+      `[DIAGNOSTIC] Cluster tracker state file: "${mergedConfig.clusterTracker.stateFilePath}"`
+    );
+    if (mergedConfig.authentication?.impersonateServiceAccount) {
+      console.error(
+        `[DIAGNOSTIC] Service account impersonation: "${mergedConfig.authentication.impersonateServiceAccount}"`
+      );
+    }
+    if (mergedConfig.authentication?.projectId) {
+      console.error(`[DIAGNOSTIC] Default project ID: "${mergedConfig.authentication.projectId}"`);
+    }
+    if (mergedConfig.authentication?.region) {
+      console.error(`[DIAGNOSTIC] Default region: "${mergedConfig.authentication.region}"`);
+    }
+    console.error(`[DIAGNOSTIC] ================================================`);
+
     if (process.env.LOG_LEVEL === 'debug') {
       console.error(
         '[DEBUG] Server Config: Final merged configuration:',
@@ -193,7 +256,13 @@ export async function getServerConfig(configPath?: string): Promise<ServerConfig
 
     return mergedConfig;
   } catch (error) {
-    console.error(`[ERROR] Error loading server config from ${filePath}:`, error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`[ERROR] Error loading server config from ${filePath}: ${errorMessage}`);
+    console.error(`[DIAGNOSTIC] ===== Configuration Error Fallback =====`);
+    console.error(`[DIAGNOSTIC] Failed to load config from: "${filePath}"`);
+    console.error(`[DIAGNOSTIC] Falling back to default configuration with MCP overrides`);
+    console.error(`[DIAGNOSTIC] ================================================`);
+
     if (process.env.LOG_LEVEL === 'debug')
       console.error('[DEBUG] Using default server config with MCP overrides');
     return {
