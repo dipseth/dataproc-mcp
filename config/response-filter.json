@@ -1,10 +1,10 @@
 {
   "tokenLimits": {
-    "list_clusters": 500,
+    "list_clusters": 250,
     "get_cluster": 300,
     "submit_hive_query": 400,
     "get_query_results": 600,
-    "list_tracked_clusters": 350,
+    "list_tracked_clusters": 250,
     "check_active_jobs": 450,
     "default": 400
   },

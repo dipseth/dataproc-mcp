@@ -20,6 +20,13 @@ const DEFAULT_CONFIG: ClusterTrackerConfig = {
 
 /**
  * Cluster Tracker class for maintaining relationships between clusters and profiles
+ *
+ * MEMORY-FIRST APPROACH:
+ * - In-memory Map is the primary source of truth for active sessions
+ * - File persistence is used as fallback and for session recovery
+ * - All read operations prioritize memory over file data
+ * - Write operations update memory immediately and persist to file asynchronously
+ * - Optional forceRefreshFromFile parameter available for explicit file reads
  */
 export class ClusterTracker {
   private config: ClusterTrackerConfig;
@@ -164,6 +171,11 @@ export class ClusterTracker {
 
     this.clusters.set(clusterId, trackingInfo);
 
+    // Save state immediately to persist the tracking
+    this.saveState().catch((error) => {
+      console.error('[ERROR] ClusterTracker: Error saving state after tracking cluster:', error);
+    });
+
     if (process.env.LOG_LEVEL === 'debug')
       console.error(`[DEBUG] ClusterTracker: Tracking cluster ${clusterName} (${clusterId})`);
   }
@@ -197,6 +209,15 @@ export class ClusterTracker {
 
     if (cluster) {
       this.clusters.delete(clusterId);
+
+      // Save state immediately to persist the untracking
+      this.saveState().catch((error) => {
+        console.error(
+          '[ERROR] ClusterTracker: Error saving state after untracking cluster:',
+          error
+        );
+      });
+
       if (process.env.LOG_LEVEL === 'debug')
         console.error(
           `[DEBUG] ClusterTracker: Untracked cluster ${cluster.clusterName} (${clusterId})`
@@ -205,29 +226,94 @@ export class ClusterTracker {
   }
 
   /**
-   * Gets all tracked clusters
+   * Gets all tracked clusters from memory (preferred) with file fallback
+   * Memory is the primary source of truth for active sessions
+   * @param forceRefreshFromFile Optional: Force refresh from file before returning
    * @returns Array of cluster tracking information
    */
-  getAllTrackedClusters(): ClusterTrackingInfo[] {
+  getAllTrackedClusters(forceRefreshFromFile = false): ClusterTrackingInfo[] {
+    if (forceRefreshFromFile) {
+      this.loadState().catch((error) => {
+        console.error('[ERROR] ClusterTracker: Error refreshing from file:', error);
+      });
+    }
+
+    if (process.env.LOG_LEVEL === 'debug') {
+      console.error(`[DEBUG] ClusterTracker: Returning ${this.clusters.size} clusters from memory`);
+    }
+
     return Array.from(this.clusters.values());
   }
 
   /**
-   * Gets a tracked cluster by ID
+   * Gets a tracked cluster by ID from memory (preferred) with file fallback
+   * Memory is the primary source of truth for active sessions
    * @param clusterId Cluster ID (UUID)
+   * @param forceRefreshFromFile Optional: Force refresh from file before searching
    * @returns Cluster tracking information or undefined if not found
    */
-  getTrackedCluster(clusterId: string): ClusterTrackingInfo | undefined {
-    return this.clusters.get(clusterId);
+  getTrackedCluster(
+    clusterId: string,
+    forceRefreshFromFile = false
+  ): ClusterTrackingInfo | undefined {
+    if (forceRefreshFromFile) {
+      this.loadState().catch((error) => {
+        console.error('[ERROR] ClusterTracker: Error refreshing from file:', error);
+      });
+    }
+
+    const cluster = this.clusters.get(clusterId);
+
+    if (process.env.LOG_LEVEL === 'debug') {
+      console.error(
+        `[DEBUG] ClusterTracker: ${cluster ? 'Found' : 'Not found'} cluster ${clusterId} in memory`
+      );
+    }
+
+    return cluster;
   }
 
   /**
-   * Gets tracked clusters by profile ID
+   * Gets tracked clusters by profile ID from memory (preferred) with file fallback
+   * Memory is the primary source of truth for active sessions
    * @param profileId Profile ID
+   * @param forceRefreshFromFile Optional: Force refresh from file before filtering
    * @returns Array of cluster tracking information
    */
-  getTrackedClustersByProfile(profileId: string): ClusterTrackingInfo[] {
-    return Array.from(this.clusters.values()).filter((cluster) => cluster.profileId === profileId);
+  getTrackedClustersByProfile(
+    profileId: string,
+    forceRefreshFromFile = false
+  ): ClusterTrackingInfo[] {
+    if (forceRefreshFromFile) {
+      this.loadState().catch((error) => {
+        console.error('[ERROR] ClusterTracker: Error refreshing from file:', error);
+      });
+    }
+
+    const clusters = Array.from(this.clusters.values()).filter(
+      (cluster) => cluster.profileId === profileId
+    );
+
+    if (process.env.LOG_LEVEL === 'debug') {
+      console.error(
+        `[DEBUG] ClusterTracker: Found ${clusters.length} clusters for profile ${profileId} in memory`
+      );
+    }
+
+    return clusters;
+  }
+
+  /**
+   * Explicitly refresh cluster data from file
+   * Useful when you want to ensure you have the latest persisted state
+   * @returns Promise that resolves when refresh is complete
+   */
+  async refreshFromFile(): Promise<void> {
+    if (process.env.LOG_LEVEL === 'debug') {
+      console.error('[DEBUG] ClusterTracker: Explicitly refreshing from file');
+    }
+
+    await this.loadState();
   }
 
   /**

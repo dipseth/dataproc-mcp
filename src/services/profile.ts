@@ -5,7 +5,7 @@
 
 import fs from 'fs/promises';
 import path from 'path';
-import { readYamlConfig, YamlClusterConfig } from '../config/yaml.js';
+import { readYamlConfig, YamlClusterConfig, convertYamlToDataprocConfig } from '../config/yaml.js';
 import { ProfileInfo, ProfileManagerConfig } from '../types/profile.js';
 import { DefaultParameterManager } from './default-params.js';
 
@@ -181,6 +181,9 @@ export class ProfileManager {
     filePath: string,
     relativePath: string
   ): ProfileInfo {
+    // Use the existing YAML conversion function that handles snake_case to camelCase conversion
+    const dataprocConfig = convertYamlToDataprocConfig(yamlConfig, filePath);
+
     // Extract the category from the relative path
     const category = path.dirname(relativePath) !== '.' ? path.dirname(relativePath) : 'default';
 
@@ -190,33 +193,13 @@ export class ProfileManager {
         ? `${category}/${path.basename(relativePath, '.yaml')}`
         : path.basename(relativePath, '.yaml');
 
-    // Extract metadata from the YAML
+    // Extract metadata from the original YAML for additional info
     const metadata: Record<string, unknown> = {};
 
-    let clusterName: string;
-    let parameters: Record<string, unknown> | undefined;
-
-    // Check if it's the traditional format
-    if ('cluster' in yamlConfig) {
-      // Traditional format
-      const traditionalConfig =
-        yamlConfig as import('../config/yaml.js').TraditionalYamlClusterConfig;
-      clusterName = traditionalConfig.cluster.name;
-
-      // Add description if available
-      if (traditionalConfig.cluster.config?.description) {
-        metadata.description = traditionalConfig.cluster.config.description;
-      }
-
-      // Extract parameters from traditional config
-      parameters = traditionalConfig.cluster.parameters;
-    } else {
-      // Enhanced format
+    // Check if it's the enhanced format and extract metadata
+    if (!('cluster' in yamlConfig)) {
       const projectId = Object.keys(yamlConfig)[0];
       const projectConfig = yamlConfig[projectId];
-
-      // Use the filename without extension as the cluster name
-      clusterName = path.basename(filePath, '.yaml') + '-cluster';
 
       // Add project ID to metadata
       metadata.projectId = projectId;
@@ -230,28 +213,32 @@ export class ProfileManager {
         metadata.labels = projectConfig.labels;
       }
 
-      // Add description if available in either snake_case or camelCase
+      // Add description if available
       const config = projectConfig.cluster_config || projectConfig.clusterConfig;
       if (config?.description) {
         metadata.description = config.description;
       }
-
-      // Extract parameters from enhanced config
-      parameters =
-        typeof config?.parameters === 'object' && config.parameters !== null
-          ? (config.parameters as Record<string, unknown>)
-          : undefined;
+    } else {
+      // Traditional format
+      const traditionalConfig =
+        yamlConfig as import('../config/yaml.js').TraditionalYamlClusterConfig;
+      if (traditionalConfig.cluster.config?.description) {
+        metadata.description = traditionalConfig.cluster.config.description;
+      }
     }
 
-    // Create the profile info
+    // Create the profile info using the properly converted configuration
     return {
       id,
-      name: clusterName,
+      name: dataprocConfig.clusterName,
       path: filePath,
       category,
       timesUsed: 0,
       metadata,
-      parameters,
+      parameters: dataprocConfig.parameters,
+      clusterConfig: dataprocConfig.config as Record<string, unknown>, // This is now properly converted to camelCase
+      region: dataprocConfig.region,
+      labels: dataprocConfig.labels,
     };
   }
 

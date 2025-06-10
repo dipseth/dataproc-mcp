@@ -13,8 +13,6 @@ import {
   DeleteClusterSchema,
 } from '../validation/schemas.js';
 import { createCluster, deleteCluster, listClusters, getCluster } from '../services/cluster.js';
-import * as fs from 'fs';
-import * as yaml from 'js-yaml';
 import { DefaultParameterManager } from '../services/default-params.js';
 import { ResponseFilter } from '../services/response-filter.js';
 import { KnowledgeIndexer } from '../services/knowledge-indexer.js';
@@ -103,6 +101,41 @@ export async function handleStartDataprocCluster(args: any, deps: HandlerDepende
   let response;
   try {
     response = await createCluster(projectId, region, clusterName, clusterConfig);
+
+    // Track the cluster if clusterTracker is available
+    // The clusterUuid is in response.metadata.clusterUuid for operation responses
+    const clusterUuid = response?.metadata?.clusterUuid || response?.clusterUuid;
+    if (response && clusterUuid && deps.clusterTracker) {
+      logger.debug('MCP start_dataproc_cluster: Tracking cluster:', {
+        clusterUuid,
+        clusterName,
+        projectId,
+        region,
+        responseType: response.metadata ? 'operation' : 'cluster',
+      });
+
+      deps.clusterTracker.trackCluster(
+        clusterUuid,
+        clusterName,
+        undefined, // No profile ID for direct cluster creation
+        undefined, // No profile path
+        {
+          projectId,
+          region,
+          createdAt: new Date().toISOString(),
+          tool: 'start_dataproc_cluster',
+        }
+      );
+
+      logger.debug('MCP start_dataproc_cluster: Cluster tracked successfully');
+    } else {
+      logger.debug('MCP start_dataproc_cluster: Cluster tracking skipped:', {
+        hasResponse: !!response,
+        hasClusterUuid: !!(response && clusterUuid),
+        hasClusterTracker: !!deps.clusterTracker,
+        responseStructure: response ? Object.keys(response) : 'no response',
+      });
+    }
 
     SecurityMiddleware.auditLog('Cluster creation completed', {
       tool: 'start_dataproc_cluster',
@@ -333,6 +366,12 @@ export async function handleListClusters(args: any, deps: HandlerDependencies) {
   // Regular response handling
   if (deps.responseFilter && !args.verbose) {
     try {
+      logger.debug('🔍 [DEBUG] Starting response filtering for list_clusters', {
+        verbose: args.verbose,
+        responseSize: JSON.stringify(response).length,
+        hasResponseFilter: !!deps.responseFilter,
+      });
+
       const filteredResponse = await deps.responseFilter.filterResponse('list_clusters', response, {
         toolName: 'list_clusters',
         timestamp: new Date().toISOString(),
@@ -344,10 +383,24 @@ export async function handleListClusters(args: any, deps: HandlerDependencies) {
         compressionRatio: 1.0,
       });
 
+      logger.debug('🔍 [DEBUG] Response filtering completed', {
+        filterType: filteredResponse.type,
+        tokensSaved: filteredResponse.tokensSaved,
+        contentLength: filteredResponse.content.length,
+        hasContent: !!filteredResponse.content,
+        hasSummary: !!filteredResponse.summary,
+      });
+
       const formattedContent =
         filteredResponse.type === 'summary'
           ? filteredResponse.summary || filteredResponse.content
           : filteredResponse.content;
+
+      logger.debug('🔍 [DEBUG] Using formatted content', {
+        contentType: filteredResponse.type === 'summary' ? 'summary' : 'content',
+        finalContentLength: formattedContent.length,
+        contentPreview: formattedContent.substring(0, 200),
+      });
 
       return {
         content: [
@@ -359,6 +412,10 @@ export async function handleListClusters(args: any, deps: HandlerDependencies) {
       };
     } catch (filterError) {
       logger.warn('Response filtering failed, returning raw response:', filterError);
+      logger.debug('🔍 [DEBUG] Filter error details', {
+        errorMessage: filterError instanceof Error ? filterError.message : String(filterError),
+        errorStack: filterError instanceof Error ? filterError.stack : undefined,
+      });
     }
   }
 
@@ -596,7 +653,7 @@ export async function handleGetCluster(args: any, deps: HandlerDependencies) {
   };
 }
 
-export async function handleDeleteCluster(args: any, _deps: HandlerDependencies) {
+export async function handleDeleteCluster(args: any, deps: HandlerDependencies) {
   // Apply security middleware
   SecurityMiddleware.checkRateLimit(`delete_cluster:${JSON.stringify(args)}`);
 
@@ -623,7 +680,30 @@ export async function handleDeleteCluster(args: any, _deps: HandlerDependencies)
     );
   }
 
-  const { projectId, region, clusterName } = validatedArgs;
+  // Get default parameters if not provided
+  const { clusterName } = validatedArgs;
+  let { projectId, region } = validatedArgs;
+
+  if (!projectId && deps.defaultParamManager) {
+    try {
+      projectId = deps.defaultParamManager.getParameterValue('projectId');
+    } catch (error) {
+      // Ignore error, will be caught by validation below
+    }
+  }
+
+  if (!region && deps.defaultParamManager) {
+    try {
+      region = deps.defaultParamManager.getParameterValue('region');
+    } catch (error) {
+      // Ignore error, will be caught by validation below
+    }
+  }
+
+  // Validate required parameters after defaults
+  if (!projectId || !region) {
+    throw new McpError(ErrorCode.InvalidParams, 'Missing required parameters: projectId, region');
+  }
 
   // Additional GCP constraint validation
   SecurityMiddleware.validateGCPConstraints({ projectId, region, clusterName });
@@ -663,11 +743,13 @@ export async function handleCreateClusterFromYaml(args: any, deps: HandlerDepend
   // Apply security middleware
   SecurityMiddleware.checkRateLimit(`create_cluster_from_yaml:${JSON.stringify(args)}`);
 
-  // Sanitize input
-  const sanitizedArgs = SecurityMiddleware.sanitizeObject(args);
+  // Basic validation (sanitize only the input parameters, not the YAML data)
+  const typedArgs = args as any;
 
-  // Basic validation
-  const typedArgs = sanitizedArgs as any;
+  // Sanitize only the user-provided parameters
+  if (typedArgs.yamlPath && typeof typedArgs.yamlPath === 'string') {
+    typedArgs.yamlPath = SecurityMiddleware.sanitizeString(typedArgs.yamlPath);
+  }
   if (!typedArgs.yamlPath || typeof typedArgs.yamlPath !== 'string') {
     throw new McpError(ErrorCode.InvalidParams, 'yamlPath is required and must be a string');
   }
@@ -675,19 +757,21 @@ export async function handleCreateClusterFromYaml(args: any, deps: HandlerDepend
   const { yamlPath, overrides } = typedArgs;
 
   try {
-    // Read and parse YAML file
-    const yamlContent = fs.readFileSync(yamlPath, 'utf8');
-    const clusterConfig = yaml.load(yamlContent) as any;
+    // Use the proper YAML processing function that handles both formats
+    const { getDataprocConfigFromYaml } = await import('../config/yaml.js');
+    const yamlResult = await getDataprocConfigFromYaml(yamlPath);
+
+    // Extract the properly processed configuration
+    const { clusterName } = yamlResult;
+    let clusterConfig = yamlResult.config;
 
     // Apply overrides if provided
     if (overrides && typeof overrides === 'object') {
-      Object.assign(clusterConfig, overrides);
+      clusterConfig = { ...clusterConfig, ...overrides };
     }
 
-    // Extract cluster name from config or generate one
-    const clusterName = clusterConfig.clusterName || `cluster-${Date.now()}`;
-
-    // Use existing cluster creation logic
+    // Use existing cluster creation logic with properly extracted config
+    // This will now include tracking since we updated handleStartDataprocCluster
     return handleStartDataprocCluster({ clusterName, clusterConfig }, deps);
   } catch (error) {
     logger.error('Failed to create cluster from YAML:', error);
@@ -705,11 +789,16 @@ export async function handleCreateClusterFromProfile(args: any, deps: HandlerDep
   // Apply security middleware
   SecurityMiddleware.checkRateLimit(`create_cluster_from_profile:${JSON.stringify(args)}`);
 
-  // Sanitize input
-  const sanitizedArgs = SecurityMiddleware.sanitizeObject(args);
+  // Basic validation (sanitize only the input parameters, not the profile data)
+  const typedArgs = args as any;
 
-  // Basic validation
-  const typedArgs = sanitizedArgs as any;
+  // Sanitize only the user-provided parameters
+  if (typedArgs.profileName && typeof typedArgs.profileName === 'string') {
+    typedArgs.profileName = SecurityMiddleware.sanitizeString(typedArgs.profileName);
+  }
+  if (typedArgs.clusterName && typeof typedArgs.clusterName === 'string') {
+    typedArgs.clusterName = SecurityMiddleware.sanitizeString(typedArgs.clusterName);
+  }
   if (!typedArgs.profileName || typeof typedArgs.profileName !== 'string') {
     throw new McpError(ErrorCode.InvalidParams, 'profileName is required and must be a string');
   }
@@ -731,7 +820,7 @@ export async function handleCreateClusterFromProfile(args: any, deps: HandlerDep
     }
 
     // Get cluster config from profile
-    let clusterConfig = (profile as any).config || {};
+    let clusterConfig = profile.clusterConfig || {};
 
     // Apply overrides if provided
     if (overrides && typeof overrides === 'object') {

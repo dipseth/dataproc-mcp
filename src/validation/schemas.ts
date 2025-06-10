@@ -130,8 +130,8 @@ export const GetClusterSchema = z.object({
 });
 
 export const DeleteClusterSchema = z.object({
-  projectId: ProjectIdSchema,
-  region: RegionSchema,
+  projectId: ProjectIdSchema.optional(),
+  region: RegionSchema.optional(),
   clusterName: ClusterNameSchema,
 });
 
