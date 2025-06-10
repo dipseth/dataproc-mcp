@@ -1,8 +1,8 @@
 {
   "name": "@dipseth/dataproc-mcp-server",
-  "version": "4.2.1",
-  "released": "2025-06-10T16:59:26Z",
-  "npmUrl": "https://www.npmjs.com/package/@dipseth/dataproc-mcp-server/v/4.2.1",
-  "githubRelease": "https://github.com/dipseth/dataproc-mcp/releases/tag/v4.2.1",
-  "installCommand": "npm install @dipseth/dataproc-mcp-server@4.2.1"
+  "version": "4.2.2",
+  "released": "2025-06-10T20:52:35Z",
+  "npmUrl": "https://www.npmjs.com/package/@dipseth/dataproc-mcp-server/v/4.2.2",
+  "githubRelease": "https://github.com/dipseth/dataproc-mcp/releases/tag/v4.2.2",
+  "installCommand": "npm install @dipseth/dataproc-mcp-server@4.2.2"
 }
