@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- semantic-release-changelog -->
 
+## [4.2.1](https://github.com/dipseth/dataproc-mcp/compare/v4.2.0...v4.2.1) (2025-06-10)
+
+
+### 🐛 Bug Fixes
+
+* **response-filter:** resolve token optimization and status display issues ([dd5aa6a](https://github.com/dipseth/dataproc-mcp/commit/dd5aa6aa6b34a9ba1e72420d7acfc7ad3eb087c3))
+
+
+### 📚 Documentation
+
+* Add comprehensive sensitive file management and Git history cleanup guide ([12f4442](https://github.com/dipseth/dataproc-mcp/commit/12f4442312d75b8a7ab72f213876c9112a9c027f))
+* update documentation for v4.2.0 ([82a0c25](https://github.com/dipseth/dataproc-mcp/commit/82a0c257e18b475c8056f512a4de9da4f3caed1c))
+
 ## 1.0.0 (2025-06-09)
 
 
