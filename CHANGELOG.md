@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- semantic-release-changelog -->
 
+## [4.3.0](https://github.com/dipseth/dataproc-mcp/compare/v4.2.2...v4.3.0) (2025-06-11)
+
+
+### 🚀 Features
+
+* implement centralized configuration path resolution ([#30](https://github.com/dipseth/dataproc-mcp/issues/30)) ([567c5d1](https://github.com/dipseth/dataproc-mcp/commit/567c5d1b954f0b57f7947132f8ebd4ee5f40e4fb))
+
+
+### 📚 Documentation
+
+* update documentation for v4.2.2 ([60163c7](https://github.com/dipseth/dataproc-mcp/commit/60163c7ee84c4a46c975020602290ff24dcbcd1d))
+
 ## [4.2.2](https://github.com/dipseth/dataproc-mcp/compare/v4.2.1...v4.2.2) (2025-06-10)
 
 
