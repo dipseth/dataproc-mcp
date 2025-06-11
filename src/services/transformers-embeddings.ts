@@ -7,7 +7,7 @@
 
 import { pipeline } from '@huggingface/transformers';
 import { writeFileSync, readFileSync, existsSync } from 'fs';
-import { join } from 'path';
+import { getStateFilePath } from '../utils/config-path-resolver.js';
 import {
   GenericQdrantConverter,
   createGenericConverter,
@@ -86,8 +86,7 @@ export class TransformersEmbeddingService {
 
     this.modelName = modelName;
     this.vectorSize = 384; // Standard for all-MiniLM-L6-v2
-    this.trainingDataPath =
-      trainingDataPath || join(process.cwd(), 'state', 'embedding-training-data.json');
+    this.trainingDataPath = trainingDataPath || getStateFilePath('embedding-training-data.json');
 
     // Phase 3: Initialize Generic Converter Integration
     this.compressionService = new CompressionService();
@@ -136,7 +135,7 @@ export class TransformersEmbeddingService {
           // Use quantized model for better performance
           dtype: 'q8',
           // Cache models locally
-          cache_dir: join(process.cwd(), 'state', 'transformers-cache'),
+          cache_dir: getStateFilePath('transformers-cache'),
         })) as unknown;
 
         logger.info(`✅ Model loaded successfully: ${this.modelName}`);

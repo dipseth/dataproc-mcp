@@ -8,6 +8,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { createServer } from 'net';
 import { logger } from '../utils/logger.js';
+import { getStateFilePath, getAppRoot } from '../utils/config-path-resolver.js';
 
 export interface QdrantManagerConfig {
   autoStart: boolean;
@@ -101,7 +102,7 @@ export class QdrantManager {
       }
 
       // Create data directory
-      const dataPath = this.config.dataPath || path.join(process.cwd(), 'state', 'qdrant-data');
+      const dataPath = this.config.dataPath || getStateFilePath('qdrant-data');
       await fs.mkdir(dataPath, { recursive: true });
 
       // Try Docker first, then fallback to binary
@@ -181,7 +182,7 @@ export class QdrantManager {
         'qdrant',
         '/usr/local/bin/qdrant',
         '/opt/homebrew/bin/qdrant',
-        path.join(process.cwd(), 'bin', 'qdrant'),
+        path.join(getAppRoot(), 'bin', 'qdrant'),
       ];
 
       let binaryPath: string | null = null;

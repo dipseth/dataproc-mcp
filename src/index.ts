@@ -29,6 +29,8 @@ import CredentialManager from './security/credential-manager.js';
 import * as fs from 'fs';
 import * as path from 'path';
 import { createRequire } from 'module';
+import { fileURLToPath } from 'url';
+import { getConfigFilePath, logConfigPathDiagnostics } from './utils/config-path-resolver.js';
 
 // Import package.json for version info
 const require = createRequire(import.meta.url);
@@ -101,10 +103,19 @@ export function getGlobalKnowledgeIndexer(): KnowledgeIndexer | null {
 
 // Initialize default parameter manager
 try {
-  const defaultParamsPath = path.join(process.cwd(), 'config', 'default-params.json');
+  // Use centralized configuration path resolution
+  const defaultParamsPath = getConfigFilePath('default-params.json');
+
+  if (process.env.LOG_LEVEL === 'debug') {
+    logConfigPathDiagnostics('DefaultParameterManager');
+  }
+
   if (fs.existsSync(defaultParamsPath)) {
     const defaultParamsConfig = JSON.parse(fs.readFileSync(defaultParamsPath, 'utf8'));
     defaultParamManager = new DefaultParameterManager(defaultParamsConfig);
+    console.error(`[INFO] Default parameters loaded from: ${defaultParamsPath}`);
+  } else {
+    console.error(`[INFO] No default parameters file found at: ${defaultParamsPath}`);
   }
 } catch (error) {
   console.warn('Could not load default parameters:', error);
