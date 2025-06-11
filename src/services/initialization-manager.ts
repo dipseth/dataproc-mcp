@@ -25,8 +25,8 @@ import { SemanticQueryService } from './semantic-query.js';
 import { KnowledgeIndexer } from './knowledge-indexer.js';
 import { MockDataLoader } from './mock-data-loader.js'; // Only used for testing
 import { getStartupStatus } from './startup-status.js';
+import { getConfigFilePath, logConfigPathDiagnostics } from '../utils/config-path-resolver.js';
 import * as fs from 'fs';
-import * as path from 'path';
 
 export interface InitializedServices {
   profileManager: ProfileManager;
@@ -50,12 +50,20 @@ export class InitializationManager {
    */
   async initializeDefaultParams(): Promise<DefaultParameterManager | undefined> {
     try {
-      const defaultParamsPath = path.join(process.cwd(), 'config', 'default-params.json');
+      // Use centralized configuration path resolution
+      const defaultParamsPath = getConfigFilePath('default-params.json');
+
+      if (process.env.LOG_LEVEL === 'debug') {
+        logConfigPathDiagnostics('InitializationManager.DefaultParams');
+      }
+
       if (fs.existsSync(defaultParamsPath)) {
         const defaultParamsConfig = JSON.parse(fs.readFileSync(defaultParamsPath, 'utf8'));
         this.services.defaultParamManager = new DefaultParameterManager(defaultParamsConfig);
-        logger.info('✅ [INIT] Default parameters loaded');
+        logger.info(`✅ [INIT] Default parameters loaded from: ${defaultParamsPath}`);
         return this.services.defaultParamManager;
+      } else {
+        logger.info(`ℹ️ [INIT] No default parameters file found at: ${defaultParamsPath}`);
       }
     } catch (error) {
       logger.warn('⚠️ [INIT] Could not load default parameters:', error);
@@ -117,15 +125,11 @@ export class InitializationManager {
 
       logger.info(`🎯 [GLOBAL-QDRANT] Using verified URL for ALL services: ${discoveredQdrantUrl}`);
 
-      // Try to use the same directory as the main server config
-      let responseFilterConfigPath: string;
+      // Use centralized configuration path resolution for response filter
+      const responseFilterConfigPath = getConfigFilePath('response-filter.json');
 
-      // eslint-disable-next-line no-undef
-      if (global.DATAPROC_CONFIG_DIR) {
-        // eslint-disable-next-line no-undef
-        responseFilterConfigPath = path.join(global.DATAPROC_CONFIG_DIR, 'response-filter.json');
-      } else {
-        responseFilterConfigPath = path.join(process.cwd(), 'config', 'response-filter.json');
+      if (process.env.LOG_LEVEL === 'debug') {
+        logConfigPathDiagnostics('InitializationManager.ResponseOptimization');
       }
 
       if (fs.existsSync(responseFilterConfigPath)) {

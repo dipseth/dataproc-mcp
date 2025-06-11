@@ -2,6 +2,7 @@ import { RequestInit, Response } from 'node-fetch';
 import { QueryResultResponse } from '../types/response.js';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { getStateFilePath } from '../utils/config-path-resolver.js';
 /**
  * Query service for executing Hive queries on Dataproc clusters
  */
@@ -845,7 +846,7 @@ async function optimizeQueryResultsResponse(
     let filePath: string | null = null;
     if (saveLocalFile) {
       try {
-        const outputDir = path.join(process.cwd(), 'output');
+        const outputDir = getStateFilePath('output');
         await fs.mkdir(outputDir, { recursive: true });
         const filename = `query-results-${jobId}-${timestamp.replace(/[:.]/g, '-')}.json`;
         filePath = path.join(outputDir, filename);

@@ -4,8 +4,14 @@
 
 import { promises as fs } from 'fs';
 import * as path from 'path';
-import { fileURLToPath } from 'url';
+
 import { ProfileManagerConfig, ClusterTrackerConfig } from '../types/profile.js';
+import {
+  getAppRoot,
+  getConfigDirectory,
+  getStateFilePath,
+  logConfigPathDiagnostics,
+} from '../utils/config-path-resolver.js';
 
 // Global type declaration for config directory
 declare global {
@@ -13,10 +19,8 @@ declare global {
   var DATAPROC_CONFIG_DIR: string;
 }
 
-// Determine the application root directory
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const APP_ROOT = path.resolve(__dirname, '../..');
+// Get application root from centralized resolver
+const APP_ROOT = getAppRoot();
 console.error(`[DEBUG] Application root directory: ${APP_ROOT}`);
 
 /**
@@ -89,7 +93,7 @@ const DEFAULT_CONFIG: ServerConfig = {
     profileScanInterval: 300000, // 5 minutes
   },
   clusterTracker: {
-    stateFilePath: path.join(APP_ROOT, 'state/dataproc-state.json'),
+    stateFilePath: getStateFilePath('dataproc-state.json'),
     stateSaveInterval: 60000, // 1 minute
   },
   authentication: {
@@ -123,6 +127,10 @@ export async function getServerConfig(configPath?: string): Promise<ServerConfig
   }
 
   // Add comprehensive diagnostic logging for configuration path resolution
+  if (process.env.LOG_LEVEL === 'debug') {
+    logConfigPathDiagnostics('ServerConfig');
+  }
+
   console.error(`[DIAGNOSTIC] ===== Configuration Path Resolution =====`);
   console.error(
     `[DIAGNOSTIC] configPath parameter: ${configPath ? `"${configPath}"` : 'undefined'}`
@@ -151,9 +159,9 @@ export async function getServerConfig(configPath?: string): Promise<ServerConfig
   console.error(`[DIAGNOSTIC] Current working directory: ${process.cwd()}`);
   console.error(`[DIAGNOSTIC] Config path is absolute: ${path.isAbsolute(filePath)}`);
 
-  // Store the config directory for other modules to use
+  // Store the config directory for other modules to use (for backward compatibility)
   // eslint-disable-next-line no-undef
-  global.DATAPROC_CONFIG_DIR = path.dirname(filePath);
+  global.DATAPROC_CONFIG_DIR = getConfigDirectory();
   // eslint-disable-next-line no-undef
   console.error(`[DIAGNOSTIC] Server Config: Config directory: ${global.DATAPROC_CONFIG_DIR}`);
 
