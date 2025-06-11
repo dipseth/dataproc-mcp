@@ -12,6 +12,7 @@
 
 import { promises as fs } from 'fs';
 import path from 'path';
+import { getConfigDirectory } from '../utils/config-path-resolver.js';
 import {
   FilteredResponse,
   ClusterSummary,
@@ -162,8 +163,8 @@ export class ResponseFilter {
           `[INFO] Looking for response-filter.json in server config directory: ${configPath}`
         );
       } else {
-        // Fallback to the old behavior
-        configPath = path.join(process.cwd(), 'config', 'response-filter.json');
+        // Fallback to the centralized config directory
+        configPath = path.join(getConfigDirectory(), 'response-filter.json');
         console.log(`[INFO] Fallback: Looking for response-filter.json in: ${configPath}`);
       }
 
