@@ -15,12 +15,14 @@ import {
   CheckActiveJobsSchema,
 } from '../validation/schemas.js';
 import { submitHiveQuery, getJobStatus, getQueryResults } from '../services/query.js';
+import { submitDataprocJob } from '../services/job.js';
 import { DefaultParameterManager } from '../services/default-params.js';
 import { ResponseFilter } from '../services/response-filter.js';
 import { KnowledgeIndexer } from '../services/knowledge-indexer.js';
 import { JobTracker } from '../services/job-tracker.js';
 import { AsyncQueryPoller } from '../services/async-query-poller.js';
 import { TemplatingIntegration } from '../services/templating-integration.js';
+import { LocalFileStagingService } from '../services/local-file-staging.js';
 
 export interface JobHandlerDependencies {
   defaultParamManager?: DefaultParameterManager;
@@ -180,13 +182,29 @@ export async function handleSubmitHiveQuery(args: any, deps: JobHandlerDependenc
     }
   }
 
+  const jobId = response?.reference?.jobId;
+  let responseText: string;
+
+  if (async) {
+    responseText =
+      `Hive query submitted asynchronously. Job ID: ${jobId}\n\n` +
+      `📋 **NEXT STEPS:**\n` +
+      `1. Check status: get_job_status("${jobId}")\n` +
+      `2. When DONE, get results: query_knowledge("jobId:${jobId} contentType:query_results")\n\n` +
+      `💡 **PRO TIP:** The query_knowledge approach gets actual data, not just metadata!`;
+  } else {
+    responseText =
+      `Hive query completed successfully.\n\n` +
+      `🎯 **GET ACTUAL RESULTS:**\n` +
+      `query_knowledge("jobId:${jobId} contentType:query_results")\n\n` +
+      `📊 **Raw Response:**\n${JSON.stringify(SecurityMiddleware.sanitizeForLogging(response), null, 2)}`;
+  }
+
   return {
     content: [
       {
         type: 'text',
-        text: async
-          ? `Hive query submitted asynchronously. Job ID: ${response?.reference?.jobId}\nUse get_query_status to check progress.`
-          : `Hive query completed successfully.\nResults:\n${JSON.stringify(SecurityMiddleware.sanitizeForLogging(response), null, 2)}`,
+        text: responseText,
       },
     ],
   };
@@ -268,11 +286,24 @@ export async function handleGetQueryStatus(args: any, deps: JobHandlerDependenci
     status: response?.status?.state,
   });
 
+  // Add result discovery hints when job is complete
+  let statusText = `Job ${jobId} status:\n${JSON.stringify(SecurityMiddleware.sanitizeForLogging(response), null, 2)}`;
+
+  if (response?.status?.state === 'DONE') {
+    statusText +=
+      `\n\n🎯 **GET ACTUAL RESULTS:**\n` +
+      `Use: query_knowledge("jobId:${jobId} contentType:query_results")\n` +
+      `💡 This will return the actual query output data (not just metadata)\n\n` +
+      `**Alternative patterns:**\n` +
+      `• jobId:${jobId} type:query_result - Alternative format\n` +
+      `• jobId:${jobId} includeRawDocument:true - Complete data access`;
+  }
+
   return {
     content: [
       {
         type: 'text',
-        text: `Job ${jobId} status:\n${JSON.stringify(SecurityMiddleware.sanitizeForLogging(response), null, 2)}`,
+        text: statusText,
       },
     ],
   };
@@ -531,8 +562,48 @@ export async function handleSubmitDataprocJob(args: any, deps: JobHandlerDepende
 
   const { clusterName, jobType, jobConfig, async } = typedArgs;
 
+  // Get default parameters if not provided
+  let { projectId, region } = typedArgs;
+
+  if (!projectId && deps.defaultParamManager) {
+    try {
+      projectId = deps.defaultParamManager.getParameterValue('projectId');
+    } catch (error) {
+      // Ignore error, will be caught by validation below
+    }
+  }
+
+  if (!region && deps.defaultParamManager) {
+    try {
+      region = deps.defaultParamManager.getParameterValue('region');
+    } catch (error) {
+      // Ignore error, will be caught by validation below
+    }
+  }
+
+  // Validate required parameters after defaults
+  if (!projectId || !region || !clusterName) {
+    throw new McpError(
+      ErrorCode.InvalidParams,
+      'Missing required parameters: projectId, region, clusterName'
+    );
+  }
+
+  // Additional GCP constraint validation
+  SecurityMiddleware.validateGCPConstraints({ projectId, region, clusterName });
+
+  // Audit log the operation
+  SecurityMiddleware.auditLog('Dataproc job submission initiated', {
+    tool: 'submit_dataproc_job',
+    projectId,
+    region,
+    clusterName,
+    jobType,
+    async: !!async,
+  });
+
   try {
-    // For now, delegate to Hive query handler if it's a Hive job
+    // For Hive jobs, delegate to the specialized Hive handler
     if (jobType.toLowerCase() === 'hive') {
       const hiveQuery = jobConfig.query || jobConfig.queryList?.queries?.[0];
       if (hiveQuery) {
@@ -540,16 +611,144 @@ export async function handleSubmitDataprocJob(args: any, deps: JobHandlerDepende
       }
     }
 
-    // For other job types, return a placeholder implementation
+    // Check for local files and stage if needed
+    const stagingService = new LocalFileStagingService(deps.defaultParamManager);
+    const localFiles = stagingService.detectLocalFiles(jobConfig);
+
+    let processedJobConfig = jobConfig;
+    if (localFiles.length > 0) {
+      logger.debug(
+        `handleSubmitDataprocJob: Found ${localFiles.length} local files to stage: ${localFiles.join(', ')}`
+      );
+
+      try {
+        const fileMapping = await stagingService.stageFiles(localFiles, clusterName);
+        processedJobConfig = stagingService.transformJobConfig(jobConfig, fileMapping);
+
+        logger.debug(
+          `handleSubmitDataprocJob: Successfully staged files and transformed job config`
+        );
+
+        // Log the transformation for debugging
+        SecurityMiddleware.auditLog('Local files staged for job', {
+          tool: 'submit_dataproc_job',
+          projectId,
+          region,
+          clusterName,
+          jobType,
+          localFiles: localFiles.length,
+          stagedFiles: Array.from(fileMapping.values()),
+        });
+      } catch (stagingError) {
+        logger.error(`handleSubmitDataprocJob: Failed to stage local files:`, stagingError);
+        throw new McpError(
+          ErrorCode.InternalError,
+          `Failed to stage local files: ${stagingError instanceof Error ? stagingError.message : 'Unknown error'}`
+        );
+      }
+    }
+
+    // For all other job types (including PySpark), use the generic job service
+    const response = await submitDataprocJob({
+      projectId,
+      region,
+      clusterName,
+      jobType,
+      jobConfig: processedJobConfig,
+      async,
+    });
+
+    SecurityMiddleware.auditLog('Dataproc job submission completed', {
+      tool: 'submit_dataproc_job',
+      projectId,
+      region,
+      clusterName,
+      jobType,
+      jobId: response?.jobId,
+      success: true,
+    });
+
+    // Index job for knowledge base
+    if (deps.knowledgeIndexer && response?.jobId) {
+      try {
+        await deps.knowledgeIndexer.indexJobSubmission({
+          jobId: response.jobId,
+          jobType: jobType as any,
+          projectId,
+          region,
+          clusterName,
+          status: 'SUBMITTED',
+          submissionTime: new Date().toISOString(),
+        });
+      } catch (indexError) {
+        logger.warn('Failed to index job submission:', indexError);
+      }
+    }
+
+    // Track job if async and tracker available
+    if (async && deps.jobTracker && response?.jobId) {
+      try {
+        deps.jobTracker.addOrUpdateJob({
+          jobId: response.jobId,
+          projectId,
+          region,
+          clusterName,
+          toolName: 'submit_dataproc_job',
+          status: 'SUBMITTED',
+          submissionTime: new Date().toISOString(),
+        });
+      } catch (trackError) {
+        logger.warn('Failed to track async job:', trackError);
+      }
+    }
+
+    const jobId = response?.jobId;
+    let responseText: string;
+
+    if (async) {
+      responseText =
+        `${jobType} job submitted asynchronously. Job ID: ${jobId}\n\n` +
+        `📋 **MONITORING & RESULTS:**\n` +
+        `1. Check status: get_job_status("${jobId}")\n` +
+        `2. When DONE, get results: query_knowledge("jobId:${jobId} contentType:query_results")\n\n` +
+        `🔍 **SEARCH PATTERNS:**\n` +
+        `• jobId:${jobId} type:job - Job metadata\n` +
+        `• jobId:${jobId} contentType:query_results - Actual output data\n` +
+        `• clusterName:${clusterName} ${jobType} - Related jobs on cluster`;
+    } else {
+      responseText =
+        `${jobType} job completed successfully.\n\n` +
+        `🎯 **GET ACTUAL RESULTS:**\n` +
+        `query_knowledge("jobId:${jobId} contentType:query_results")\n\n` +
+        `📊 **Job Details:**\n` +
+        `Job ID: ${jobId}\n` +
+        `Status: ${response?.status}\n` +
+        `Type: ${jobType}\n` +
+        `Cluster: ${clusterName}`;
+    }
+
     return {
       content: [
         {
           type: 'text',
-          text: `Generic Dataproc job submission for type "${jobType}" is not yet fully implemented. Currently only Hive jobs are supported via submit_hive_query.`,
+          text: responseText,
         },
       ],
     };
   } catch (error) {
+    SecurityMiddleware.auditLog(
+      'Dataproc job submission failed',
+      {
+        tool: 'submit_dataproc_job',
+        projectId,
+        region,
+        clusterName,
+        jobType,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      },
+      'error'
+    );
+
     logger.error('Failed to submit Dataproc job:', error);
     throw new McpError(
       ErrorCode.InternalError,
