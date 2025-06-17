@@ -87,7 +87,7 @@ npx @dipseth/dataproc-mcp-server@latest
 ## ✨ Features
 
 ### 🎯 **Core Capabilities**
-- **21 Production-Ready MCP Tools** - Complete Dataproc management suite
+- **22 Production-Ready MCP Tools** - Complete Dataproc management suite
 - **🧠 Knowledge Base Semantic Search** - Natural language queries with optional Qdrant integration
 - **🚀 Response Optimization** - 60-96% token reduction with Qdrant storage
 - **🔄 Generic Type Conversion System** - Automatic, type-safe data transformations
@@ -132,7 +132,7 @@ npx @dipseth/dataproc-mcp-server@latest
 - **Troubleshooting Guides** - Common issues and solutions
 - **IDE Integration** - TypeScript support
 
-## 🛠️ Complete MCP Tools Suite (21 Tools)
+## 🛠️ Complete MCP Tools Suite (22 Tools)
 
 > **🔄 Enhanced with Generic Type Conversion**: All tools now benefit from automatic, type-safe data transformations with intelligent compression and field mapping.
 
@@ -148,11 +148,12 @@ npx @dipseth/dataproc-mcp-server@latest
 | `delete_cluster` | Delete existing clusters | ✅ Project/region defaults | Safe deletion |
 | `get_zeppelin_url` | Get Zeppelin notebook URL | ✅ Auto-discovery | Web interface access |
 
-### 💼 **Job Management (6 Tools)**
+### 💼 **Job Management (7 Tools)**
 | Tool | Description | Smart Defaults | Key Features |
 |------|-------------|----------------|--------------|
 | `submit_hive_query` | Submit Hive queries to clusters | ✅ 70% fewer params | Async support, timeouts |
 | `submit_dataproc_job` | Submit Spark/PySpark/Presto jobs | ✅ 75% fewer params | Multi-engine support, **Local file staging** |
+| `cancel_dataproc_job` | Cancel running or pending jobs | ✅ JobID only needed | **Emergency cancellation**, cost control |
 | `get_job_status` | Get job execution status | ✅ JobID only needed | Real-time monitoring |
 | `get_job_results` | Get job outputs and results | ✅ Auto-pagination | Result formatting |
 | `get_query_status` | Get Hive query status | ✅ Minimal params | Query tracking |
@@ -216,7 +217,7 @@ my-company-analytics-prod-1234:
 - **[Knowledge Base Semantic Search](https://dipseth.github.io/dataproc-mcp/KNOWLEDGE_BASE_SEMANTIC_SEARCH/)** - Natural language queries and setup
 - **[Generic Type Conversion System](docs/GENERIC_TYPE_CONVERTER.md)** - Architectural design and implementation
 - **[Generic Converter Migration Guide](docs/GENERIC_TYPE_CONVERTER.md)** - Migration from manual conversions
-- **[API Reference](https://dipseth.github.io/dataproc-mcp/api/)** - Complete tool documentation
+- **[API Reference](https://dipseth.github.io/dataproc-mcp/API_REFERENCE/)** - Complete tool documentation
 - **[Configuration Examples](https://dipseth.github.io/dataproc-mcp/CONFIGURATION_EXAMPLES/)** - Real-world configurations
 - **[Security Guide](https://dipseth.github.io/dataproc-mcp/security/)** - Best practices and compliance
 - **[Installation Guide](https://dipseth.github.io/dataproc-mcp/INSTALLATION_GUIDE/)** - Detailed setup instructions

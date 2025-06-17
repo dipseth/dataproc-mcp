@@ -7,13 +7,13 @@ permalink: /API_REFERENCE/
 
 # 📚 API Reference
 
-Complete reference for all 16 Dataproc MCP Server tools with practical examples and usage patterns.
+Complete reference for all 17 Dataproc MCP Server tools with practical examples and usage patterns.
 
 ## Overview
 
-The Dataproc MCP Server provides 16 comprehensive tools organized into four categories:
+The Dataproc MCP Server provides 17 comprehensive tools organized into four categories:
 - **Cluster Management** (6 tools)
-- **Job Execution** (5 tools)
+- **Job Execution** (6 tools)
 - **Profile Management** (3 tools)
 - **Monitoring & Utilities** (2 tools)
 
@@ -542,9 +542,78 @@ Gets the results of a completed Dataproc job.
 }
 ```
 
+### 12. cancel_dataproc_job
+
+Cancels a running or pending Dataproc job with intelligent status handling and job tracking integration.
+
+**Parameters:**
+- `jobId` (string, required): The ID of the Dataproc job to cancel
+- `projectId` (string, optional): GCP project ID (uses defaults if not provided)
+- `region` (string, optional): Dataproc region (uses defaults if not provided)
+- `verbose` (boolean, optional): Return full response without filtering (default: false)
+
+**🛑 CANCELLATION WORKFLOW:**
+- Attempts to cancel jobs in PENDING or RUNNING states
+- Provides informative messages for jobs already in terminal states
+- Updates internal job tracking when cancellation succeeds
+
+**📊 STATUS HANDLING:**
+- **PENDING/RUNNING** → Cancellation attempted
+- **DONE/ERROR/CANCELLED** → Informative message returned
+- **Job not found** → Clear error message
+
+**💡 MONITORING:**
+After cancellation, use `get_job_status("jobId")` to confirm the job reaches CANCELLED state.
+
+**Example:**
+```json
+{
+  "tool": "cancel_dataproc_job",
+  "arguments": {
+    "jobId": "Clean_Places_sub_group_base_1_cleaned_places_13b6ec3f"
+  }
+}
+```
+
+**Successful Cancellation Response:**
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "🛑 Job Cancellation Status\n\nJob ID: Clean_Places_sub_group_base_1_cleaned_places_13b6ec3f\nStatus: 3\nMessage: Cancellation request sent for job Clean_Places_sub_group_base_1_cleaned_places_13b6ec3f."
+    }
+  ]
+}
+```
+
+**Job Already Completed Response:**
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Cannot cancel job Clean_Places_sub_group_base_1_cleaned_places_13b6ec3f in state: 'DONE'; cancellable states: '[PENDING, RUNNING]'"
+    }
+  ]
+}
+```
+
+**Use Cases:**
+- **Emergency Cancellation**: Stop runaway jobs consuming excessive resources
+- **Pipeline Management**: Cancel dependent jobs when upstream processes fail
+- **Cost Control**: Terminate expensive long-running jobs
+- **Development Workflow**: Cancel test jobs during development iterations
+
+**Best Practices:**
+1. **Monitor job status** before and after cancellation attempts
+2. **Use with get_job_status** to verify cancellation completion
+3. **Handle gracefully** when jobs are already in terminal states
+4. **Consider dependencies** before cancelling pipeline jobs
+
 ## Profile Management Tools
 
-### 12. list_profiles
+### 13. list_profiles
 
 Lists available cluster configuration profiles.
 
@@ -573,7 +642,7 @@ Lists available cluster configuration profiles.
 }
 ```
 
-### 13. get_profile
+### 14. get_profile
 
 Gets details for a specific cluster configuration profile.
 
@@ -590,7 +659,7 @@ Gets details for a specific cluster configuration profile.
 }
 ```
 
-### 14. list_tracked_clusters
+### 15. list_tracked_clusters
 
 Lists clusters that were created and tracked by this MCP server.
 
@@ -609,7 +678,7 @@ Lists clusters that were created and tracked by this MCP server.
 
 ## Monitoring & Utilities
 
-### 15. get_zeppelin_url
+### 16. get_zeppelin_url
 
 Gets the Zeppelin notebook URL for a cluster (if enabled).
 
@@ -642,7 +711,7 @@ Gets the Zeppelin notebook URL for a cluster (if enabled).
 }
 ```
 
-### 16. check_active_jobs
+### 17. check_active_jobs
 
 🚀 Quick status check for all active and recent jobs with intelligent response optimization.
 

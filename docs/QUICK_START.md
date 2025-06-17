@@ -191,6 +191,16 @@ Show me all my Dataproc clusters
 Submit a Spark job to process data from gs://my-bucket/data.csv
 ```
 
+### Cancel a Running Job
+```
+Cancel the job with ID "my-long-running-job-12345"
+```
+
+### Monitor Job Status
+```
+Check the status of job "my-job-67890"
+```
+
 ### Try Semantic Search (if Qdrant enabled)
 ```
 Show me clusters with machine learning packages installed

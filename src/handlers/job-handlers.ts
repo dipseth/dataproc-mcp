@@ -10,12 +10,13 @@ import {
   SubmitHiveQuerySchema,
   GetJobStatusSchema,
   GetQueryResultsSchema,
+  CancelDataprocJobSchema,
   // SubmitDataprocJobSchema,
   // GetJobResultsSchema,
   CheckActiveJobsSchema,
 } from '../validation/schemas.js';
 import { submitHiveQuery, getJobStatus, getQueryResults } from '../services/query.js';
-import { submitDataprocJob } from '../services/job.js';
+import { submitDataprocJob, cancelDataprocJob } from '../services/job.js';
 import { DefaultParameterManager } from '../services/default-params.js';
 import { ResponseFilter } from '../services/response-filter.js';
 import { KnowledgeIndexer } from '../services/knowledge-indexer.js';
@@ -771,4 +772,212 @@ export async function handleGetJobStatus(args: any, deps: JobHandlerDependencies
 export async function handleGetJobResults(args: any, deps: JobHandlerDependencies) {
   // For now, delegate to the existing query results handler
   return handleGetQueryResults(args, deps);
+}
+
+/**
+ * Cancel a Dataproc job
+ */
+export async function handleCancelDataprocJob(args: any, deps: JobHandlerDependencies) {
+  // Apply security middleware
+  SecurityMiddleware.checkRateLimit(`cancel_dataproc_job:${JSON.stringify(args)}`);
+
+  // Sanitize input
+  const sanitizedArgs = SecurityMiddleware.sanitizeObject(args);
+
+  // Validate input with Zod schema
+  let validatedArgs;
+  try {
+    validatedArgs = SecurityMiddleware.validateInput(CancelDataprocJobSchema, sanitizedArgs);
+  } catch (error) {
+    SecurityMiddleware.auditLog(
+      'Input validation failed',
+      {
+        tool: 'cancel_dataproc_job',
+        error: error instanceof Error ? error.message : 'Unknown error',
+        args: SecurityMiddleware.sanitizeForLogging(args),
+      },
+      'warn'
+    );
+    throw new McpError(
+      ErrorCode.InvalidParams,
+      error instanceof Error ? error.message : 'Invalid input'
+    );
+  }
+
+  // Get default parameters if not provided
+  let { projectId, region } = validatedArgs;
+  const { jobId, verbose } = validatedArgs;
+
+  if (!projectId && deps.defaultParamManager) {
+    try {
+      projectId = deps.defaultParamManager.getParameterValue('projectId');
+    } catch (error) {
+      // Ignore error, will be caught by validation below
+    }
+  }
+
+  if (!region && deps.defaultParamManager) {
+    try {
+      region = deps.defaultParamManager.getParameterValue('region');
+    } catch (error) {
+      // Ignore error, will be caught by validation below
+    }
+  }
+
+  // Validate required parameters after defaults
+  if (!projectId || !region || !jobId) {
+    throw new McpError(
+      ErrorCode.InvalidParams,
+      'Missing required parameters: projectId, region, jobId'
+    );
+  }
+
+  // Additional GCP constraint validation
+  SecurityMiddleware.validateGCPConstraints({ projectId, region });
+
+  // Audit log the operation
+  SecurityMiddleware.auditLog('Dataproc job cancellation initiated', {
+    tool: 'cancel_dataproc_job',
+    projectId,
+    region,
+    jobId,
+  });
+
+  try {
+    const cancellationResult = await cancelDataprocJob({ projectId, region, jobId });
+
+    if (cancellationResult.success) {
+      // Update JobTracker if available
+      if (
+        deps.jobTracker &&
+        (cancellationResult.status === 'PENDING' || cancellationResult.status === 'RUNNING')
+      ) {
+        try {
+          deps.jobTracker.addOrUpdateJob({
+            jobId,
+            projectId,
+            region,
+            status: 'CANCELLING',
+            toolName: 'cancel_dataproc_job',
+            submissionTime: new Date().toISOString(),
+          });
+        } catch (trackError) {
+          logger.warn('Failed to update job tracker:', trackError);
+        }
+      }
+
+      // Index in Knowledge Base if available
+      if (deps.knowledgeIndexer) {
+        try {
+          await deps.knowledgeIndexer.indexJobSubmission({
+            jobId,
+            jobType: 'cancel',
+            projectId,
+            region,
+            clusterName: 'unknown',
+            status: 'CANCELLATION_REQUESTED',
+            submissionTime: new Date().toISOString(),
+            results: cancellationResult.jobDetails,
+          });
+        } catch (indexError) {
+          logger.warn('Failed to index cancellation event:', indexError);
+        }
+      }
+
+      SecurityMiddleware.auditLog('Dataproc job cancellation completed', {
+        tool: 'cancel_dataproc_job',
+        projectId,
+        region,
+        jobId,
+        status: cancellationResult.status,
+        success: true,
+      });
+
+      let responseText = '';
+
+      // Handle different status scenarios
+      if (cancellationResult.status === 'PENDING' || cancellationResult.status === 'RUNNING') {
+        responseText =
+          `🛑 **Job Cancellation Initiated**\n\n` +
+          `Job ID: ${jobId}\n` +
+          `Status: Cancellation requested\n` +
+          `Message: ${cancellationResult.message}\n\n` +
+          `📋 **NEXT STEPS:**\n` +
+          `1. Monitor status: get_job_status("${jobId}")\n` +
+          `2. Expected final status: CANCELLED\n\n` +
+          `💡 **TIP:** Cancellation may take a few moments to complete.`;
+      } else if (
+        cancellationResult.status === 'DONE' ||
+        cancellationResult.status === 'ERROR' ||
+        cancellationResult.status === 'CANCELLED'
+      ) {
+        responseText =
+          `ℹ️ **Job Already Completed**\n\n` +
+          `Job ID: ${jobId}\n` +
+          `Current Status: ${cancellationResult.status}\n` +
+          `Message: ${cancellationResult.message}\n\n` +
+          `🎯 **GET RESULTS:**\n` +
+          `query_knowledge("jobId:${jobId} contentType:query_results")`;
+      } else {
+        responseText =
+          `🛑 **Job Cancellation Status**\n\n` +
+          `Job ID: ${jobId}\n` +
+          `Status: ${cancellationResult.status}\n` +
+          `Message: ${cancellationResult.message}`;
+      }
+
+      if (verbose && cancellationResult.jobDetails) {
+        responseText += `\n\n📊 **Raw Response:**\n${JSON.stringify(SecurityMiddleware.sanitizeForLogging(cancellationResult.jobDetails), null, 2)}`;
+      }
+
+      return {
+        content: [{ type: 'text', text: responseText }],
+      };
+    } else {
+      // Handle failure cases (e.g., job not found)
+      SecurityMiddleware.auditLog(
+        'Dataproc job cancellation failed',
+        {
+          tool: 'cancel_dataproc_job',
+          projectId,
+          region,
+          jobId,
+          error: cancellationResult.message,
+        },
+        'error'
+      );
+
+      const errorText =
+        `❌ **Job Not Found**\n\n` +
+        `Job ID: ${jobId}\n` +
+        `Status: ${cancellationResult.status}\n` +
+        `Message: ${cancellationResult.message}\n\n` +
+        `💡 **TROUBLESHOOTING:**\n` +
+        `• Verify the job ID is correct\n` +
+        `• Check that you're using the right project and region\n` +
+        `• Ensure you have Dataproc Job Admin permissions`;
+
+      return {
+        content: [{ type: 'text', text: errorText }],
+      };
+    }
+  } catch (error) {
+    SecurityMiddleware.auditLog(
+      'Dataproc job cancellation failed',
+      {
+        tool: 'cancel_dataproc_job',
+        projectId,
+        region,
+        jobId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      },
+      'error'
+    );
+
+    logger.error('Failed to cancel Dataproc job:', error);
+    throw new McpError(
+      ErrorCode.InternalError,
+      `Failed to cancel Dataproc job: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  }
 }
