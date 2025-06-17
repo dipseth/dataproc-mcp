@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- semantic-release-changelog -->
 
+## [4.4.0](https://github.com/dipseth/dataproc-mcp/compare/v4.3.0...v4.4.0) (2025-06-17)
+
+
+### 🚀 Features
+
+* enhance prompts and job submission with ESLint fixes ([#33](https://github.com/dipseth/dataproc-mcp/issues/33)) ([252e39b](https://github.com/dipseth/dataproc-mcp/commit/252e39b4043ca97fac6e005e88520f3664b1d1a9))
+
+
+### 📚 Documentation
+
+* update documentation for v4.3.0 ([d9a56b2](https://github.com/dipseth/dataproc-mcp/commit/d9a56b26028cc2d84cd0e9760c896f247c9261e8))
+
 ## [4.3.0](https://github.com/dipseth/dataproc-mcp/compare/v4.2.2...v4.3.0) (2025-06-11)
 
 
