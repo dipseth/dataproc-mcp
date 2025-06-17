@@ -195,4 +195,37 @@ export const jobTools = [
       required: [],
     },
   },
+
+  // New tool: cancel Dataproc job
+  {
+    name: 'cancel_dataproc_job',
+    description:
+      'Cancel a running Dataproc job with intelligent status handling and job tracking integration.\n\n' +
+      '**🛑 CANCELLATION WORKFLOW:**\n' +
+      '• Attempts to cancel jobs in PENDING or RUNNING states\n' +
+      '• Provides informative messages for jobs already in terminal states\n' +
+      '• Updates internal job tracking when cancellation succeeds\n\n' +
+      '**📊 STATUS HANDLING:**\n' +
+      '• PENDING/RUNNING → Cancellation attempted\n' +
+      '• DONE/ERROR/CANCELLED → Informative message returned\n' +
+      '• Job not found → Clear error message\n\n' +
+      '**💡 MONITORING:**\n' +
+      'After cancellation, use get_job_status("jobId") to confirm the job reaches CANCELLED state.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        jobId: { type: 'string', description: 'The ID of the Dataproc job to cancel' },
+        projectId: {
+          type: 'string',
+          description: 'Optional: Google Cloud Project ID (uses defaults)',
+        },
+        region: { type: 'string', description: 'Optional: Google Cloud region (uses defaults)' },
+        verbose: {
+          type: 'boolean',
+          description: 'Optional: Return full response without filtering (default: false)',
+        },
+      },
+      required: ['jobId'],
+    },
+  },
 ];

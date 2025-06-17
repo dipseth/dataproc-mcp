@@ -183,6 +183,13 @@ export const GetQueryResultsSchema = z.object({
   pageToken: z.string().max(1000, 'Page token too long').optional().describe('Pagination token'),
 });
 
+export const CancelDataprocJobSchema = z.object({
+  projectId: ProjectIdSchema.optional(),
+  region: RegionSchema.optional(),
+  jobId: JobIdSchema,
+  verbose: z.boolean().optional().default(false).describe('Return full response without filtering'),
+});
+
 export const SubmitDataprocJobSchema = z.object({
   projectId: ProjectIdSchema,
   region: RegionSchema,
