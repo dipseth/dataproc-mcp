@@ -140,6 +140,7 @@ async function createMCPTemplate() {
         "submit_dataproc_job",
         "get_job_status",
         "get_job_results",
+        "cancel_dataproc_job",
         "get_zeppelin_url"
       ],
       "env": {

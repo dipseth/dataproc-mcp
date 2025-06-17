@@ -8,6 +8,7 @@ type Operation = protos.google.longrunning.IOperation;
 import { getGcloudAccessTokenWithConfig } from '../config/credentials.js';
 import { getDataprocConfigFromYaml } from '../config/yaml.js';
 import { ClusterConfig } from '../types/cluster-config.js';
+import { deepMerge } from '../utils/object-utils.js';
 // For ESM compatibility with node-fetch
 import fetch from 'node-fetch';
 
@@ -185,7 +186,7 @@ export async function createClusterFromYaml(
       }
 
       if (overrides.labels) {
-        configData.labels = { ...configData.labels, ...overrides.labels };
+        configData.labels = deepMerge(configData.labels || {}, overrides.labels);
       }
     }
 

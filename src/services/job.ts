@@ -721,3 +721,124 @@ export async function getDataprocJobResults<T>(
 }
 
 // Removed deprecated processHiveOutput function - use JobOutputHandler.getJobOutput instead
+
+/**
+ * Cancel a running Dataproc job
+ */
+export async function cancelDataprocJob(options: {
+  projectId: string;
+  region: string;
+  jobId: string;
+}): Promise<{
+  success: boolean;
+  status: string;
+  message: string;
+  jobDetails?: any;
+}> {
+  const startTime = Date.now();
+  console.error(`[TIMING] cancelDataprocJob: Starting job cancellation`);
+  const { projectId, region, jobId } = options;
+
+  try {
+    // 1. Get current job status first
+    console.error(`[TIMING] cancelDataprocJob: Getting current job status`);
+    const currentJobStatus = await getDataprocJobStatus({ projectId, region, jobId });
+    const jobState = currentJobStatus.status?.state;
+
+    // Check if job is already in a terminal state
+    if (
+      jobState === protos.google.cloud.dataproc.v1.JobStatus.State.DONE ||
+      jobState === protos.google.cloud.dataproc.v1.JobStatus.State.ERROR ||
+      jobState === protos.google.cloud.dataproc.v1.JobStatus.State.CANCELLED
+    ) {
+      const stateName = protos.google.cloud.dataproc.v1.JobStatus.State[jobState];
+      const totalDuration = Date.now() - startTime;
+      console.error(`[TIMING] cancelDataprocJob: Job already terminal after ${totalDuration}ms`);
+
+      return {
+        success: true,
+        status: stateName,
+        message: `Job ${jobId} is already in a terminal state (${stateName}) and cannot be cancelled.`,
+        jobDetails: currentJobStatus,
+      };
+    }
+
+    // 2. Call Dataproc Cancel API
+    console.error(`[TIMING] cancelDataprocJob: Calling Dataproc cancel API`);
+    const authStartTime = Date.now();
+    const token = await getGcloudAccessTokenWithConfig();
+    const authDuration = Date.now() - authStartTime;
+
+    const url = `https://${region}-dataproc.googleapis.com/v1/projects/${projectId}/regions/${region}/jobs/${jobId}:cancel`;
+
+    const fetchStartTime = Date.now();
+    const response = await fetchWithTimeout(
+      url,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}), // Empty body for cancel API
+      },
+      30000 // 30 second timeout
+    );
+    const fetchDuration = Date.now() - fetchStartTime;
+
+    if (!response.ok) {
+      const totalDuration = Date.now() - startTime;
+      console.error(
+        `[TIMING] cancelDataprocJob: FAILED after ${totalDuration}ms (auth: ${authDuration}ms, fetch: ${fetchDuration}ms)`
+      );
+      const errorText = await response.text();
+
+      // Handle specific error cases
+      if (response.status === 404) {
+        return {
+          success: false,
+          status: 'NOT_FOUND',
+          message: `Job ${jobId} not found. Please verify the Job ID, Project ID, and Region.`,
+        };
+      }
+
+      throw new Error(`Failed to cancel Dataproc job ${jobId}: ${response.status} - ${errorText}`);
+    }
+
+    const parseStartTime = Date.now();
+    const result = (await response.json()) as protos.google.cloud.dataproc.v1.IJob;
+    const parseDuration = Date.now() - parseStartTime;
+    const totalDuration = Date.now() - startTime;
+
+    console.error(
+      `[TIMING] cancelDataprocJob: SUCCESS - auth: ${authDuration}ms, fetch: ${fetchDuration}ms, parse: ${parseDuration}ms, total: ${totalDuration}ms`
+    );
+
+    const resultStatus = result.status?.state
+      ? (protos.google.cloud.dataproc.v1.JobStatus.State[result.status.state] as string)
+      : 'UNKNOWN';
+
+    return {
+      success: true,
+      status: resultStatus,
+      message: `Cancellation request sent for job ${jobId}.`,
+      jobDetails: result,
+    };
+  } catch (error) {
+    const totalDuration = Date.now() - startTime;
+    console.error(`[TIMING] cancelDataprocJob: FAILED after ${totalDuration}ms`);
+    console.error('[ERROR] cancelDataprocJob: Failed to cancel job:', error);
+
+    if (error instanceof Error && error.message.includes('Not Found')) {
+      return {
+        success: false,
+        status: 'NOT_FOUND',
+        message: `Job ${jobId} not found. Please verify the Job ID, Project ID, and Region.`,
+      };
+    }
+
+    throw new Error(
+      `Failed to cancel Dataproc job: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  }
+}

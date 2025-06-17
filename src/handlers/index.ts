@@ -20,6 +20,7 @@ import {
   handleGetQueryResults,
   handleGetJobResults,
   handleCheckActiveJobs,
+  handleCancelDataprocJob,
 } from './job-handlers.js';
 import {
   handleListProfiles,
@@ -97,6 +98,8 @@ export async function handleToolCall(toolName: string, args: any, deps: AllHandl
       return handleGetJobResults(args, deps);
     case 'check_active_jobs':
       return handleCheckActiveJobs(args, deps);
+    case 'cancel_dataproc_job':
+      return handleCancelDataprocJob(args, deps);
 
     // Profile handlers
     case 'list_profiles':

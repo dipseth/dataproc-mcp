@@ -5,6 +5,7 @@
 
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { logger } from '../utils/logger.js';
+import { deepMerge } from '../utils/object-utils.js';
 import SecurityMiddleware from '../security/middleware.js';
 import {
   StartDataprocClusterSchema,
@@ -767,7 +768,7 @@ export async function handleCreateClusterFromYaml(args: any, deps: HandlerDepend
 
     // Apply overrides if provided
     if (overrides && typeof overrides === 'object') {
-      clusterConfig = { ...clusterConfig, ...overrides };
+      clusterConfig = deepMerge(clusterConfig, overrides);
     }
 
     // Use existing cluster creation logic with properly extracted config
@@ -824,7 +825,7 @@ export async function handleCreateClusterFromProfile(args: any, deps: HandlerDep
 
     // Apply overrides if provided
     if (overrides && typeof overrides === 'object') {
-      clusterConfig = { ...clusterConfig, ...overrides };
+      clusterConfig = deepMerge(clusterConfig, overrides);
     }
 
     // Use existing cluster creation logic

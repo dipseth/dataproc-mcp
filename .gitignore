@@ -131,3 +131,4 @@ dataproc-ops-test-report.json
 enhanced-prompt-demo.js
 test-spark-job.py
 verification-report.json
+state/dataproc-state.json
