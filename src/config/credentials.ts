@@ -8,6 +8,7 @@ import { GoogleAuth, OAuth2Client, Impersonated, AuthClient } from 'google-auth-
 import { ClusterControllerClient, JobControllerClient } from '@google-cloud/dataproc';
 import { execSync } from 'child_process';
 import { getServerConfig } from './server.js';
+import axios from 'axios';
 
 /**
  * Authentication cache to reduce overhead
@@ -28,6 +29,8 @@ export interface DataprocClientOptions {
   region?: string;
   keyFilename?: string;
   useApplicationDefault?: boolean;
+  clientId?: string;
+  clientSecret?: string;
 }
 
 /**
@@ -36,6 +39,7 @@ export interface DataprocClientOptions {
 export enum AuthStrategy {
   KEY_FILE = 'key_file',
   APPLICATION_DEFAULT = 'application_default',
+  OAUTH = 'oauth',
 }
 
 /**
@@ -45,7 +49,7 @@ export interface AuthResult {
   strategy: AuthStrategy;
   success: boolean;
   error?: string;
-  auth?: GoogleAuth;
+  auth?: GoogleAuth<AuthClient>; // Explicitly define the generic type
 }
 
 /**
@@ -125,6 +129,109 @@ export async function getGcloudAccessTokenWithConfig(): Promise<string> {
 }
 
 /**
+ * Initiates OAuth 2.0 device flow and returns an authenticated OAuth2Client
+ * @param clientId The OAuth 2.0 client ID
+ * @param clientSecret The OAuth 2.0 client secret
+ * @returns Authenticated OAuth2Client
+ */
+export async function getOAuth2Client(
+  clientId: string,
+  clientSecret: string
+): Promise<OAuth2Client> {
+  const startTime = Date.now();
+  console.error(`[TIMING] getOAuth2Client: Starting OAuth 2.0 device flow`);
+
+  const deviceAuthUrl = 'https://oauth2.googleapis.com/device/code';
+  const tokenUrl = 'https://oauth2.googleapis.com/token';
+  const scopes = ['https://www.googleapis.com/auth/cloud-platform'];
+
+  try {
+    // Step 1: Get device code and user code
+    const deviceCodeResponse = await axios.post(deviceAuthUrl, null, {
+      params: {
+        client_id: clientId,
+        scope: scopes.join(' '),
+      },
+    });
+
+    const { device_code, user_code, verification_url, interval } = deviceCodeResponse.data;
+
+    console.error(
+      `[INFO] getOAuth2Client: Please open the following URL in your browser to authorize: ${verification_url}`
+    );
+    console.error(`[INFO] getOAuth2Client: And enter the following code: ${user_code}`);
+
+    // Step 2: Poll for token
+    return new Promise((resolve, reject) => {
+      const pollInterval = setInterval(async () => {
+        try {
+          const tokenResponse = await axios.post(tokenUrl, null, {
+            params: {
+              client_id: clientId,
+              client_secret: clientSecret,
+              code: device_code,
+              grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+            },
+          });
+
+          const { access_token, refresh_token, id_token, expiry_date } = tokenResponse.data;
+
+          const oAuth2Client = new OAuth2Client(clientId, clientSecret);
+          oAuth2Client.setCredentials({
+            access_token,
+            refresh_token,
+            id_token,
+            expiry_date,
+          });
+
+          clearInterval(pollInterval);
+          const totalDuration = Date.now() - startTime;
+          console.error(
+            `[TIMING] getOAuth2Client: SUCCESS - token acquisition: ${totalDuration}ms`
+          );
+          console.error('[DEBUG] getOAuth2Client: OAuth 2.0 authentication successful');
+          resolve(oAuth2Client);
+        } catch (error: any) {
+          if (
+            error.response &&
+            error.response.data &&
+            error.response.data.error === 'authorization_pending'
+          ) {
+            // Authorization pending, continue polling
+            if (process.env.LOG_LEVEL === 'debug') {
+              console.error('[DEBUG] getOAuth2Client: Authorization pending...');
+            }
+          } else {
+            clearInterval(pollInterval);
+            const totalDuration = Date.now() - startTime;
+            console.error(`[TIMING] getOAuth2Client: FAILED after ${totalDuration}ms`);
+            console.error(
+              '[ERROR] getOAuth2Client: OAuth 2.0 authentication failed:',
+              error.response?.data || error.message
+            );
+            reject(
+              new Error(
+                `OAuth 2.0 authentication failed: ${error.response?.data?.error_description || error.message}`
+              )
+            );
+          }
+        }
+      }, interval * 1000); // Poll at the specified interval
+    });
+  } catch (error: any) {
+    const totalDuration = Date.now() - startTime;
+    console.error(`[TIMING] getOAuth2Client: FAILED after ${totalDuration}ms`);
+    console.error(
+      '[ERROR] getOAuth2Client: Failed to initiate OAuth 2.0 device flow:',
+      error.response?.data || error.message
+    );
+    throw new Error(
+      `Failed to initiate OAuth 2.0 device flow: ${error.response?.data?.error_description || error.message}`
+    );
+  }
+}
+
+/**
  * Creates an impersonated service account credential
  * @param targetServiceAccount The service account to impersonate
  * @param sourceCredentials Optional source credentials (defaults to ADC)
@@ -193,7 +300,7 @@ export async function createImpersonatedAuth(
 export async function createAuth(options: DataprocClientOptions = {}): Promise<AuthResult> {
   const startTime = Date.now();
   console.error(`[TIMING] createAuth: Starting authentication process`);
-  const { keyFilename, useApplicationDefault } = options;
+  const { keyFilename, useApplicationDefault, clientId, clientSecret } = options;
 
   // Get server configuration to check for impersonation settings
   let serverConfig;
@@ -212,7 +319,11 @@ export async function createAuth(options: DataprocClientOptions = {}): Promise<A
     useApplicationDefault: useApplicationDefault,
     impersonateServiceAccount: serverConfig?.authentication?.impersonateServiceAccount || 'NOT SET',
     fallbackKeyPath: serverConfig?.authentication?.fallbackKeyPath || 'NOT SET',
+    googleServiceAccountKeyPath:
+      serverConfig?.authentication?.googleServiceAccountKeyPath || 'NOT SET',
     preferImpersonation: serverConfig?.authentication?.preferImpersonation ?? 'NOT SET',
+    clientId: clientId ? 'provided' : 'not provided',
+    clientSecret: clientSecret ? 'provided' : 'not provided',
   });
 
   // Strategy 0: Service Account Impersonation (highest priority if preferred)
@@ -278,7 +389,7 @@ export async function createAuth(options: DataprocClientOptions = {}): Promise<A
       return {
         strategy: AuthStrategy.KEY_FILE,
         success: true,
-        auth: googleAuth,
+        auth: googleAuth as GoogleAuth<AuthClient>, // Type assertion
       };
     } catch (error) {
       const impersonationFailDuration = Date.now() - startTime;
@@ -290,14 +401,103 @@ export async function createAuth(options: DataprocClientOptions = {}): Promise<A
     }
   }
 
-  // Strategy 1: Use configured key file (explicit configuration only - no environment fallback)
+  // Strategy 1: OAuth 2.0 Device Flow (if clientId and clientSecret are provided)
+  if (clientId && clientSecret) {
+    try {
+      const oauthStartTime = Date.now();
+      console.error(`[TIMING] createAuth: Attempting OAuth 2.0 device flow authentication`);
+      if (process.env.LOG_LEVEL === 'debug') {
+        console.error('[DEBUG] createAuth: Using OAuth 2.0 device flow authentication');
+      }
+
+      const oAuth2Client = await getOAuth2Client(clientId, clientSecret);
+      const oauthTotal = Date.now() - oauthStartTime;
+      const totalDuration = Date.now() - startTime;
+
+      console.error(
+        `[TIMING] createAuth: OAuth 2.0 auth SUCCESS - oauth total: ${oauthTotal}ms, overall total: ${totalDuration}ms`
+      );
+      if (process.env.LOG_LEVEL === 'debug') {
+        console.error('[DEBUG] createAuth: OAuth 2.0 authentication successful');
+      }
+
+      // Wrap the OAuth2Client in a GoogleAuth instance
+      const googleAuth = new GoogleAuth({
+        authClient: oAuth2Client,
+      });
+
+      return {
+        strategy: AuthStrategy.OAUTH,
+        success: true,
+        auth: googleAuth as GoogleAuth<AuthClient>,
+      };
+    } catch (error) {
+      const oauthFailDuration = Date.now() - startTime;
+      console.error(`[TIMING] createAuth: OAuth 2.0 strategy FAILED after ${oauthFailDuration}ms`);
+      console.warn(`[WARN] createAuth: OAuth 2.0 strategy failed: ${error}`);
+    }
+  }
+
+  // Strategy 2: Use Google service account key file (highest priority for server operations)
+  const googleServiceAccountKeyPath = serverConfig?.authentication?.googleServiceAccountKeyPath;
+  if (googleServiceAccountKeyPath && !useApplicationDefault) {
+    try {
+      const keyFileStartTime = Date.now();
+      console.error(
+        `[TIMING] createAuth: Attempting Google service account key file authentication: ${googleServiceAccountKeyPath}`
+      );
+      if (process.env.LOG_LEVEL === 'debug') {
+        console.error(
+          `[DEBUG] createAuth: Using Google service account key file authentication: ${googleServiceAccountKeyPath}`
+        );
+      }
+
+      const authCreateStartTime = Date.now();
+      const auth = new GoogleAuth({
+        keyFilename: googleServiceAccountKeyPath,
+        scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+      });
+      const authCreateDuration = Date.now() - authCreateStartTime;
+      console.error(`[TIMING] createAuth: GoogleAuth instance created in ${authCreateDuration}ms`);
+
+      // Test the auth by getting a token
+      const tokenTestStartTime = Date.now();
+      console.error(`[TIMING] createAuth: Testing token acquisition...`);
+      await auth.getAccessToken();
+      const tokenTestDuration = Date.now() - tokenTestStartTime;
+      const keyFileTotal = Date.now() - keyFileStartTime;
+
+      console.error(
+        `[TIMING] createAuth: Google service account key file auth SUCCESS - token test: ${tokenTestDuration}ms, total: ${keyFileTotal}ms`
+      );
+      if (process.env.LOG_LEVEL === 'debug') {
+        console.error(
+          '[DEBUG] createAuth: Google service account key file authentication successful'
+        );
+      }
+
+      return {
+        strategy: AuthStrategy.KEY_FILE,
+        success: true,
+        auth: auth as GoogleAuth<AuthClient>,
+      };
+    } catch (error) {
+      const keyFileFailDuration = Date.now() - startTime;
+      console.error(
+        `[TIMING] createAuth: Google service account key file strategy FAILED after ${keyFileFailDuration}ms`
+      );
+      console.warn(`[WARN] createAuth: Google service account key file strategy failed: ${error}`);
+    }
+  }
+
+  // Strategy 3: Use configured key file (explicit configuration only - no environment fallback)
   const keyPath = keyFilename || serverConfig?.authentication?.fallbackKeyPath;
   if (keyPath && !useApplicationDefault) {
     try {
       const keyFileStartTime = Date.now();
-      console.error(`[TIMING] createAuth: Attempting key file authentication: ${keyPath}`);
+      console.error(`[TIMING] createAuth: Attempting fallback key file authentication: ${keyPath}`);
       if (process.env.LOG_LEVEL === 'debug') {
-        console.error(`[DEBUG] createAuth: Using key file authentication: ${keyPath}`);
+        console.error(`[DEBUG] createAuth: Using fallback key file authentication: ${keyPath}`);
       }
 
       const authCreateStartTime = Date.now();
@@ -316,25 +516,27 @@ export async function createAuth(options: DataprocClientOptions = {}): Promise<A
       const keyFileTotal = Date.now() - keyFileStartTime;
 
       console.error(
-        `[TIMING] createAuth: Key file auth SUCCESS - token test: ${tokenTestDuration}ms, total: ${keyFileTotal}ms`
+        `[TIMING] createAuth: Fallback key file auth SUCCESS - token test: ${tokenTestDuration}ms, total: ${keyFileTotal}ms`
       );
       if (process.env.LOG_LEVEL === 'debug') {
-        console.error('[DEBUG] createAuth: Key file authentication successful');
+        console.error('[DEBUG] createAuth: Fallback key file authentication successful');
       }
 
       return {
         strategy: AuthStrategy.KEY_FILE,
         success: true,
-        auth,
+        auth: auth as GoogleAuth<AuthClient>,
       };
     } catch (error) {
       const keyFileFailDuration = Date.now() - startTime;
-      console.error(`[TIMING] createAuth: Key file strategy FAILED after ${keyFileFailDuration}ms`);
-      console.warn(`[WARN] createAuth: Key file strategy failed: ${error}`);
+      console.error(
+        `[TIMING] createAuth: Fallback key file strategy FAILED after ${keyFileFailDuration}ms`
+      );
+      console.warn(`[WARN] createAuth: Fallback key file strategy failed: ${error}`);
     }
   }
 
-  // Strategy 2: Application Default Credentials (only if explicitly enabled)
+  // Strategy 4: Application Default Credentials (only if explicitly enabled)
   if (serverConfig?.authentication?.useApplicationDefaultFallback) {
     try {
       const adcStartTime = Date.now();
@@ -372,7 +574,7 @@ export async function createAuth(options: DataprocClientOptions = {}): Promise<A
       return {
         strategy: AuthStrategy.APPLICATION_DEFAULT,
         success: true,
-        auth,
+        auth: auth as GoogleAuth<AuthClient>,
       };
     } catch (error) {
       const totalFailDuration = Date.now() - startTime;
