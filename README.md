@@ -152,7 +152,7 @@ npx @dipseth/dataproc-mcp-server@latest
 | Tool | Description | Smart Defaults | Key Features |
 |------|-------------|----------------|--------------|
 | `submit_hive_query` | Submit Hive queries to clusters | ✅ 70% fewer params | Async support, timeouts |
-| `submit_dataproc_job` | Submit Spark/PySpark/Presto jobs | ✅ 75% fewer params | Multi-engine support |
+| `submit_dataproc_job` | Submit Spark/PySpark/Presto jobs | ✅ 75% fewer params | Multi-engine support, **Local file staging** |
 | `get_job_status` | Get job execution status | ✅ JobID only needed | Real-time monitoring |
 | `get_job_results` | Get job outputs and results | ✅ Auto-pagination | Result formatting |
 | `get_query_status` | Get Hive query status | ✅ Minimal params | Query tracking |

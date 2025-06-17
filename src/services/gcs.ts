@@ -513,4 +513,161 @@ export class GCSService {
       return 'text';
     }
   }
+
+  /**
+   * Upload a local file to GCS
+   * @param localPath Path to the local file
+   * @param gcsUri Target GCS URI (gs://bucket/path)
+   * @returns Promise that resolves when upload is complete
+   */
+  async uploadFile(localPath: string, gcsUri: string): Promise<void> {
+    const { bucket, path } = this.parseUri(gcsUri);
+
+    console.log(`[DEBUG] GCSService.uploadFile: Uploading ${localPath} to ${gcsUri}`);
+
+    // Check if local file exists
+    const fs = await import('fs/promises');
+    try {
+      await fs.access(localPath);
+    } catch (error) {
+      throw new GCSError(
+        GCSErrorTypes.NOT_FOUND,
+        `Local file not found: ${localPath}`,
+        error as Error
+      );
+    }
+
+    // Read the local file
+    let fileBuffer: Buffer;
+    try {
+      fileBuffer = await fs.readFile(localPath);
+      console.log(
+        `[DEBUG] GCSService.uploadFile: Read ${fileBuffer.length} bytes from ${localPath}`
+      );
+    } catch (error) {
+      throw new GCSError(
+        GCSErrorTypes.DOWNLOAD_FAILED,
+        `Failed to read local file: ${localPath}`,
+        error as Error
+      );
+    }
+
+    // Get token for the service account from the server configuration
+    let token: string;
+    try {
+      token = await getGcloudAccessTokenWithConfig();
+      console.log(
+        `[DEBUG] GCSService.uploadFile: Successfully obtained token for upload to ${gcsUri}`
+      );
+    } catch (error) {
+      console.error(`[DEBUG] GCSService.uploadFile: Failed to get token for ${gcsUri}:`, error);
+      throw error;
+    }
+
+    // Use fetch API directly with the token
+    const fetch = (await import('node-fetch')).default;
+
+    // Convert GCS URI to HTTP URL for upload
+    // Format: gs://bucket/path -> https://storage.googleapis.com/upload/storage/v1/b/bucket/o?uploadType=media&name=path
+    const encodedPath = encodeURIComponent(path);
+    const url = `https://storage.googleapis.com/upload/storage/v1/b/${bucket}/o?uploadType=media&name=${encodedPath}`;
+
+    console.log(`[DEBUG] GCSService.uploadFile: Uploading to URL: ${url}`);
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/octet-stream',
+          'Content-Length': fileBuffer.length.toString(),
+        },
+        body: fileBuffer,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP error ${response.status}: ${errorText}`);
+      }
+
+      console.log(`[DEBUG] GCSService.uploadFile: Successfully uploaded ${localPath} to ${gcsUri}`);
+    } catch (error: unknown) {
+      console.error(
+        `[DEBUG] GCSService.uploadFile: Error uploading ${localPath} to ${gcsUri}:`,
+        error
+      );
+      throw new GCSError(
+        GCSErrorTypes.DOWNLOAD_FAILED, // Reusing this error type for upload failures
+        `Failed to upload ${localPath} to ${gcsUri}`,
+        error as Error
+      );
+    }
+  }
+
+  /**
+   * Discover the staging bucket from an existing Dataproc cluster
+   * @param projectId GCP Project ID
+   * @param region GCP Region
+   * @param clusterName Cluster name to get staging bucket from
+   * @returns Promise that resolves to the staging bucket name
+   */
+  async discoverStagingBucketFromCluster(
+    projectId: string,
+    region: string,
+    clusterName: string
+  ): Promise<string> {
+    console.log(
+      `[DEBUG] GCSService.discoverStagingBucketFromCluster: Getting staging bucket from cluster ${clusterName}`
+    );
+
+    // Get token for the service account from the server configuration
+    let token: string;
+    try {
+      token = await getGcloudAccessTokenWithConfig();
+    } catch (error) {
+      console.error(
+        `[DEBUG] GCSService.discoverStagingBucketFromCluster: Failed to get token:`,
+        error
+      );
+      throw error;
+    }
+
+    const fetch = (await import('node-fetch')).default;
+
+    // Get cluster configuration to extract staging bucket
+    try {
+      const clusterUrl = `https://${region}-dataproc.googleapis.com/v1/projects/${projectId}/regions/${region}/clusters/${clusterName}`;
+      const clusterResponse = await fetch(clusterUrl, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
+      });
+
+      if (clusterResponse.ok) {
+        const clusterData = (await clusterResponse.json()) as {
+          config?: { configBucket?: string };
+        };
+        if (clusterData.config?.configBucket) {
+          console.log(
+            `[DEBUG] GCSService.discoverStagingBucketFromCluster: Found staging bucket: ${clusterData.config.configBucket}`
+          );
+          return clusterData.config.configBucket;
+        }
+      }
+    } catch (error) {
+      console.warn(
+        `[DEBUG] GCSService.discoverStagingBucketFromCluster: Could not get cluster config:`,
+        error
+      );
+    }
+
+    // Fallback to default naming pattern
+    const defaultBucket = `${projectId}-dataproc-staging`;
+    console.log(
+      `[DEBUG] GCSService.discoverStagingBucketFromCluster: Using fallback staging bucket: ${defaultBucket}`
+    );
+    return defaultBucket;
+  }
 }

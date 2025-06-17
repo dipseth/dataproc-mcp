@@ -27,6 +27,7 @@ test-formatted-output.js
 old-tests/
 .nyc_output/
 coverage/
+tests/prompts/
 
 # IDE and editor files
 .vscode/
@@ -116,3 +117,17 @@ scripts/copy-config-to-desktop.sh
 src/services/qdrantpayloadexample.json
 tests/manual/state/*
 dataproc-tools-test-results*.json
+config/state/transformers-cache/Xenova/all-MiniLM-L6-v2/config.json
+config/state/transformers-cache/Xenova/all-MiniLM-L6-v2/tokenizer_config.json
+config/state/transformers-cache/Xenova/all-MiniLM-L6-v2/tokenizer.json
+config/state/transformers-cache/Xenova/all-MiniLM-L6-v2/onnx/model_quantized.onnx
+test-dynamic-functions.js
+.issue-analysis/*
+state/**
+examples/local-file-staging/test-basedirectory-resolution.js
+config/state/embedding-training-data.json
+sample-enhanced-prompts.js
+dataproc-ops-test-report.json
+enhanced-prompt-demo.js
+test-spark-job.py
+verification-report.json

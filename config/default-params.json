@@ -20,6 +20,19 @@
       "description": "Default GCP zone",
       "required": false,
       "defaultValue": "us-central1-a"
+    },
+    {
+      "name": "stagingBucket",
+      "type": "string",
+      "description": "Override staging bucket (auto-discovered if not set)",
+      "required": false
+    },
+    {
+      "name": "baseDirectory",
+      "type": "string",
+      "description": "Base directory for relative file paths",
+      "required": false,
+      "defaultValue": "."
     }
   ],
   "environments": [

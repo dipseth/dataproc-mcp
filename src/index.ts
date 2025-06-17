@@ -11,13 +11,16 @@
 // Import MCP stdio handler first to ensure all console output is properly handled
 import './utils/mcp-stdio-handler.js';
 
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
   ListResourcesRequestSchema,
   ReadResourceRequestSchema,
+  ListPromptsRequestSchema,
+  GetPromptRequestSchema,
+  CompleteRequestSchema,
   ErrorCode,
   McpError,
 } from '@modelcontextprotocol/sdk/types.js';
@@ -45,6 +48,18 @@ import { getStartupStatus } from './services/startup-status.js';
 // Import tool definitions and handlers
 import { allTools } from './tools/index.js';
 import { handleToolCall, AllHandlerDependencies } from './handlers/index.js';
+import {
+  handleListPrompts,
+  handleGetPrompt,
+  handleCompletion,
+  initializeEnhancedPromptGenerator,
+} from './handlers/prompt-handlers.js';
+import { registerDataprocPrompts } from './prompts/dataproc-prompts.js';
+import { initializePromptTemplatesService } from './services/prompt-templates.js';
+import { DataprocPromptGenerator } from './prompts/prompt-generator.js';
+import { KnowledgeReindexer } from './services/knowledge-reindexer.js';
+import { EnhancedPromptDynamicFunctions } from './prompts/dynamic-functions.js';
+import { ENHANCED_PROMPT_TEMPLATES } from './prompts/enhanced-prompt-templates.js';
 
 // Import services
 import { ProfileManager } from './services/profile.js';
@@ -63,6 +78,8 @@ import {
   initializeTemplatingIntegration,
   getTemplatingIntegration,
 } from './services/templating-integration.js';
+import { ParameterInjector } from './services/parameter-injector.js';
+import { DynamicResolver } from './services/dynamic-resolver.js';
 
 // Parse command line arguments
 const args = process.argv.slice(2);
@@ -92,6 +109,10 @@ let qdrantManager: QdrantManager | undefined;
 let semanticQueryService: SemanticQueryService | undefined;
 let knowledgeIndexer: KnowledgeIndexer | undefined;
 let templatingIntegration: TemplatingIntegration | undefined;
+let parameterInjector: ParameterInjector | undefined;
+let dynamicResolver: DynamicResolver | undefined;
+let enhancedPromptGenerator: DataprocPromptGenerator | undefined;
+let knowledgeReindexer: KnowledgeReindexer | undefined;
 
 /**
  * Get the global KnowledgeIndexer instance
@@ -171,13 +192,107 @@ async function initializeResponseOptimization() {
     defaultParamManager,
     profileManager
   );
+
+  // Initialize prompt templates service
+  initializePromptTemplatesService(defaultParamManager, profileManager);
+
+  // Initialize parameter injector and dynamic resolver
+  parameterInjector = new ParameterInjector(
+    {
+      validation: {
+        enableStrictMode: true,
+        allowUnknownParameters: false,
+        validateTypes: true,
+      },
+      performance: {
+        enableCaching: true,
+        cacheTimeoutMs: 300000, // 5 minutes
+      },
+    },
+    defaultParamManager,
+    profileManager
+  );
+
+  dynamicResolver = new DynamicResolver({
+    enableCaching: true,
+    maxCacheSize: 500,
+    defaultTtlMs: 600000, // 10 minutes
+    executionTimeoutMs: 10000, // 10 seconds
+  });
+
+  // Initialize enhanced prompt system
+  try {
+    // Create dynamic functions executor
+    const dynamicFunctions = new EnhancedPromptDynamicFunctions(
+      knowledgeIndexer,
+      jobTracker,
+      knowledgeIndexer?.getQdrantService()
+    );
+
+    // Create enhanced prompt generator with proper dependencies
+    enhancedPromptGenerator = new DataprocPromptGenerator(
+      {
+        enableTemplating: true,
+        enableKnowledgeIntegration: !!knowledgeIndexer,
+        enableProfileIntegration: !!profileManager,
+        cacheConfig: {
+          enableCaching: true,
+          defaultTtlMs: 300000, // 5 minutes
+          maxCacheSize: 1000,
+        },
+        dynamicResolution: {
+          executeAtGenerationTime: true,
+          timeoutMs: 10000, // 10 seconds
+        },
+        reindexing: {
+          enableScheduledReindexing: true,
+          intervalMs: 3600000, // 1 hour
+          batchSize: 100,
+          maxRetries: 3,
+        },
+      },
+      {
+        templatingIntegration,
+        knowledgeIndexer,
+        profileManager,
+        parameterInjector,
+        dynamicResolver,
+        defaultParameterManager: defaultParamManager,
+      }
+    );
+
+    // Load enhanced prompt templates
+    for (const template of ENHANCED_PROMPT_TEMPLATES) {
+      enhancedPromptGenerator.registerTemplate(template);
+    }
+
+    // Initialize knowledge reindexer
+    if (knowledgeIndexer) {
+      knowledgeReindexer = new KnowledgeReindexer(knowledgeIndexer, {
+        intervalMs: 3600000, // 1 hour
+        batchSize: 100,
+        maxRetries: 3,
+      });
+
+      knowledgeReindexer.startScheduledReindexing();
+      logger.info('Knowledge reindexer started successfully');
+    }
+
+    // Initialize enhanced prompt generator in handlers
+    initializeEnhancedPromptGenerator(enhancedPromptGenerator);
+
+    logger.info('Enhanced prompt system initialized successfully');
+  } catch (error) {
+    logger.error('Failed to initialize enhanced prompt system:', error);
+    // Continue with legacy prompt system
+  }
 }
 
 // Get startup status
 const startupStatus = getStartupStatus();
 
 // Create the server
-const server = new Server(
+const server = new McpServer(
   {
     name: 'dataproc-server',
     version: packageJson.version,
@@ -191,15 +306,18 @@ const server = new Server(
   }
 );
 
+// Register Dataproc prompts using the new SDK approach
+registerDataprocPrompts(server);
+
 // Define all available tools
-server.setRequestHandler(ListToolsRequestSchema, async () => {
+server.server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: allTools,
   };
 });
 
 // List available resources
-server.setRequestHandler(ListResourcesRequestSchema, async () => {
+server.server.setRequestHandler(ListResourcesRequestSchema, async () => {
   try {
     const resources: Array<{
       uri: string;
@@ -282,7 +400,7 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => {
 });
 
 // Read resource content
-server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+server.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
   const uri = request.params.uri;
 
   try {
@@ -373,7 +491,7 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
 });
 
 // Handle tool calls
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
+server.server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const toolName = request.params.name;
   const args = request.params.arguments;
 
@@ -409,6 +527,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       isError: true,
     };
   }
+});
+
+// Handle prompt requests
+server.server.setRequestHandler(ListPromptsRequestSchema, async () => {
+  return await handleListPrompts();
+});
+
+server.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+  return await handleGetPrompt(request.params);
+});
+
+server.server.setRequestHandler(CompleteRequestSchema, async (request) => {
+  return await handleCompletion(request.params);
 });
 
 // Main function to start the server
@@ -449,6 +580,18 @@ async function main() {
 // Graceful shutdown handling
 process.on('SIGINT', async () => {
   console.error('[INFO] MCP Server: Received SIGINT, shutting down gracefully...');
+  if (enhancedPromptGenerator) {
+    await enhancedPromptGenerator.shutdown();
+  }
+  if (knowledgeReindexer) {
+    await knowledgeReindexer.shutdown();
+  }
+  if (parameterInjector) {
+    await parameterInjector.shutdown();
+  }
+  if (dynamicResolver) {
+    await dynamicResolver.shutdown();
+  }
   if (asyncQueryPoller) {
     await asyncQueryPoller.shutdown();
   }
@@ -460,6 +603,18 @@ process.on('SIGINT', async () => {
 
 process.on('SIGTERM', async () => {
   console.error('[INFO] MCP Server: Received SIGTERM, shutting down gracefully...');
+  if (enhancedPromptGenerator) {
+    await enhancedPromptGenerator.shutdown();
+  }
+  if (knowledgeReindexer) {
+    await knowledgeReindexer.shutdown();
+  }
+  if (parameterInjector) {
+    await parameterInjector.shutdown();
+  }
+  if (dynamicResolver) {
+    await dynamicResolver.shutdown();
+  }
   if (asyncQueryPoller) {
     await asyncQueryPoller.shutdown();
   }
