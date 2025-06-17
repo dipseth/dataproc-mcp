@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- semantic-release-changelog -->
 
+## [4.5.0](https://github.com/dipseth/dataproc-mcp/compare/v4.4.0...v4.5.0) (2025-06-17)
+
+
+### 🚀 Features
+
+* **jobs:** Add cancel_dataproc_job tool with comprehensive job cancellation support ([#34](https://github.com/dipseth/dataproc-mcp/issues/34)) ([fe9257a](https://github.com/dipseth/dataproc-mcp/commit/fe9257aeb31878c36d2f8909e46806de9d9e327f))
+
+
+### 📚 Documentation
+
+* update documentation for v4.4.0 ([0a09a80](https://github.com/dipseth/dataproc-mcp/commit/0a09a80a18b58d6d78c1b5a4b4305715af40dc9b))
+
 ## [4.4.0](https://github.com/dipseth/dataproc-mcp/compare/v4.3.0...v4.4.0) (2025-06-17)
 
 
