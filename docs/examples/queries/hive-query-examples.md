@@ -148,9 +148,11 @@ The MCP server supports automatic local file staging for PySpark jobs, allowing 
 
 ```json
 {
+  "projectId": "your-project-id",
+  "region": "us-central1",
+  "clusterName": "pyspark-cluster",
   "tool": "submit_dataproc_job",
   "arguments": {
-    "clusterName": "pyspark-cluster",
     "jobType": "pyspark",
     "jobConfig": {
       "mainPythonFileUri": "{@./test-spark-job.py}",
@@ -164,9 +166,11 @@ The MCP server supports automatic local file staging for PySpark jobs, allowing 
 
 ```json
 {
+  "projectId": "your-project-id",
+  "region": "us-central1",
+  "clusterName": "analytics-cluster",
   "tool": "submit_dataproc_job",
   "arguments": {
-    "clusterName": "analytics-cluster",
     "jobType": "pyspark",
     "jobConfig": {
       "mainPythonFileUri": "{@./scripts/data_processor.py}",
