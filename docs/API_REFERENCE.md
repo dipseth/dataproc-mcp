@@ -288,7 +288,7 @@ Submits a Hive query to a Dataproc cluster.
 
 ### 8. submit_dataproc_job
 
-Submits a generic Dataproc job (Hive, Spark, PySpark, etc.).
+Submits a generic Dataproc job (Hive, Spark, PySpark, etc.) with enhanced local file staging support.
 
 **Parameters:**
 - `projectId` (string, required): GCP project ID
@@ -297,6 +297,92 @@ Submits a generic Dataproc job (Hive, Spark, PySpark, etc.).
 - `jobType` (string, required): Type of job (hive, spark, pyspark, presto, pig, hadoop)
 - `jobConfig` (object, required): Job configuration object
 - `async` (boolean, optional): Whether to submit asynchronously
+
+**🔧 LOCAL FILE STAGING:**
+
+The `baseDirectory` parameter in the local file staging system controls how relative file paths are resolved when using the template syntax `{@./relative/path}` or direct relative paths in job configurations.
+
+**Configuration:**
+The `baseDirectory` parameter is configured in `config/default-params.json` with a default value of `"."`, which refers to the **current working directory** where the MCP server process is running (typically the project root directory).
+
+**Path Resolution Logic:**
+
+1. **Absolute Paths**: If a file path is already absolute (starts with `/`), it's used as-is
+2. **Relative Path Resolution**: For relative paths, the system:
+   - Gets the baseDirectory value from configuration (default: `"."`)
+   - Resolves the baseDirectory if it's relative:
+     - First tries to use `DATAPROC_CONFIG_PATH` environment variable's directory
+     - Falls back to `process.cwd()` (current working directory)
+   - Combines baseDirectory with the relative file path
+
+**Template Syntax Support:**
+```typescript
+// Template syntax - recommended approach
+{@./relative/path/to/file.py}
+{@../parent/directory/file.jar}
+{@subdirectory/file.sql}
+
+// Direct relative paths (also supported)
+"./relative/path/to/file.py"
+"../parent/directory/file.jar"
+"subdirectory/file.sql"
+```
+
+**Practical Examples:**
+
+*Example 1: Default Configuration (`baseDirectory: "."`)*
+- **Template**: `{@./test-spark-job.py}`
+- **Resolution**: `/Users/srivers/Documents/Cline/MCP/dataproc-server/test-spark-job.py`
+
+*Example 2: Config Directory Base*
+- **Configuration**: `baseDirectory: "config"`
+- **Template**: `{@./my-script.py}`
+- **Resolution**: `/Users/srivers/Documents/Cline/MCP/dataproc-server/config/my-script.py`
+
+*Example 3: Absolute Base Directory*
+- **Configuration**: `baseDirectory: "/absolute/path/to/files"`
+- **Template**: `{@./script.py}`
+- **Resolution**: `/absolute/path/to/files/script.py`
+
+**Environment Variable Influence:**
+The `DATAPROC_CONFIG_PATH` environment variable affects path resolution:
+- **If set**: The directory containing the config file becomes the reference point for relative `baseDirectory` values
+- **If not set**: The current working directory (`process.cwd()`) is used as the reference point
+
+**Best Practices:**
+1. **Use Template Syntax**: Prefer `{@./file.py}` over direct relative paths for clarity
+2. **Organize Files Relative to Project Root**: With the default `baseDirectory: "."`, organize your files relative to the project root
+3. **Consider Absolute Paths for External Files**: For files outside the project structure, use absolute paths
+
+**Supported File Extensions:**
+- `.py` - Python files for PySpark jobs
+- `.jar` - Java/Scala JAR files for Spark jobs
+- `.sql` - SQL files for various job types
+- `.R` - R script files for SparkR jobs
+
+**Troubleshooting:**
+- **File Not Found**: Check that the resolved absolute path exists
+- **Permission Denied**: Ensure the MCP server has read access to the file
+- **Unexpected Path Resolution**: Verify your `baseDirectory` setting and current working directory
+
+**Debug Path Resolution:**
+Enable debug logging to see the actual path resolution:
+```bash
+DEBUG=dataproc-mcp:* node build/index.js
+```
+
+**Configuration Override:**
+You can override the `baseDirectory` in your environment-specific configuration:
+```json
+{
+  "environment": "development",
+  "parameters": {
+    "baseDirectory": "./dev-scripts"
+  }
+}
+```
+
+Files are automatically staged to GCS and cleaned up after job completion.
 
 **Example - Spark Job:**
 ```json
@@ -309,7 +395,7 @@ Submits a generic Dataproc job (Hive, Spark, PySpark, etc.).
     "jobType": "spark",
     "jobConfig": {
       "mainClass": "com.example.SparkApp",
-      "jarFileUris": ["gs://my-bucket/spark-app.jar"],
+      "jarFileUris": ["{@./spark-app.jar}"],
       "args": ["--input", "gs://my-bucket/input/", "--output", "gs://my-bucket/output/"],
       "properties": {
         "spark.executor.memory": "4g",
@@ -321,7 +407,29 @@ Submits a generic Dataproc job (Hive, Spark, PySpark, etc.).
 }
 ```
 
-**Example - PySpark Job:**
+**Example - PySpark Job with Local File Staging:**
+```json
+{
+  "tool": "submit_dataproc_job",
+  "arguments": {
+    "projectId": "my-project-123",
+    "region": "us-central1",
+    "clusterName": "pyspark-cluster",
+    "jobType": "pyspark",
+    "jobConfig": {
+      "mainPythonFileUri": "{@./test-spark-job.py}",
+      "pythonFileUris": ["{@./utils/helper.py}", "{@/absolute/path/library.py}"],
+      "args": ["--date", "2024-01-01"],
+      "properties": {
+        "spark.sql.adaptive.enabled": "true",
+        "spark.sql.adaptive.coalescePartitions.enabled": "true"
+      }
+    }
+  }
+}
+```
+
+**Example - Traditional PySpark Job (GCS URIs):**
 ```json
 {
   "tool": "submit_dataproc_job",
@@ -342,6 +450,19 @@ Submits a generic Dataproc job (Hive, Spark, PySpark, etc.).
   }
 }
 ```
+
+**Local File Staging Process:**
+1. **Detection**: Local file paths are automatically detected using template syntax
+2. **Staging**: Files are uploaded to the cluster's staging bucket with unique names
+3. **Transformation**: Job config is updated with GCS URIs
+4. **Execution**: Job runs with staged files
+5. **Cleanup**: Staged files are automatically cleaned up after job completion
+
+**Supported File Extensions:**
+- `.py` - Python files for PySpark jobs
+- `.jar` - Java/Scala JAR files for Spark jobs
+- `.sql` - SQL files for various job types
+- `.R` - R script files for SparkR jobs
 
 ### 9. get_job_status
 

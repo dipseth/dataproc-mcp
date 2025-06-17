@@ -85,12 +85,21 @@ export const knowledgeTools = [
       '• `region:value` - Search by region\n' +
       '• `toolName:value` - Search by tool name\n' +
       '• `type:value` - Search by data type\n\n' +
-      '**Examples:**\n' +
-      '• `query: "jobId:20d1092f-9aa8-4f4d-b4e3-bfbdbdd8d431", includeRawDocument: true` - Find specific job\n' +
-      '• `query: "clusterName:my-cluster hive"` - Jobs on specific cluster with hive\n' +
-      '• `query: "projectId:my-project type:query_result"` - Query results from project\n' +
-      '• `query: "machine learning clusters", type: "clusters"` - Semantic cluster search\n' +
-      '• `query: "toolName:submit_hive_query SHOW"` - Hive queries containing "SHOW"',
+      '**🔍 RESULT DISCOVERY EXAMPLES:**\n' +
+      '• `jobId:abc123-def456 contentType:query_results` - Get actual Hive/Spark results\n' +
+      '• `jobId:xyz789 type:query_result includeRawDocument:true` - Complete job output\n' +
+      '• `clusterName:analytics-prod contentType:query_results` - All results from cluster\n' +
+      '• `projectId:data-warehouse contentType:query_results` - Project query outputs\n\n' +
+      '**🎯 COMMON PATTERNS:**\n' +
+      '• Find table counts: `jobId:YOUR_ID contentType:query_results` → ["42857"]\n' +
+      '• Get schema info: `DESCRIBE TABLE contentType:query_results` → column details\n' +
+      '• Check job status: `jobId:YOUR_ID type:job` → execution metadata\n' +
+      '• Cluster analysis: `clusterName:spark-cluster machine types` → hardware info\n\n' +
+      '**🚀 POWER USER TIPS:**\n' +
+      '• Combine tags: `jobId:123 clusterName:prod contentType:query_results`\n' +
+      '• Time-based: `toolName:submit_hive_query 2024-12 contentType:query_results`\n' +
+      '• Error hunting: `ERROR contentType:query_results` → failed query outputs\n' +
+      '• Performance: `EXPLAIN contentType:query_results` → query plans',
     inputSchema: {
       type: 'object',
       properties: {
