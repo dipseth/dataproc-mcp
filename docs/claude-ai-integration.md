@@ -1242,7 +1242,6 @@ Special thanks to:
 ### Production Deployment
 - **[Production Deployment Guide](PRODUCTION_DEPLOYMENT.md)** - Production setup
 - **[CI/CD Guide](CI_CD_GUIDE.md)** - Automated deployment
-- **[Monitoring Guide](docs/monitoring.md)** - Production monitoring
 
 ### Community and Support
 - **[GitHub Issues](https://github.com/dipseth/dataproc-mcp/issues)** - Bug reports and features
