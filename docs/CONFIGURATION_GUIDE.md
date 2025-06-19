@@ -182,54 +182,7 @@ profiles/
 
 ## Environment-Independent Authentication
 
-### Service Account Impersonation Configuration
-
-The MCP server now supports **environment-independent authentication** through service account impersonation, eliminating dependencies on environment variables like `GOOGLE_APPLICATION_CREDENTIALS`.
-
-#### Required Configuration
-```json
-{
-  "authentication": {
-    "impersonateServiceAccount": "target-service-account@project.iam.gserviceaccount.com",
-    "fallbackKeyPath": "/absolute/path/to/source-service-account-key.json",
-    "preferImpersonation": true,
-    "useApplicationDefaultFallback": false
-  }
-}
-```
-
-#### Configuration Parameters
-- **`impersonateServiceAccount`**: Target service account to impersonate for all operations
-- **`fallbackKeyPath`**: **REQUIRED** - Absolute path to source service account key file
-- **`preferImpersonation`**: Whether to prefer impersonation over direct key file usage
-- **`useApplicationDefaultFallback`**: Whether to allow Application Default Credentials as final fallback
-
-#### Environment Independence Benefits
-- ✅ **No Environment Variable Dependencies**: System ignores `GOOGLE_APPLICATION_CREDENTIALS`
-- ✅ **Predictable Behavior**: Authentication determined by configuration file only
-- ✅ **Fail-Fast Configuration**: Missing configuration results in clear error messages
-- ✅ **Production Ready**: Works consistently across different environments
-
-#### Authentication Strategy Priority
-1. **Service Account Impersonation** (if configured and preferred)
-2. **Configured Key File** (explicit configuration only)
-3. **Application Default Credentials** (only if explicitly enabled)
-
-### Example: Multi-Environment Setup
-```json
-{
-  "dataproc-server-dev": {
-    "env": {
-      "MCP_CONFIG": "{\"authentication\":{\"impersonateServiceAccount\":\"dev-sa@dev-project.iam.gserviceaccount.com\",\"fallbackKeyPath\":\"/path/to/dev-key.json\",\"preferImpersonation\":true,\"useApplicationDefaultFallback\":false}}"
-    }
-  },
-  "dataproc-server-prod": {
-    "env": {
-      "MCP_CONFIG": "{\"authentication\":{\"impersonateServiceAccount\":\"prod-sa@prod-project.iam.gserviceaccount.com\",\"fallbackKeyPath\":\"/path/to/prod-key.json\",\"preferImpersonation\":true,\"useApplicationDefaultFallback\":false}}"
-    }
-  }
-}
-```
+For detailed information on environment-independent authentication and service account impersonation, refer to the [Authentication Implementation Guide](AUTHENTICATION_IMPLEMENTATION_GUIDE.md).
 
 ## Best Practices
 
@@ -245,10 +198,7 @@ The MCP server now supports **environment-independent authentication** through s
 
 ### ✅ Authentication Best Practices
 
-1. **Use service account impersonation** instead of direct key file authentication
-2. **Set `useApplicationDefaultFallback: false`** to ensure environment independence
-3. **Use absolute paths** for `fallbackKeyPath` to avoid path resolution issues
-4. **Test configuration** in different environments to ensure consistency
+For detailed authentication best practices, refer to the [Authentication Implementation Guide](AUTHENTICATION_IMPLEMENTATION_GUIDE.md).
 
 ### ❌ Avoid
 

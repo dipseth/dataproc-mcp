@@ -547,7 +547,7 @@ export const TOOL_TEMPLATE_MAPPING: Record<string, string[]> = {
   submit_dataproc_job: ['gcp-cluster-base'],
   get_job_status: ['gcp-job-status'],
   get_job_results: ['gcp-job-results'],
-  get_zeppelin_url: ['gcp-cluster-zeppelin'],
+  get_cluster_endpoints: ['gcp-cluster-zeppelin'],
   check_active_jobs: ['gcp-jobs'],
 
   // Profile management tools (2 tools)

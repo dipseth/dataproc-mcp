@@ -49,6 +49,8 @@
     "stop": "node scripts/stop-server.js",
     "restart": "npm run stop && npm run start",
     "setup": "node scripts/setup.js",
+    "ssl:generate": "node scripts/generate-ssl-cert.js",
+    "ssl:test": "node scripts/test-trusted-certificates.js",
     "validate": "node scripts/validate-config.js",
     "validate:examples": "node scripts/validate-examples.js",
     "docs:generate": "node scripts/generate-docs.js",
@@ -144,11 +146,14 @@
     "@modelcontextprotocol/sdk": "^1.12.3",
     "@qdrant/js-client-rest": "^1.8.2",
     "@types/uri-templates": "^0.1.34",
+    "@types/ws": "^8.18.1",
+    "axios": "^1.10.0",
     "google-auth-library": "^9.14.2",
     "js-yaml": "^4.1.0",
     "node-fetch": "^3.3.2",
     "table": "^6.9.0",
     "uri-templates": "^0.2.0",
+    "ws": "^8.18.2",
     "zod": "^3.22.5"
   },
   "devDependencies": {

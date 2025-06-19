@@ -218,9 +218,9 @@ export const GetJobResultsSchema = z.object({
     .describe('Maximum number of rows to display'),
 });
 
-export const GetZeppelinUrlSchema = z.object({
-  projectId: ProjectIdSchema,
-  region: RegionSchema,
+export const GetClusterEndpointsSchema = z.object({
+  projectId: ProjectIdSchema.optional(),
+  region: RegionSchema.optional(),
   clusterName: ClusterNameSchema,
 });
 

@@ -127,8 +127,9 @@ Create a custom config file (e.g., `~/.config/dataproc/server.json`):
   "projectId": "your-gcp-project",
   "region": "us-central1",
   "authentication": {
-    "type": "service-account",
-    "keyFilename": "/path/to/service-account.json"
+    "type": "service-account-impersonation",
+    "impersonateServiceAccount": "dataproc-worker@your-project.iam.gserviceaccount.com",
+    "fallbackKeyPath": "/path/to/source-key.json"
   },
   "defaults": {
     "clusterConfig": {
@@ -165,7 +166,8 @@ Create a custom config file (e.g., `~/.config/dataproc/server.json`):
         "LOG_LEVEL": "warn",
         "DATAPROC_CONFIG_PATH": "/etc/dataproc/production.json",
         "GOOGLE_APPLICATION_CREDENTIALS": "/etc/gcp/service-account.json"
-      }
+      },
+      "alwaysAllow": []
     }
   }
 }
@@ -181,7 +183,8 @@ Create a custom config file (e.g., `~/.config/dataproc/server.json`):
       "env": {
         "LOG_LEVEL": "debug",
         "DATAPROC_CONFIG_PATH": "~/.config/dataproc/dev.json"
-      }
+      },
+      "alwaysAllow": []
     }
   }
 }

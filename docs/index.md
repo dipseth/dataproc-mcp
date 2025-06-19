@@ -79,10 +79,7 @@ my-company-analytics-prod-1234:
 
 ### Authentication Methods
 
-1. **Service Account Impersonation** (Recommended)
-2. **Direct Service Account Key**
-3. **Application Default Credentials**
-4. **Hybrid Authentication** with fallbacks
+For detailed information on authentication methods, refer to the [Authentication Implementation Guide](AUTHENTICATION_IMPLEMENTATION_GUIDE.md).
 
 ### Environment Variables
 

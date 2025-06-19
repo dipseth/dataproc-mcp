@@ -84,6 +84,44 @@ npx @dipseth/dataproc-mcp-server@latest
    dataproc-mcp
    ```
 
+### 🌐 **Claude.ai Web App Compatibility**
+
+**✅ PRODUCTION-READY: Full Claude.ai Integration with HTTPS Tunneling & OAuth**
+
+The Dataproc MCP Server now provides **complete Claude.ai web app compatibility** with a working solution that includes all 22 MCP tools!
+
+#### 🚀 Working Solution (Tested & Verified)
+
+**Terminal 1 - Start MCP Server:**
+```bash
+DATAPROC_CONFIG_PATH=config/github-oauth-server.json npm start -- --http --oauth --port 8080
+```
+
+**Terminal 2 - Start Cloudflare Tunnel:**
+```bash
+cloudflared tunnel --url https://localhost:8443 --origin-server-name localhost --no-tls-verify
+```
+
+**Result**: Claude.ai can see and use all tools successfully! 🎉
+
+#### Key Features:
+- ✅ **Complete Tool Access** - All 22 MCP tools available in Claude.ai
+- ✅ **HTTPS Tunneling** - Cloudflare tunnel for secure external access
+- ✅ **OAuth Authentication** - GitHub OAuth for secure authentication
+- ✅ **Trusted Certificates** - No browser warnings or connection issues
+- ✅ **WebSocket Support** - Full WebSocket compatibility with Claude.ai
+- ✅ **Production Ready** - Tested and verified working solution
+
+#### Quick Setup:
+1. **Setup GitHub OAuth** (5 minutes)
+2. **Generate SSL certificates**: `npm run ssl:generate`
+3. **Start services** (2 terminals as shown above)
+4. **Connect Claude.ai** to your tunnel URL
+
+> **📖 Complete Guide:** See [`docs/claude-ai-integration.md`](docs/claude-ai-integration.md) for detailed setup instructions, troubleshooting, and advanced features.
+
+> **📖 Certificate Setup:** See [`docs/trusted-certificates.md`](docs/trusted-certificates.md) for SSL certificate configuration.
+
 ## ✨ Features
 
 ### 🎯 **Core Capabilities**

@@ -16,6 +16,7 @@ import { JobTracker } from './job-tracker.js';
 import { logger } from '../utils/logger.js';
 import { setInterval } from 'node:timers/promises';
 import { EventEmitter } from 'node:events';
+import type { KnowledgeIndexer } from './knowledge-indexer.js';
 
 export interface QueryInfo {
   jobId: string;
@@ -66,6 +67,7 @@ export class AsyncQueryPoller extends EventEmitter {
   private cleanupController: AbortController | null = null;
   private activeQueries: Map<string, QueryInfo> = new Map();
   private jobTracker: JobTracker;
+  private knowledgeIndexer: KnowledgeIndexer | null = null;
   private config: AsyncQueryPollerConfig;
   private isPolling: boolean = false;
   private concurrentPolls: number = 0;
@@ -74,9 +76,14 @@ export class AsyncQueryPoller extends EventEmitter {
   private errorCount: number = 0;
   private lastPollTime: string = '';
 
-  constructor(jobTracker: JobTracker, config: AsyncQueryPollerConfig = {}) {
+  constructor(
+    jobTracker: JobTracker,
+    config: AsyncQueryPollerConfig = {},
+    knowledgeIndexer?: KnowledgeIndexer
+  ) {
     super();
     this.jobTracker = jobTracker;
+    this.knowledgeIndexer = knowledgeIndexer || null;
     this.config = {
       intervalMs: parseInt(process.env.POLL_INTERVAL_MS || '30000'),
       maxRetries: parseInt(process.env.MAX_RETRIES || '3'),
@@ -94,6 +101,14 @@ export class AsyncQueryPoller extends EventEmitter {
       this.errorCount++;
       logger.error('AsyncQueryPoller: Unhandled error:', error);
     });
+  }
+
+  /**
+   * Set the KnowledgeIndexer for auto-indexing job results (can be called after construction)
+   */
+  setKnowledgeIndexer(knowledgeIndexer: KnowledgeIndexer): void {
+    this.knowledgeIndexer = knowledgeIndexer;
+    logger.debug('AsyncQueryPoller: KnowledgeIndexer set for auto-indexing job results');
   }
 
   /**
@@ -478,6 +493,15 @@ export class AsyncQueryPoller extends EventEmitter {
               finalStatus: newStatus,
               completedAt: new Date().toISOString(),
             });
+
+            // Auto-retrieve and index job results if KnowledgeIndexer is available
+            this.autoIndexJobResults(
+              jobId,
+              job.projectId,
+              job.region,
+              job.toolName || 'unknown',
+              duration
+            );
           } else {
             logger.warn(`⚠️ AsyncQueryPoller: Job ${jobId} finished with status ${newStatus}`);
           }
@@ -598,5 +622,88 @@ export class AsyncQueryPoller extends EventEmitter {
         lastPoll: this.lastPollTime,
       },
     };
+  }
+
+  /**
+   * Auto-retrieve and index job results when a job completes
+   */
+  private async autoIndexJobResults(
+    jobId: string,
+    projectId: string,
+    region: string,
+    toolName: string,
+    duration?: number
+  ): Promise<void> {
+    if (!this.knowledgeIndexer) {
+      logger.debug(
+        `AsyncQueryPoller: No KnowledgeIndexer available for auto-indexing job ${jobId}`
+      );
+      return;
+    }
+
+    try {
+      logger.info(`🔄 AsyncQueryPoller: Auto-retrieving results for completed job ${jobId}`);
+
+      // Import and call get_job_results
+      const { getDataprocJobResults } = await import('./job.js');
+
+      const jobResults = await getDataprocJobResults({
+        projectId,
+        region,
+        jobId,
+        maxDisplayRows: 100, // Get more rows for better indexing
+      });
+
+      logger.debug(`AsyncQueryPoller: Retrieved results for job ${jobId}:`, {
+        hasResults: !!jobResults,
+        resultType: typeof jobResults,
+      });
+
+      // Prepare job data for indexing
+      const jobData = {
+        jobId,
+        jobType: this.inferJobTypeFromToolName(toolName),
+        projectId,
+        region,
+        clusterName: 'unknown', // Will be resolved from job details if possible
+        status: 'COMPLETED',
+        submissionTime: new Date().toISOString(),
+        duration,
+        results: jobResults,
+      };
+
+      // Try to get cluster name from job tracker
+      const trackedJob = this.jobTracker.getJob(jobId);
+      if (trackedJob?.clusterName) {
+        jobData.clusterName = trackedJob.clusterName;
+      }
+
+      // Index the job results
+      await this.knowledgeIndexer.indexJobSubmission(jobData);
+
+      logger.info(
+        `✅ AsyncQueryPoller: Successfully indexed results for job ${jobId} (${jobData.jobType})`
+      );
+    } catch (error) {
+      logger.warn(
+        `⚠️ AsyncQueryPoller: Failed to auto-index results for job ${jobId}:`,
+        error instanceof Error ? error.message : String(error)
+      );
+      // Don't throw - this is a best-effort enhancement
+    }
+  }
+
+  /**
+   * Infer job type from tool name for better categorization
+   */
+  private inferJobTypeFromToolName(toolName: string): string {
+    const lowerToolName = toolName.toLowerCase();
+
+    if (lowerToolName.includes('hive')) return 'hive';
+    if (lowerToolName.includes('spark')) return 'spark';
+    if (lowerToolName.includes('pyspark')) return 'pyspark';
+    if (lowerToolName.includes('presto')) return 'presto';
+
+    return 'other';
   }
 }

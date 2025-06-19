@@ -19,6 +19,8 @@ The Dataproc MCP Server provides 17 comprehensive tools organized into four cate
 
 ## Authentication
 
+For detailed authentication setup and best practices, refer to the [Authentication Implementation Guide](AUTHENTICATION_IMPLEMENTATION_GUIDE.md).
+
 All tools support intelligent default parameters. When `projectId` and `region` are not provided, the server automatically uses configured defaults from `config/default-params.json`.
 
 ## Cluster Management Tools

@@ -571,8 +571,9 @@ HEALTH_CHECK_ENABLED=true
   "projectId": "my-production-project",
   "region": "us-central1",
   "authentication": {
-    "type": "service_account",
-    "keyFile": "/app/config/service-account.json"
+    "type": "service_account_impersonation",
+    "impersonateServiceAccount": "dataproc-worker@your-project.iam.gserviceaccount.com",
+    "fallbackKeyPath": "/app/config/source-key.json"
   },
   "responseOptimization": {
     "enabled": true,

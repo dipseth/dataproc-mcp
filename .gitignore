@@ -22,6 +22,9 @@ state/dataproc-state.json
 config/server.json
 config/default-params.json
 
+# SSL certificates (development only)
+certs/
+
 # Test files and results
 test-formatted-output.js
 old-tests/
@@ -132,3 +135,7 @@ enhanced-prompt-demo.js
 test-spark-job.py
 verification-report.json
 state/dataproc-state.json
+config/*.json
+release-checklist.md
+test-oauth-endpoints.sh
+test-oauth-protocol-fix.js

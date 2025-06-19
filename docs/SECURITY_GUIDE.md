@@ -60,39 +60,7 @@ Built-in rate limiting prevents abuse and ensures fair resource usage:
 
 ### 🔐 Credential Management
 
-Comprehensive credential validation and protection:
-
-#### Service Account Key Validation
-
-- **Format Validation**: Ensures proper JSON structure and required fields
-- **Permission Checks**: Validates file permissions (warns if world-readable)
-- **Age Monitoring**: Warns about keys older than 90 days
-- **Content Sanitization**: Removes sensitive data from logs
-
-#### Best Practices
-
-1. **Use Service Account Impersonation**
-   ```json
-   {
-     "authentication": {
-       "impersonateServiceAccount": "dataproc-sa@project.iam.gserviceaccount.com",
-       "fallbackKeyPath": "/secure/path/to/source-key.json",
-       "preferImpersonation": true
-     }
-   }
-   ```
-
-2. **Secure Key Storage**
-   ```bash
-   # Set restrictive permissions
-   chmod 600 /path/to/service-account-key.json
-   chown dataproc-user:dataproc-group /path/to/service-account-key.json
-   ```
-
-3. **Regular Key Rotation**
-   - Rotate keys every 90 days
-   - Monitor key age with built-in warnings
-   - Use automated rotation where possible
+For detailed information on credential management, including service account impersonation, key validation, and best practices, refer to the [Authentication Implementation Guide](AUTHENTICATION_IMPLEMENTATION_GUIDE.md).
 
 ### 📊 Audit Logging
 

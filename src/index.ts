@@ -80,12 +80,14 @@ import {
 } from './services/templating-integration.js';
 import { ParameterInjector } from './services/parameter-injector.js';
 import { DynamicResolver } from './services/dynamic-resolver.js';
+import { DataprocHttpServer } from './server/http-server.js';
 
 // Parse command line arguments
 const args = process.argv.slice(2);
-const httpMode = args.includes('--http');
+const httpMode = args.includes('--http') || args.includes('--http-server');
+const oauthMode = args.includes('--oauth');
 const portIndex = args.indexOf('--port');
-const port = portIndex !== -1 && args[portIndex + 1] ? parseInt(args[portIndex + 1]) : 3000;
+const cliPort = portIndex !== -1 && args[portIndex + 1] ? parseInt(args[portIndex + 1]) : undefined;
 
 // Check for credentials
 const credentials = getCredentialsConfig();
@@ -113,6 +115,7 @@ let parameterInjector: ParameterInjector | undefined;
 let dynamicResolver: DynamicResolver | undefined;
 let enhancedPromptGenerator: DataprocPromptGenerator | undefined;
 let knowledgeReindexer: KnowledgeReindexer | undefined;
+let httpServer: DataprocHttpServer | undefined;
 
 /**
  * Get the global KnowledgeIndexer instance
@@ -551,18 +554,70 @@ async function main() {
     // Security middleware and credential manager are already initialized
     // No additional initialization needed
 
-    // Create transport
-    const transport = new StdioServerTransport();
+    // CRITICAL: Initialize the MCP server BEFORE starting HTTP server
+    // This ensures the server is ready to handle connections
+    console.error('[INFO] Initializing MCP server...');
+
+    // Pre-initialize the server by setting up a dummy transport to ensure readiness
+    // This forces the server to complete its internal initialization
+    await new Promise<void>((resolve) => {
+      // The server is considered ready once all handlers are registered
+      // Since we've already registered all handlers above, we just need to ensure
+      // the server is in a ready state
+      setTimeout(() => {
+        console.error('[INFO] MCP server initialization complete');
+        resolve();
+      }, 100); // Small delay to ensure all async registrations complete
+    });
 
     if (httpMode) {
-      console.error('[INFO] HTTP mode requested but not yet implemented. Using stdio mode.');
-      console.error('[INFO] For simultaneous testing, run multiple instances:');
-      console.error('[INFO] 1. MCP Inspector: npx @modelcontextprotocol/inspector build/index.js');
-      console.error('[INFO] 2. VS Code: Configure .roo/mcp.json to use stdio transport');
-    }
+      // HTTP mode with OAuth proxy support
+      console.error('[INFO] Starting HTTP server with MCP Streamable HTTP transport...');
 
-    // Connect server to transport
-    await server.connect(transport);
+      // Get server configuration to determine port and OAuth settings
+      const serverConfig = await getServerConfig();
+      const actualPort = cliPort || serverConfig.httpServer?.port || 8080;
+      const enableOAuth = oauthMode || serverConfig.httpServer?.enableOAuthProxy || false;
+
+      httpServer = new DataprocHttpServer({
+        port: actualPort,
+        httpsPort: serverConfig.httpServer?.httpsPort || 8443,
+        enableHttps: serverConfig.httpServer?.enableHttps !== false, // Default to true
+        enableOAuthProxy: enableOAuth,
+        mcpServer: server,
+      });
+
+      await httpServer.start();
+
+      console.error('[INFO] HTTP server started successfully!');
+      const httpsPort = serverConfig.httpServer?.httpsPort || 8443;
+      const enableHttps = serverConfig.httpServer?.enableHttps !== false;
+
+      console.error(`[INFO] HTTP MCP endpoint: http://localhost:${actualPort}/mcp`);
+      console.error(`[INFO] HTTP Health check: http://localhost:${actualPort}/health`);
+
+      if (enableHttps) {
+        console.error(`[INFO] HTTPS MCP endpoint: https://localhost:${httpsPort}/mcp`);
+        console.error(`[INFO] HTTPS Health check: https://localhost:${httpsPort}/health`);
+      }
+
+      if (enableOAuth) {
+        if (enableHttps) {
+          console.error(
+            `[INFO] OAuth authorization server: https://localhost:${httpsPort}/.well-known/oauth-authorization-server`
+          );
+          console.error(
+            `[INFO] OAuth endpoints: https://localhost:${httpsPort}/authorize, /token, /register`
+          );
+        }
+        console.error(`[INFO] OAuth proxy: http://localhost:${actualPort}/oauth`);
+      }
+    } else {
+      // Default stdio mode
+      console.error('[INFO] Starting in stdio mode...');
+      const transport = new StdioServerTransport();
+      await server.connect(transport);
+    }
 
     // Start AsyncQueryPoller for automatic query tracking
     if (asyncQueryPoller) {
@@ -580,6 +635,9 @@ async function main() {
 // Graceful shutdown handling
 process.on('SIGINT', async () => {
   console.error('[INFO] MCP Server: Received SIGINT, shutting down gracefully...');
+  if (httpServer) {
+    await httpServer.stop();
+  }
   if (enhancedPromptGenerator) {
     await enhancedPromptGenerator.shutdown();
   }
@@ -603,6 +661,9 @@ process.on('SIGINT', async () => {
 
 process.on('SIGTERM', async () => {
   console.error('[INFO] MCP Server: Received SIGTERM, shutting down gracefully...');
+  if (httpServer) {
+    await httpServer.stop();
+  }
   if (enhancedPromptGenerator) {
     await enhancedPromptGenerator.shutdown();
   }

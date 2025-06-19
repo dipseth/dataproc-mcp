@@ -10,7 +10,7 @@ import {
   handleListClusters,
   handleGetCluster,
   handleDeleteCluster,
-  handleGetZeppelinUrl,
+  handleGetClusterEndpoints,
 } from './cluster-handlers.js';
 import {
   handleSubmitHiveQuery,
@@ -80,8 +80,8 @@ export async function handleToolCall(toolName: string, args: any, deps: AllHandl
       return handleDeleteCluster(args, deps);
     case 'list_tracked_clusters':
       return handleListTrackedClusters(args, deps);
-    case 'get_zeppelin_url':
-      return handleGetZeppelinUrl(args, deps);
+    case 'get_cluster_endpoints':
+      return handleGetClusterEndpoints(args, deps);
 
     // Job handlers
     case 'submit_hive_query':
@@ -158,7 +158,7 @@ export function getSupportedToolNames(): string[] {
  */
 export const handlerSummary = {
   total: getSupportedToolNames().length,
-  cluster: 8, // Added create_cluster_from_yaml, create_cluster_from_profile, get_zeppelin_url
+  cluster: 8, // Added create_cluster_from_yaml, create_cluster_from_profile, get_cluster_endpoints
   job: 7, // Added submit_dataproc_job, get_job_status, get_job_results
   profile: 2,
   knowledge: 4,

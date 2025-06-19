@@ -38,6 +38,12 @@ export interface AuthenticationConfig {
   fallbackKeyPath?: string;
 
   /**
+   * Google service account key file path for server-side operations
+   * Optional - if not provided, server will rely on user-driven authentication
+   */
+  googleServiceAccountKeyPath?: string;
+
+  /**
    * Fallback service account for elevated permissions (e.g., cluster deletion)
    * Used when the primary service account lacks sufficient permissions
    */
@@ -64,6 +70,96 @@ export interface AuthenticationConfig {
    * @default true
    */
   useApplicationDefaultFallback?: boolean;
+
+  /**
+   * Whether to enable OAuth proxy integration for enterprise SSO
+   * @default false
+   */
+  useOAuthProxy?: boolean;
+
+  /**
+   * Path to a JSON file containing the OAuth 2.0 Client ID and Client Secret
+   * for the "Web application" type client used by the OAuth proxy.
+   * If provided, `oauthProxyClientId` and `oauthProxyClientSecret` will be loaded from this file.
+   */
+  oauthClientKeyPath?: string;
+
+  /**
+   * OAuth proxy endpoints configuration
+   */
+  oauthProxyEndpoints?: {
+    authorizationUrl: string;
+    tokenUrl: string;
+    revocationUrl?: string;
+  };
+
+  /**
+   * OAuth proxy client ID
+   * Can be explicitly set or loaded from `oauthClientKeyPath`.
+   */
+  oauthProxyClientId?: string;
+
+  /**
+   * OAuth proxy client secret
+   * Can be explicitly set or loaded from `oauthClientKeyPath`.
+   */
+  oauthProxyClientSecret?: string;
+
+  /**
+   * OAuth proxy redirect URIs
+   */
+  oauthProxyRedirectUris?: string[];
+
+  /**
+   * OAuth provider type
+   * @default 'google'
+   */
+  oauthProvider?: 'google' | 'github';
+
+  /**
+   * GitHub OAuth configuration
+   */
+  githubOAuth?: {
+    clientId: string;
+    clientSecret: string;
+    redirectUri: string;
+    scopes?: string[];
+  };
+}
+
+/**
+ * HTTP server configuration
+ */
+export interface HttpServerConfig {
+  /**
+   * Port for HTTP server
+   * @default 8080
+   */
+  port?: number;
+
+  /**
+   * Port for HTTPS server
+   * @default 8443
+   */
+  httpsPort?: number;
+
+  /**
+   * Whether to enable HTTPS
+   * @default true
+   */
+  enableHttps?: boolean;
+
+  /**
+   * Whether to enable OAuth proxy
+   * @default false
+   */
+  enableOAuthProxy?: boolean;
+
+  /**
+   * Host to bind to
+   * @default "localhost"
+   */
+  host?: string;
 }
 
 /**
@@ -84,6 +180,11 @@ export interface ServerConfig {
    * Authentication configuration
    */
   authentication?: AuthenticationConfig;
+
+  /**
+   * HTTP server configuration
+   */
+  httpServer?: HttpServerConfig;
 }
 
 // Default configuration with absolute paths
@@ -98,6 +199,14 @@ const DEFAULT_CONFIG: ServerConfig = {
   },
   authentication: {
     impersonateServiceAccount: undefined,
+    useOAuthProxy: false, // Default to false
+  },
+  httpServer: {
+    port: 8080, // Default to 8080 to match VS Code expectation
+    httpsPort: 8443, // Default HTTPS port
+    enableHttps: true, // Enable HTTPS by default for OAuth compliance
+    enableOAuthProxy: false,
+    host: 'localhost',
   },
 };
 
@@ -137,6 +246,9 @@ export async function getServerConfig(configPath?: string): Promise<ServerConfig
   );
   console.error(
     `[DIAGNOSTIC] DATAPROC_CONFIG_PATH env var: ${process.env.DATAPROC_CONFIG_PATH ? `"${process.env.DATAPROC_CONFIG_PATH}"` : 'undefined'}`
+  );
+  console.error(
+    `[DEBUG] Value of process.env.DATAPROC_CONFIG_PATH: ${process.env.DATAPROC_CONFIG_PATH}`
   );
   console.error(`[DIAGNOSTIC] Default config path: "${path.join(APP_ROOT, 'config/server.json')}"`);
 
@@ -198,6 +310,10 @@ export async function getServerConfig(configPath?: string): Promise<ServerConfig
           ...DEFAULT_CONFIG.authentication,
           ...mcpConfig.authentication,
         },
+        httpServer: {
+          ...DEFAULT_CONFIG.httpServer,
+          ...mcpConfig.httpServer,
+        },
       };
       if (process.env.LOG_LEVEL === 'debug')
         console.error(`[DEBUG] Using default config (no file found at ${filePath})`);
@@ -215,7 +331,7 @@ export async function getServerConfig(configPath?: string): Promise<ServerConfig
     console.error(`[DIAGNOSTIC] Config contains keys: [${Object.keys(config).join(', ')}]`);
 
     // Merge with default config, then MCP config, then file config (priority order)
-    const mergedConfig = {
+    const mergedConfig: ServerConfig = {
       profileManager: {
         ...DEFAULT_CONFIG.profileManager,
         ...mcpConfig.profileManager,
@@ -231,7 +347,68 @@ export async function getServerConfig(configPath?: string): Promise<ServerConfig
         ...mcpConfig.authentication,
         ...config.authentication,
       },
+      httpServer: {
+        ...DEFAULT_CONFIG.httpServer,
+        ...mcpConfig.httpServer,
+        ...config.httpServer,
+      },
     };
+
+    // Load OAuth client ID and secret from file if oauthClientKeyPath is provided
+    if (mergedConfig.authentication?.oauthClientKeyPath) {
+      try {
+        const oauthClientKeyPath = path.resolve(
+          APP_ROOT,
+          mergedConfig.authentication.oauthClientKeyPath
+        );
+        console.error(
+          `[DIAGNOSTIC] Loading OAuth client credentials from: "${oauthClientKeyPath}"`
+        );
+        const oauthClientJson = await fs.readFile(oauthClientKeyPath, 'utf8');
+        const oauthClientData = JSON.parse(oauthClientJson);
+
+        // Check for the "installed" property (for "Other" client type)
+        if (
+          oauthClientData.installed &&
+          oauthClientData.installed.client_id &&
+          oauthClientData.installed.client_secret
+        ) {
+          mergedConfig.authentication.oauthProxyClientId = oauthClientData.installed.client_id;
+          mergedConfig.authentication.oauthProxyClientSecret =
+            oauthClientData.installed.client_secret;
+          console.error(
+            `[DIAGNOSTIC] Successfully loaded OAuth client ID and secret from file (nested under "installed").`
+          );
+        }
+        // Check for the "web" property (for "Web application" client type)
+        else if (
+          oauthClientData.web &&
+          oauthClientData.web.client_id &&
+          oauthClientData.web.client_secret
+        ) {
+          mergedConfig.authentication.oauthProxyClientId = oauthClientData.web.client_id;
+          mergedConfig.authentication.oauthProxyClientSecret = oauthClientData.web.client_secret;
+          console.error(
+            `[DIAGNOSTIC] Successfully loaded OAuth client ID and secret from file (nested under "web").`
+          );
+        }
+        // Fallback for non-nested structure (e.g., if user provides a simplified JSON)
+        else if (oauthClientData.client_id && oauthClientData.client_secret) {
+          mergedConfig.authentication.oauthProxyClientId = oauthClientData.client_id;
+          mergedConfig.authentication.oauthProxyClientSecret = oauthClientData.client_secret;
+          console.error(
+            `[DIAGNOSTIC] Successfully loaded OAuth client ID and secret from file (at root).`
+          );
+        } else {
+          console.warn(
+            `[WARN] OAuth client key file "${oauthClientKeyPath}" does not contain client_id and client_secret (neither at root, nor nested under "web" or "installed").`
+          );
+        }
+      } catch (error) {
+        console.error(`[ERROR] Failed to load OAuth client credentials from file: ${error}`);
+        console.warn(`[WARN] OAuth proxy might not function correctly without client credentials.`);
+      }
+    }
 
     console.error(`[DIAGNOSTIC] ===== Configuration Resolution Summary =====`);
     console.error(`[DIAGNOSTIC] Configuration loaded successfully from: ${configSource}`);
@@ -252,6 +429,24 @@ export async function getServerConfig(configPath?: string): Promise<ServerConfig
     }
     if (mergedConfig.authentication?.region) {
       console.error(`[DIAGNOSTIC] Default region: "${mergedConfig.authentication.region}"`);
+    }
+    if (mergedConfig.authentication?.useOAuthProxy) {
+      console.error(`[DIAGNOSTIC] OAuth Proxy Enabled: YES`);
+      if (mergedConfig.authentication.oauthProxyEndpoints?.authorizationUrl) {
+        console.error(
+          `[DIAGNOSTIC] OAuth Proxy Auth URL: "${mergedConfig.authentication.oauthProxyEndpoints.authorizationUrl}"`
+        );
+      }
+      if (mergedConfig.authentication.oauthProxyClientId) {
+        console.error(
+          `[DIAGNOSTIC] OAuth Proxy Client ID: "${mergedConfig.authentication.oauthProxyClientId}"`
+        );
+      }
+      if (mergedConfig.authentication.oauthClientKeyPath) {
+        console.error(
+          `[DIAGNOSTIC] OAuth Client Key Path: "${mergedConfig.authentication.oauthClientKeyPath}"`
+        );
+      }
     }
     console.error(`[DIAGNOSTIC] ================================================`);
 
@@ -285,6 +480,10 @@ export async function getServerConfig(configPath?: string): Promise<ServerConfig
       authentication: {
         ...DEFAULT_CONFIG.authentication,
         ...mcpConfig.authentication,
+      },
+      httpServer: {
+        ...DEFAULT_CONFIG.httpServer,
+        ...mcpConfig.httpServer,
       },
     };
   }

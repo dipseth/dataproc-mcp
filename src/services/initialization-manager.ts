@@ -232,6 +232,12 @@ export class InitializationManager {
         status: 'OPERATIONAL',
         details: 'Collection ready for real data',
       });
+
+      // Set KnowledgeIndexer on AsyncQueryPoller for auto-indexing
+      if (this.services.asyncQueryPoller) {
+        this.services.asyncQueryPoller.setKnowledgeIndexer(this.services.knowledgeIndexer);
+        logger.info('🔗 AsyncQueryPoller: KnowledgeIndexer integration enabled for auto-indexing');
+      }
     } catch (error) {
       startupStatus.updateComponent('Knowledge Indexer', {
         status: 'FAILED',

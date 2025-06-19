@@ -1,0 +1,21 @@
+{
+  "profileManager": {
+    "rootConfigPath": "./profiles",
+    "profileScanInterval": 300000
+  },
+  "clusterTracker": {
+    "stateFilePath": "./state/dataproc-state.json",
+    "stateSaveInterval": 60000
+  },
+  "authentication": {
+    "impersonateServiceAccount": "your-service-account@project.iam.gserviceaccount.com",
+    "useOAuthProxy": false,
+    "projectId": "your-default-project-id",
+    "region": "us-central1"
+  },
+  "httpServer": {
+    "port": 8080,
+    "enableOAuthProxy": false,
+    "host": "localhost"
+  }
+}

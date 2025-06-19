@@ -1,10 +1,9 @@
-#!/usr/bin/env node
-
 /**
  * Test the modern Transformers.js embedding service
  */
 
-import { TransformersEmbeddingService } from '../../../build/services/transformers-embeddings.js';
+import { expect } from 'chai';
+import { TransformersEmbeddingService } from '../../../src/services/transformers-embeddings.js';
 
 interface TestClusterData {
   clusterName: string;
@@ -24,92 +23,101 @@ interface TestClusterData {
   [key: string]: unknown;
 }
 
-async function testTransformersEmbeddings(): Promise<void> {
-  console.log('🤖 **Testing Transformers.js Embedding Service**\n');
+describe('TransformersEmbeddingService', () => {
+  let embeddingService: TransformersEmbeddingService;
+  let testClusterData: TestClusterData;
 
-  const embeddingService = new TransformersEmbeddingService();
-
-  // Test cluster data similar to what we get from GCP - using proper types
-  const testClusterData: TestClusterData = {
-    clusterName: 'test-pandas-cluster',
-    projectId: 'test-project',
-    region: 'us-central1',
-    config: {
-      softwareConfig: {
-        properties: {
-          'dataproc:pip.packages': 'pandas==1.3.5,numpy==1.21.6,scikit-learn==1.0.2,matplotlib==3.5.1'
+  beforeEach(() => {
+    embeddingService = new TransformersEmbeddingService();
+    
+    // Test cluster data similar to what we get from GCP - using proper types
+    testClusterData = {
+      clusterName: 'test-pandas-cluster',
+      projectId: 'test-project',
+      region: 'us-central1',
+      config: {
+        softwareConfig: {
+          properties: {
+            'dataproc:pip.packages': 'pandas==1.3.5,numpy==1.21.6,scikit-learn==1.0.2,matplotlib==3.5.1'
+          },
+          optionalComponents: ['ZEPPELIN', 'JUPYTER']
         },
-        optionalComponents: ['ZEPPELIN', 'JUPYTER']
+        masterConfig: {
+          machineTypeUri: 'projects/test/zones/us-central1-f/machineTypes/n1-standard-8',
+          numInstances: 1
+        }
       },
-      masterConfig: {
-        machineTypeUri: 'projects/test/zones/us-central1-f/machineTypes/n1-standard-8',
-        numInstances: 1
+      labels: {
+        service: 'data-science',
+        team: 'ml-team',
+        environment: 'production'
       }
-    },
-    labels: {
-      service: 'data-science',
-      team: 'ml-team',
-      environment: 'production'
-    }
-  };
+    };
+  });
 
-  console.log('1. Training model with test cluster data...');
-  embeddingService.trainOnClusterData(testClusterData);
+  it('should initialize the embedding service', () => {
+    expect(embeddingService).to.be.instanceOf(TransformersEmbeddingService);
+  });
 
-  const stats = embeddingService.getStats();
-  console.log(`   📊 Model stats: ${stats.modelName}, ${stats.documentsProcessed} docs processed`);
+  it('should get initial stats', () => {
+    const stats = embeddingService.getStats();
+    expect(stats).to.have.property('modelName');
+    expect(stats).to.have.property('documentsProcessed');
+    expect(stats.documentsProcessed).to.be.a('number');
+  });
 
-  console.log('\n2. Testing embedding generation...');
-  
-  // Test queries that should match our cluster data
-  const queries = [
-    'pandas numpy data science',
-    'python machine learning packages',
-    'jupyter notebook zeppelin',
-    'n1-standard-8 compute',
-    'ml-team production environment'
-  ];
+  it('should train on cluster data', () => {
+    embeddingService.trainOnClusterData(testClusterData);
+    const stats = embeddingService.getStats();
+    expect(stats.documentsProcessed).to.be.greaterThan(0);
+  });
 
-  for (const query of queries) {
-    console.log(`   🔍 Testing query: "${query}"`);
-    try {
-      const embedding = await embeddingService.generateEmbedding(query);
-      const magnitude = Math.sqrt(embedding.reduce((sum, val) => sum + val * val, 0));
-      console.log(`      ✅ Vector generated: ${embedding.length}D, magnitude: ${magnitude.toFixed(4)}`);
-    } catch (error) {
-      console.log(`      ❌ Error: ${error}`);
-    }
-  }
+  it('should generate embeddings for queries', async () => {
+    const query = 'pandas numpy data science';
+    const embedding = await embeddingService.generateEmbedding(query);
+    
+    expect(embedding).to.be.an('array');
+    expect(embedding.length).to.be.greaterThan(0);
+    
+    // Check that it's a valid embedding vector (normalized)
+    const magnitude = Math.sqrt(embedding.reduce((sum, val) => sum + val * val, 0));
+    expect(magnitude).to.be.greaterThan(0);
+  });
 
-  console.log('\n3. Testing cluster data embedding...');
-  try {
+  it('should generate cluster embeddings', async () => {
     const clusterEmbedding = await embeddingService.generateClusterEmbedding(testClusterData);
-    const clusterMagnitude = Math.sqrt(clusterEmbedding.reduce((sum, val) => sum + val * val, 0));
-    console.log(`   ✅ Cluster embedding: ${clusterEmbedding.length}D, magnitude: ${clusterMagnitude.toFixed(4)}`);
-  } catch (error) {
-    console.log(`   ❌ Error: ${error}`);
-  }
+    
+    expect(clusterEmbedding).to.be.an('array');
+    expect(clusterEmbedding.length).to.be.greaterThan(0);
+    
+    const magnitude = Math.sqrt(clusterEmbedding.reduce((sum, val) => sum + val * val, 0));
+    expect(magnitude).to.be.greaterThan(0);
+  });
 
-  console.log('\n4. Testing training data search...');
-  const searchResults = embeddingService.searchTrainingData('pandas');
-  console.log(`   📋 Found ${searchResults.length} training examples with 'pandas'`);
-  
-  if (searchResults.length > 0) {
-    console.log(`   📝 Sample: ${searchResults[0].extractedText.substring(0, 100)}...`);
-  }
+  it('should search training data', () => {
+    embeddingService.trainOnClusterData(testClusterData);
+    const searchResults = embeddingService.searchTrainingData('pandas');
+    
+    expect(searchResults).to.be.an('array');
+    if (searchResults.length > 0) {
+      expect(searchResults[0]).to.have.property('extractedText');
+      expect(searchResults[0]).to.have.property('clusterName');
+    }
+  });
 
-  console.log('\n5. Saving training data...');
-  embeddingService.saveTrainingDataNow();
-  console.log('   ✅ Training data saved');
+  it('should save training data', () => {
+    embeddingService.trainOnClusterData(testClusterData);
+    expect(() => embeddingService.saveTrainingDataNow()).to.not.throw();
+  });
 
-  console.log('\n6. Sample training data:');
-  const samples = embeddingService.getSampleTrainingData(1);
-  if (samples.length > 0) {
-    console.log(`   📄 Cluster: ${samples[0].clusterName}`);
-    console.log(`   📄 Text: ${samples[0].extractedText}`);
-  }
-
-  console.log('\n✅ Transformers.js embedding service test complete!');
-}
-
-testTransformersEmbeddings().catch(console.error);
+  it('should get sample training data', () => {
+    embeddingService.trainOnClusterData(testClusterData);
+    const samples = embeddingService.getSampleTrainingData(1);
+    
+    expect(samples).to.be.an('array');
+    if (samples.length > 0) {
+      expect(samples[0]).to.have.property('clusterName');
+      expect(samples[0]).to.have.property('extractedText');
+    }
+  });
+});
