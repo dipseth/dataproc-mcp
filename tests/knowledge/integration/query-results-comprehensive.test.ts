@@ -14,10 +14,10 @@
  * - Comparison with get_job_results
  */
 
-import { getQueryResultsWithRest, getQueryResults, getJobStatus } from '../../../src/services/query.js';
-import { JobOutputHandler } from '../../../src/services/job-output-handler.js';
-import { GCSService } from '../../../src/services/gcs.js';
-import { logger } from '../../../src/utils/logger.js';
+import { getQueryResultsWithRest, getQueryResults, getJobStatus } from '../../../src/services/query';
+import { JobOutputHandler } from '../../../src/services/job-output-handler';
+import { GCSService } from '../../../src/services/gcs';
+import { logger } from '../../../src/utils/logger';
 
 // Test configuration interface
 interface TestConfig {

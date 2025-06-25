@@ -216,8 +216,8 @@ async function runPerformanceBenchmarks(): Promise<void> {
   const benchmark = new PerformanceBenchmark();
 
   // Import modules for testing
-  const { StartDataprocClusterSchema } = await import('../../src/validation/schemas.ts');
-  const { validateServiceAccountKey } = await import('../../src/security/credential-manager.ts');
+  const { StartDataprocClusterSchema } = await import('../../src/validation/schemas');
+  const { validateServiceAccountKey } = await import('../../src/security/credential-manager');
 
   // Benchmark 1: Schema Validation Performance
   await benchmark.benchmark(

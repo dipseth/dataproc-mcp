@@ -5,9 +5,9 @@
  * Tests the new async query tracking functionality
  */
 
-import { AsyncQueryPoller } from '../../../src/services/async-query-poller.js';
-import { JobTracker } from '../../../src/services/job-tracker.js';
-import { logger } from '../../../src/utils/logger.js';
+import { AsyncQueryPoller } from '../../../src/services/async-query-poller';
+import { JobTracker } from '../../../src/services/job-tracker';
+import { logger } from '../../../src/utils/logger';
 
 async function testAsyncQueryTracking() {
   console.log('🧪 Testing AsyncQueryPoller Integration');
