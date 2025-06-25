@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- semantic-release-changelog -->
 
+## [4.7.0](https://github.com/dipseth/dataproc-mcp/compare/v4.6.0...v4.7.0) (2025-06-25)
+
+
+### 🚀 Features
+
+* **ci:** add release status and semantic-release badges to README ([8ace35f](https://github.com/dipseth/dataproc-mcp/commit/8ace35fc161c66dab5cf8502f0863cbfb4aea9c5))
+
+
+### 🐛 Bug Fixes
+
+* Skip GCP-dependent tests in CI and remove credentials from history ([#36](https://github.com/dipseth/dataproc-mcp/issues/36)) ([7e90971](https://github.com/dipseth/dataproc-mcp/commit/7e909716f28f7324a9b53917068e331d9557301c)), closes [#11](https://github.com/dipseth/dataproc-mcp/issues/11) [#24](https://github.com/dipseth/dataproc-mcp/issues/24) [#22](https://github.com/dipseth/dataproc-mcp/issues/22) [#17](https://github.com/dipseth/dataproc-mcp/issues/17) [#17](https://github.com/dipseth/dataproc-mcp/issues/17) [#29](https://github.com/dipseth/dataproc-mcp/issues/29) [#30](https://github.com/dipseth/dataproc-mcp/issues/30) [#30](https://github.com/dipseth/dataproc-mcp/issues/30) [#33](https://github.com/dipseth/dataproc-mcp/issues/33) [#33](https://github.com/dipseth/dataproc-mcp/issues/33) [#34](https://github.com/dipseth/dataproc-mcp/issues/34) [#34](https://github.com/dipseth/dataproc-mcp/issues/34) [#35](https://github.com/dipseth/dataproc-mcp/issues/35)
+
 ## [4.6.0](https://github.com/dipseth/dataproc-mcp/compare/v4.5.0...v4.6.0) (2025-06-25)
 
 
