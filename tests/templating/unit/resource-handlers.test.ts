@@ -1,11 +1,11 @@
 import { expect } from 'chai';
 import { z } from 'zod';
-import { ClusterManager } from '../../../build/services/cluster-manager.js';
-import { JobTracker } from '../../../build/services/job-tracker.js';
-import { ClusterTracker } from '../../../build/services/tracker.js';
-import { ProfileManager } from '../../../build/services/profile.js';
-import { JobOutputHandler } from '../../../build/services/job-output-handler.js';
-import { JobState } from '../../../build/types/query.js';
+import { ClusterManager } from '../../../build/services/cluster-manager';
+import { JobTracker } from '../../../build/services/job-tracker';
+import { ClusterTracker } from '../../../build/services/tracker';
+import { ProfileManager } from '../../../build/services/profile';
+import { JobOutputHandler } from '../../../build/services/job-output-handler';
+import { JobState } from '../../../build/types/query';
 // Simple stub function creator
 function createStub(returnValue) {
     const stub = (...args) => {

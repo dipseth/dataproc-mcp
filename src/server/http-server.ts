@@ -31,6 +31,41 @@ import { GitHubOAuthProvider } from './auth/githubOAuthProvider.js';
 import { createGitHubOAuthRouter } from './auth/githubOAuthRouter.js';
 import { createOAuthMetadataRouter } from './auth/mcpOAuthMetadata.js';
 
+interface OAuthClientCredentials {
+  client_id: string;
+  client_secret: string;
+}
+
+async function readOAuthClientCredentials(
+  filePath: string
+): Promise<OAuthClientCredentials | undefined> {
+  try {
+    const fileContent = await fs.promises.readFile(filePath, 'utf8');
+    const jsonContent = JSON.parse(fileContent);
+
+    // Handle both 'web' and 'installed' client types
+    if (jsonContent.web) {
+      return {
+        client_id: jsonContent.web.client_id,
+        client_secret: jsonContent.web.client_secret,
+      };
+    } else if (jsonContent.installed) {
+      return {
+        client_id: jsonContent.installed.client_id,
+        client_secret: jsonContent.installed.client_secret,
+      };
+    } else {
+      logger.warn(
+        `OAuth client key file ${filePath} does not contain 'web' or 'installed' client type.`
+      );
+      return undefined;
+    }
+  } catch (error) {
+    logger.error(`Failed to read or parse OAuth client key file ${filePath}:`, error);
+    return undefined;
+  }
+}
+
 /**
  * Custom WebSocket transport implementation for MCP
  */
@@ -507,8 +542,39 @@ export class DataprocHttpServer {
         logger.info('GitHub OAuth setup completed successfully');
       } else {
         // Setup Google OAuth (existing logic)
-        if (!authConfig.oauthProxyEndpoints || !authConfig.oauthProxyClientId) {
-          logger.warn('Google OAuth enabled but missing required configuration');
+        if (!authConfig.oauthProxyEndpoints) {
+          logger.warn(
+            'Google OAuth enabled but missing required oauthProxyEndpoints configuration'
+          );
+          return;
+        }
+
+        let googleClientId: string | undefined;
+        let googleClientSecret: string | undefined;
+
+        if (authConfig.oauthClientKeyPath) {
+          const credentials = await readOAuthClientCredentials(authConfig.oauthClientKeyPath);
+          if (credentials) {
+            googleClientId = credentials.client_id;
+            googleClientSecret = credentials.client_secret;
+            logger.info(
+              `Successfully loaded Google OAuth client ID from ${authConfig.oauthClientKeyPath}`
+            );
+          } else {
+            logger.warn(
+              `Could not load Google OAuth client ID and secret from ${authConfig.oauthClientKeyPath}. OAuth functionality may be limited.`
+            );
+          }
+        } else {
+          logger.warn(
+            'oauthClientKeyPath is not configured. Google OAuth functionality may be limited.'
+          );
+        }
+
+        if (!googleClientId || !googleClientSecret) {
+          logger.warn(
+            'Google OAuth enabled but client ID or secret could not be loaded. OAuth functionality may be limited.'
+          );
           return;
         }
 
@@ -526,8 +592,8 @@ export class DataprocHttpServer {
             revocationUrl: authConfig.oauthProxyEndpoints.revocationUrl,
           },
           clientStore: clientStore,
-          fallbackClientId: authConfig.oauthProxyClientId,
-          fallbackClientSecret: authConfig.oauthProxyClientSecret,
+          fallbackClientId: googleClientId,
+          fallbackClientSecret: googleClientSecret,
           fallbackRedirectUris: authConfig.oauthProxyRedirectUris,
         });
 

@@ -4,8 +4,8 @@
  */
 
 import { performance } from 'perf_hooks';
-import { ResponseFilter } from '../../../build/services/response-filter.js';
-import type { QdrantStorageMetadata } from '../../../build/types/response-filter.js';
+import { ResponseFilter } from '../../../build/services/response-filter';
+import type { QdrantStorageMetadata } from '../../../build/types/response-filter';
 
 // Sample data for benchmarking
 const benchmarkData = {

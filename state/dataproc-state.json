@@ -1,4 +1,16 @@
 {
-  "clusters": {},
+  "clusters": {
+    "9547b377-c44d-4b01-a7a0-5b8239bd281d": {
+      "clusterId": "9547b377-c44d-4b01-a7a0-5b8239bd281d",
+      "clusterName": "pricing-promotions-cluster-002",
+      "createdAt": "2025-06-11T21:02:46.079Z",
+      "metadata": {
+        "projectId": "prj-grp-data-sci-prod-b425",
+        "region": "us-central1",
+        "createdAt": "2025-06-11T21:02:46.078Z",
+        "tool": "start_dataproc_cluster"
+      }
+    }
+  },
   "profiles": {}
 }

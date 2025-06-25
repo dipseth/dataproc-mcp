@@ -3,7 +3,7 @@
  */
 
 import { expect } from 'chai';
-import { TransformersEmbeddingService } from '../../../src/services/transformers-embeddings.js';
+import { TransformersEmbeddingService } from '../../../src/services/transformers-embeddings';
 
 interface TestClusterData {
   clusterName: string;

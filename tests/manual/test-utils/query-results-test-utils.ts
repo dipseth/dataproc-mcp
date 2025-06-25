@@ -5,8 +5,8 @@
  * utilities specifically for testing the get_query_results functionality.
  */
 
-import { getJobStatus } from '../../../src/services/query.js';
-import { GCSService } from '../../../src/services/gcs.js';
+import { getJobStatus } from '../../../src/services/query';
+import { GCSService } from '../../../src/services/gcs';
 
 // Type definitions for test utilities
 export interface TestEnvironment {

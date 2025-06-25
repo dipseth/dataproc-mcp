@@ -3,9 +3,9 @@
  * Tests the new structured payload format with compression
  */
 
-import { QdrantStorageService } from '../../../src/services/qdrant-storage.js';
-import { CompressionService } from '../../../src/services/compression.js';
-import { QdrantQueryResultPayload } from '../../../src/types/qdrant-payload.js';
+import { QdrantStorageService } from '../../../src/services/qdrant-storage';
+import { CompressionService } from '../../../src/services/compression';
+import { QdrantQueryResultPayload } from '../../../src/types/qdrant-payload';
 
 async function testEnhancedQdrantStructure() {
   console.log('🧪 Testing Enhanced Qdrant Structure and ClusterName Resolution...\n');
