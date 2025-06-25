@@ -840,11 +840,11 @@ export async function handleCreateClusterFromProfile(args: any, deps: HandlerDep
 }
 
 /**
- * Get Zeppelin notebook URL for a cluster
+ * Get all available HTTP endpoints for a cluster
  */
-export async function handleGetZeppelinUrl(args: any, deps: HandlerDependencies) {
+export async function handleGetClusterEndpoints(args: any, deps: HandlerDependencies) {
   // Apply security middleware
-  SecurityMiddleware.checkRateLimit(`get_zeppelin_url:${JSON.stringify(args)}`);
+  SecurityMiddleware.checkRateLimit(`get_cluster_endpoints:${JSON.stringify(args)}`);
 
   // Sanitize input
   const sanitizedArgs = SecurityMiddleware.sanitizeObject(args);
@@ -904,14 +904,30 @@ export async function handleGetZeppelinUrl(args: any, deps: HandlerDependencies)
       };
     }
 
-    // Construct Zeppelin URL
-    const zeppelinUrl = `https://${clusterName}-m.${region}.c.${projectId}.internal:8080`;
+    // Extract all HTTP endpoints from cluster endpoint configuration
+    const httpPorts = (cluster as any).config?.endpointConfig?.httpPorts;
+
+    if (!httpPorts || Object.keys(httpPorts).length === 0) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `No HTTP endpoints are available for cluster ${clusterName}. The cluster may still be starting up or endpoint access may not be enabled.`,
+          },
+        ],
+      };
+    }
+
+    // Format all available endpoints nicely
+    const endpointsList = Object.entries(httpPorts)
+      .map(([service, url]) => `• ${service}: ${url}`)
+      .join('\n');
 
     return {
       content: [
         {
           type: 'text',
-          text: `Zeppelin notebook URL for cluster ${clusterName}:\n${zeppelinUrl}\n\nNote: This URL is accessible from within the VPC or through appropriate firewall rules.`,
+          text: `Available HTTP endpoints for cluster ${clusterName}:\n\n${endpointsList}\n\nNote: These URLs are accessible from within the VPC or through appropriate firewall rules.`,
         },
       ],
     };

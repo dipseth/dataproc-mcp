@@ -41,32 +41,7 @@ dataproc-mcp --setup
 
 ### Step 3: Configure Authentication
 
-Choose one of these authentication methods:
-
-#### Option A: Service Account Key (Simplest)
-```bash
-# Download your service account key from Google Cloud Console
-# Place it in a secure location
-export GOOGLE_APPLICATION_CREDENTIALS="/path/to/your/service-account-key.json"
-```
-
-#### Option B: Service Account Impersonation (Recommended)
-```json
-// config/server.json
-{
-  "authentication": {
-    "impersonateServiceAccount": "dataproc-worker@your-project.iam.gserviceaccount.com",
-    "fallbackKeyPath": "/path/to/source-key.json",
-    "preferImpersonation": true
-  }
-}
-```
-
-#### Option C: Application Default Credentials
-```bash
-# If running on Google Cloud or using gcloud CLI
-gcloud auth application-default login
-```
+For detailed authentication setup, refer to the [Authentication Implementation Guide](AUTHENTICATION_IMPLEMENTATION_GUIDE.md).
 
 ### Step 4: Configure Your Project
 
@@ -119,6 +94,19 @@ dataproc-mcp
 # Or run directly with Node.js
 node /path/to/dataproc-mcp/build/index.js
 ```
+
+## 🌐 Claude.ai Web App Integration
+
+**NEW: Full Claude.ai compatibility is now available!**
+
+For Claude.ai web app integration, see our dedicated guides:
+- **[Complete Claude.ai Integration Guide](claude-ai-integration.md)** - Detailed setup with troubleshooting
+
+**Key Features:**
+- ✅ All 22 MCP tools available in Claude.ai
+- ✅ HTTPS tunneling with Cloudflare
+- ✅ OAuth authentication with GitHub
+- ✅ Secure WebSocket connections
 
 ## 🔧 MCP Client Integration
 

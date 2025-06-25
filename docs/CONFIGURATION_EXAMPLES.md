@@ -160,74 +160,7 @@ This guide provides real-world configuration examples for different environments
 
 ## Authentication Scenarios
 
-### 1. Service Account Impersonation (Recommended)
-
-```json
-{
-  "authentication": {
-    "impersonateServiceAccount": "dataproc-worker@project.iam.gserviceaccount.com",
-    "fallbackKeyPath": "/path/to/source-service-account.json",
-    "preferImpersonation": true,
-    "useApplicationDefaultFallback": false
-  }
-}
-```
-
-**Benefits:**
-- No direct key management
-- Centralized permission control
-- Audit trail for impersonation
-- Easy key rotation
-
-### 2. Direct Service Account Key
-
-```json
-{
-  "authentication": {
-    "keyFilePath": "/secure/path/to/service-account-key.json",
-    "useApplicationDefaultFallback": false
-  }
-}
-```
-
-**Use when:**
-- Impersonation is not available
-- Simple single-environment setup
-- Testing and development
-
-### 3. Application Default Credentials
-
-```json
-{
-  "authentication": {
-    "useApplicationDefaultFallback": true
-  }
-}
-```
-
-**Use when:**
-- Running on Google Cloud instances
-- Using gcloud authentication
-- Development environments
-
-### 4. Hybrid Authentication
-
-```json
-{
-  "authentication": {
-    "impersonateServiceAccount": "dataproc-worker@project.iam.gserviceaccount.com",
-    "fallbackKeyPath": "/path/to/backup-key.json",
-    "keyFilePath": "/path/to/direct-key.json",
-    "preferImpersonation": true,
-    "useApplicationDefaultFallback": true
-  }
-}
-```
-
-**Fallback order:**
-1. Service account impersonation
-2. Direct key file
-3. Application default credentials
+For detailed authentication scenarios and configurations, refer to the [Authentication Implementation Guide](AUTHENTICATION_IMPLEMENTATION_GUIDE.md).
 
 ## Custom Profiles
 
