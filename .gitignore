@@ -139,9 +139,6 @@ config/*.json
 release-checklist.md
 test-oauth-endpoints.sh
 test-oauth-protocol-fix.js
-<<<<<<< fix/ci-gcp-tests
 .credentials/*
 .vscode/settings.json
 .vscode/tasks.json
-=======
->>>>>>> main

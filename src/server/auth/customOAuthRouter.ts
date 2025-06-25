@@ -163,10 +163,6 @@ export function createCustomOAuthRouter(options: CustomOAuthRouterOptions): Rout
       // If the client is dynamically registered with our MCP server,
       // we initiate the Google Device Authorization Grant flow, regardless of response_type.
       // Claude Desktop will request 'code', but our server will translate this to device flow.
-      // If the client is dynamically registered with our MCP server,
-      // we initiate the Google Device Authorization Grant flow, regardless of response_type.
-      // Claude Desktop will request 'code', but our server will translate this to device flow.
-<<<<<<< fix/ci-gcp-tests
       // Always proceed with standard redirect to Google for authorization
       logger.info(`[DEBUG] Redirecting to Google for authorization for client: ${client_id}`);
       const googleAuthUrl = new URL('https://accounts.google.com/oauth/authorize');
@@ -185,48 +181,6 @@ export function createCustomOAuthRouter(options: CustomOAuthRouterOptions): Rout
         googleAuthUrl.searchParams.set('code_challenge_method', code_challenge_method as string);
 
       res.redirect(googleAuthUrl.toString());
-=======
-      if (client.client_id.startsWith('mcp_')) {
-        // Check if it's an MCP-issued client ID
-        logger.info(
-          `[DEBUG] Client is MCP-issued. Redirecting to Google Device Authorization endpoint for client: ${client_id}`
-        );
-
-        // Construct the redirect URL to Google's Device Authorization endpoint
-        const googleDeviceAuthUrl = new URL('https://accounts.google.com/o/oauth2/device/code'); // Correct endpoint for device flow
-        googleDeviceAuthUrl.searchParams.set('client_id', provider['fallbackClientId']!); // Use the server's own Google OAuth client ID
-        googleDeviceAuthUrl.searchParams.set(
-          'scope',
-          (scope as string) || 'openid email profile https://www.googleapis.com/auth/cloud-platform'
-        );
-        googleDeviceAuthUrl.searchParams.set('access_type', 'offline'); // Request refresh token
-
-        // Redirect the user's browser to Google's Device Authorization endpoint
-        // The user will then see the device code and verification URL directly from Google.
-        res.redirect(googleDeviceAuthUrl.toString());
-      } else {
-        // For other clients or if not an MCP-issued client, proceed with standard redirect to Google
-        logger.info(
-          `[DEBUG] Client is NOT MCP-issued. Redirecting to Google for authorization for client: ${client_id}`
-        );
-        const googleAuthUrl = new URL('https://accounts.google.com/oauth/authorize');
-        googleAuthUrl.searchParams.set('client_id', client_id as string);
-        googleAuthUrl.searchParams.set('redirect_uri', redirect_uri as string);
-        googleAuthUrl.searchParams.set('response_type', (response_type as string) || 'code');
-        googleAuthUrl.searchParams.set(
-          'scope',
-          (scope as string) || 'openid email profile https://www.googleapis.com/auth/cloud-platform'
-        );
-
-        if (state) googleAuthUrl.searchParams.set('state', state as string);
-        if (code_challenge)
-          googleAuthUrl.searchParams.set('code_challenge', code_challenge as string);
-        if (code_challenge_method)
-          googleAuthUrl.searchParams.set('code_challenge_method', code_challenge_method as string);
-
-        res.redirect(googleAuthUrl.toString());
-      }
->>>>>>> main
     } catch (error) {
       logger.error('Authorization request failed:', error);
       res.status(400).json({
