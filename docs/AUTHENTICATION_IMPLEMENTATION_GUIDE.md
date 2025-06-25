@@ -120,6 +120,476 @@ Google Cloud APIs (Dataproc, GCS, etc.)
 - ✅ **Fail-Fast Behavior**: Missing configuration results in clear error messages
 - ✅ **Predictable Behavior**: Authentication determined by configuration file only
 
+## OAuth Authentication
+
+### GitHub OAuth Integration (Worked So Far)
+
+This section explains how to set up GitHub OAuth authentication for your Dataproc MCP server, which provides a much simpler and more reliable alternative to Google OAuth for Claude Desktop integration.
+
+#### Why GitHub OAuth?
+
+- **Simpler Setup**: No complex Google Cloud Console configuration
+- **Better Claude Desktop Support**: Works more reliably with MCP clients
+- **Familiar Flow**: Standard OAuth 2.0 flow that most developers know
+- **No Service Account Complexity**: Direct user authentication
+
+#### Step 1: Create a GitHub OAuth App
+
+1. Go to GitHub Settings → Developer settings → OAuth Apps
+2. Click "New OAuth App"
+3. Fill in the details:
+   - **Application name**: `Dataproc MCP Server`
+   - **Homepage URL**: `https://github.com/dipseth/dataproc-mcp`
+   - **Authorization callback URL**: `http://localhost:8080/auth/github/callback`
+   - **Application description**: `MCP server for Google Cloud Dataproc operations`
+
+4. Click "Register application"
+5. Note down your **Client ID** and generate a **Client Secret**
+
+#### Step 2: Configure the Server
+
+Create or update your server configuration file:
+
+```json
+{
+  "profileManager": {
+    "rootConfigPath": "/path/to/your/profiles",
+    "profileScanInterval": 300000
+  },
+  "clusterTracker": {
+    "stateFilePath": "./state/dataproc-state.json",
+    "stateSaveInterval": 60000
+  },
+  "authentication": {
+    "impersonateServiceAccount": "your-service-account@project.iam.gserviceaccount.com",
+    "projectId": "your-project-id",
+    "region": "us-central1",
+    "preferImpersonation": true,
+    "useApplicationDefaultFallback": true,
+    "useOAuthProxy": true,
+    "oauthProvider": "github",
+    "githubOAuth": {
+      "clientId": "YOUR_GITHUB_CLIENT_ID",
+      "clientSecret": "YOUR_GITHUB_CLIENT_SECRET", 
+      "redirectUri": "http://localhost:8080/auth/github/callback",
+      "scopes": ["read:user", "user:email"]
+    }
+  },
+  "httpServer": {
+    "port": 8080,
+    "enableOAuthProxy": true,
+    "host": "localhost"
+  }
+}
+```
+
+#### Step 3: Start the Server with GitHub OAuth
+
+```bash
+# Using the GitHub OAuth configuration
+DATAPROC_CONFIG_PATH=config/github-oauth-server.json npm start -- --http --oauth --port 8080
+```
+
+#### Step 4: Test the OAuth Flow
+
+1. **Check server health**:
+   ```bash
+   curl http://localhost:8080/health
+   ```
+   Should return: `{"status":"healthy","oauthEnabled":true}`
+
+2. **Initiate GitHub OAuth**:
+   ```bash
+   curl -H "Accept: application/json" -H "mcp-session-id: test-session" http://localhost:8080/auth/github
+   ```
+
+3. **Check authentication status**:
+   ```bash
+   curl -H "mcp-session-id: test-session" http://localhost:8080/auth/github/status
+   ```
+
+#### Step 5: Configure Claude Desktop
+
+Update your Claude Desktop MCP configuration:
+
+```json
+{
+  "mcpServers": {
+    "dataproc-github": {
+      "transport": "streamable-http",
+      "url": "http://localhost:8080/mcp",
+      "disabled": false,
+      "alwaysAllow": [
+        "start_dataproc_cluster",
+        "list_clusters",
+        "submit_hive_query",
+        "get_cluster",
+        "get_cluster_insights",
+        "get_job_analytics",
+        "query_knowledge"
+      ]
+    }
+  }
+}
+```
+
+#### OAuth Endpoints
+
+The server provides these GitHub OAuth endpoints:
+
+- `GET /auth/github` - Initiate OAuth flow
+- `GET /auth/github/callback` - OAuth callback handler
+- `GET /auth/github/status` - Check authentication status
+- `POST /auth/github/logout` - Logout and revoke token
+
+#### Authentication Flow
+
+1. **Client requests authentication**: `GET /auth/github`
+2. **Server returns GitHub authorization URL**
+3. **User visits URL and authorizes the app**
+4. **GitHub redirects to callback with authorization code**
+5. **Server exchanges code for access token**
+6. **Server stores token in session**
+7. **User can now make authenticated MCP requests**
+
+#### Security Features
+
+- **CSRF Protection**: State parameter prevents cross-site request forgery
+- **Session Management**: Secure session storage with automatic cleanup
+- **Token Validation**: Real-time GitHub API validation
+- **Scope Limitation**: Minimal required scopes (`read:user`, `user:email`)
+
+#### Troubleshooting
+
+##### Common Issues
+
+1. **"OAuth proxy enabled but missing configuration"**
+   - Ensure `githubOAuth` section is properly configured
+   - Verify `oauthProvider` is set to `"github"`
+
+2. **"Invalid GitHub token"**
+   - Check that your GitHub Client ID and Secret are correct
+   - Ensure the redirect URI matches exactly
+
+3. **"Session ID required"**
+   - MCP clients must provide `mcp-session-id` header
+   - Use a consistent session ID across requests
+
+##### Debug Mode
+
+Enable debug logging:
+```bash
+LOG_LEVEL=debug DATAPROC_CONFIG_PATH=config/github-oauth-server.json npm start -- --http --oauth --port 8080
+```
+
+#### Advantages over Google OAuth
+
+| Feature | GitHub OAuth | Google OAuth |
+|---------|-------------|--------------|
+| Setup Complexity | Simple | Complex |
+| Claude Desktop Support | Excellent | Limited |
+| Token Management | Straightforward | Complex |
+| Debugging | Easy | Difficult |
+| Enterprise SSO | Available | Available |
+
+#### Next Steps
+
+1. **Production Setup**: Use HTTPS and proper domain for production
+2. **Environment Variables**: Store secrets in environment variables
+3. **Session Persistence**: Consider Redis for session storage in production
+4. **Monitoring**: Add OAuth metrics and logging
+
+#### Example Usage
+
+Once authenticated, you can use all MCP tools normally:
+
+```bash
+# List clusters (requires authentication)
+curl -H "mcp-session-id: your-session" -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"list_clusters","arguments":{}}}' \
+  http://localhost:8080/mcp
+```
+
+The GitHub OAuth implementation provides a much more reliable and user-friendly authentication experience for your Dataproc MCP server!
+
+### Google OAuth (Device Authorization Grant - Hasn't Worked As Smoothly)
+
+This section describes the OAuth 2.1 authentication implementation for the Dataproc MCP Server, which enables Claude Desktop to connect and authenticate with the server.
+
+#### Overview
+
+The implementation provides a hybrid authentication system that:
+- Supports OAuth 2.1 with Dynamic Client Registration (required by Claude Desktop)
+- Implements Google Device Authorization Grant for user-driven authentication
+- Maintains backwards compatibility with existing transport protocols
+- Supports optional service account key files for server-side operations
+
+#### Architecture
+
+##### Components
+
+1. **JsonFileClientStore** (`src/server/auth/jsonFileClientStore.ts`)
+   - Persistent storage for dynamically registered OAuth clients
+   - Stores client credentials in `state/clients.json`
+   - Supports CRUD operations for client management
+
+2. **EnhancedOAuthProvider** (`src/server/auth/enhancedOAuthProvider.ts`)
+   - Extends ProxyOAuthServerProvider with additional capabilities
+   - Implements Google Device Authorization Grant flow
+   - Handles dynamic client registration
+
+3. **CustomOAuthRouter** (`src/server/auth/customOAuthRouter.ts`)
+   - Custom Express router implementing OAuth 2.1 endpoints
+   - Provides required endpoints for Claude Desktop compatibility
+   - Handles dynamic client registration requests
+
+##### Authentication Flow
+
+```mermaid
+sequenceDiagram
+    participant C as Claude Desktop
+    participant M as MCP Server
+    participant G as Google OAuth
+    participant U as User
+
+    C->>M: GET /.well-known/oauth-authorization-server
+    M->>C: OAuth Metadata (includes /register)
+    
+    C->>M: POST /register (Dynamic Client Registration)
+    M->>C: Client ID & Secret
+    
+    C->>M: GET /authorize (Device Flow)
+    M->>G: Device Authorization Request
+    G->>M: device_code, user_code, verification_url
+    M->>Console: Display user_code & verification_url
+    
+    U->>U: Open browser, visit verification_url
+    U->>G: Enter user_code & authenticate
+    
+    M->>G: Poll token endpoint
+    G->>M: Access Token & Refresh Token
+    M->>C: OAuth tokens
+    
+    C->>M: MCP requests with OAuth token
+    M->>G: API calls using user's token
+```
+
+#### Configuration
+
+##### Server Configuration
+
+Add OAuth configuration to your server config file:
+
+```json
+{
+  "authentication": {
+    "useOAuthProxy": true,
+    "googleServiceAccountKeyPath": "./config/service-account-key.json",
+    "oauthProxyEndpoints": {
+      "authorizationUrl": "https://accounts.google.com/oauth/authorize",
+      "tokenUrl": "https://oauth2.googleapis.com/token",
+      "revocationUrl": "https://oauth2.googleapis.com/revoke"
+    },
+    "oauthProxyClientId": "your-google-oauth-client-id.apps.googleusercontent.com",
+    "oauthProxyClientSecret": "your-google-oauth-client-secret",
+    "oauthProxyRedirectUris": [
+      "http://localhost:8080/callback"
+    ]
+  },
+  "httpServer": {
+    "port": 8080,
+    "enableOAuthProxy": true
+  }
+}
+```
+
+##### Authentication Strategies
+
+The server supports multiple authentication strategies in priority order:
+
+1. **Service Account Impersonation** (if configured)
+   - Uses `impersonateServiceAccount` with source credentials
+   - Preferred method for production environments
+
+2. **OAuth 2.0 Device Flow** (if clientId/clientSecret provided)
+   - User-driven authentication via browser
+   - Suitable for interactive scenarios
+
+3. **Google Service Account Key File** (if `googleServiceAccountKeyPath` configured)
+   - Direct service account authentication
+   - Optional - server can operate without this
+
+4. **Fallback Key File** (if `fallbackKeyPath` configured)
+   - Secondary key file for backwards compatibility
+
+5. **Application Default Credentials** (if explicitly enabled)
+   - Uses gcloud/environment credentials as final fallback
+
+#### OAuth Endpoints
+
+The server exposes the following OAuth 2.1 endpoints:
+
+- `GET /.well-known/oauth-authorization-server` - OAuth metadata
+- `POST /register` - Dynamic client registration
+- `GET /authorize` - Authorization endpoint (supports device flow)
+- `POST /token` - Token endpoint
+- `POST /revoke` - Token revocation
+- `GET /userinfo` - User information
+- `GET /.well-known/jwks` - JSON Web Key Set
+
+#### Dynamic Client Registration
+
+Claude Desktop automatically registers as an OAuth client using RFC 7591:
+
+```http
+POST /register
+Content-Type: application/json
+
+{
+  "redirect_uris": ["http://localhost:3000/callback"],
+  "client_name": "Claude Desktop",
+  "grant_types": ["authorization_code", "refresh_token"],
+  "response_types": ["code"]
+}
+```
+
+Response:
+```json
+{
+  "client_id": "mcp_12345678-1234-1234-1234-123456789abc",
+  "client_secret": "87654321-4321-4321-4321-cba987654321",
+  "client_id_issued_at": 1640995200,
+  "client_secret_expires_at": 0,
+  "redirect_uris": ["http://localhost:3000/callback"],
+  "grant_types": ["authorization_code", "refresh_token"],
+  "response_types": ["code"]
+}
+```
+
+#### Device Authorization Grant
+
+For user authentication, the server implements Google's Device Authorization Grant:
+
+1. Client requests device code
+2. Server displays user code and verification URL
+3. User opens browser and enters code
+4. Server polls Google for token completion
+5. Returns access token to client
+
+Example user prompt:
+```
+==============================================
+🔐 GOOGLE AUTHENTICATION REQUIRED
+==============================================
+Please open the following URL in your browser:
+https://accounts.google.com/device
+
+And enter the following code:
+ABCD-EFGH
+==============================================
+```
+
+#### File Structure
+
+```
+src/server/auth/
+├── jsonFileClientStore.ts      # Client storage implementation
+├── enhancedOAuthProvider.ts    # Enhanced OAuth provider
+└── customOAuthRouter.ts        # OAuth endpoints router
+
+state/
+└── clients.json               # Persistent client storage
+
+config/
+├── oauth-server.json          # Example OAuth configuration
+└── service-account-key.json   # Optional service account key
+```
+
+#### Security Considerations
+
+1. **Client Storage**: Client credentials are stored in `state/clients.json`
+   - Ensure proper file permissions (600)
+   - Consider encryption for production environments
+
+2. **Service Account Keys**: Optional but recommended for server operations
+   - Store securely with restricted access
+   - Rotate regularly according to security policies
+
+3. **HTTPS**: Recommended for production deployments
+   - OAuth flows should use secure connections
+   - Configure SSL/TLS certificates
+
+4. **Token Management**: 
+   - Access tokens are cached in memory
+   - Refresh tokens enable long-term access
+   - Implement proper token rotation
+
+#### Troubleshooting
+
+##### Common Issues
+
+1. **"Incompatible auth server: does not support dynamic client registration"**
+   - Ensure `useOAuthProxy: true` in configuration
+   - Verify `/register` endpoint is accessible
+
+2. **Device flow timeout**
+   - Check network connectivity to Google OAuth
+   - Verify user completes authentication within time limit
+
+3. **Token verification failures**
+   - Ensure proper scopes are requested
+   - Check Google Cloud project permissions
+
+##### Debug Logging
+
+Enable debug logging to troubleshoot authentication issues:
+
+```bash
+export LOG_LEVEL=debug
+npm start
+```
+
+This will provide detailed logs of:
+- Authentication strategy selection
+- OAuth flow progression
+- Token acquisition and validation
+- Client registration events
+
+#### Testing
+
+Test the OAuth implementation:
+
+1. Start server with OAuth enabled:
+   ```bash
+   DATAPROC_CONFIG_PATH=./config/oauth-server.json npm start
+   ```
+
+2. Check OAuth metadata:
+   ```bash
+   curl http://localhost:8080/.well-known/oauth-authorization-server
+   ```
+
+3. Test dynamic client registration:
+   ```bash
+   curl -X POST http://localhost:8080/register \
+     -H "Content-Type: application/json" \
+     -d '{"redirect_uris": ["http://localhost:3000/callback"]}'
+   ```
+
+4. Connect Claude Desktop using the server URL:
+   ```
+   http://localhost:8080
+   ```
+
+#### Future Enhancements
+
+- HTTPS support with SSL/TLS configuration
+- JWT-based token validation
+- Advanced client management features
+- Integration with enterprise identity providers
+- Token introspection endpoint
+- PKCE support for enhanced security
+
 ## Implementation Details
 
 ### Environment-Independent Authentication Functions

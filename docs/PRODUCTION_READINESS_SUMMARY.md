@@ -146,6 +146,8 @@ The Dataproc MCP Server has been transformed from a development prototype into a
 - ✅ Application Default Credentials
 - ✅ Workload Identity Federation (ready)
 
+For detailed information on authentication methods, refer to the [Authentication Implementation Guide](AUTHENTICATION_IMPLEMENTATION_GUIDE.md).
+
 ### Security Standards
 - ✅ Input validation on all endpoints
 - ✅ Rate limiting and abuse prevention

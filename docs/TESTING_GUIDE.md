@@ -73,37 +73,7 @@ npm run docs:test-links
 
 ### 1. Authentication Tests (`test:auth`)
 
-Tests all supported authentication methods:
-
-**Service Account Key File Authentication**
-- Valid key file validation
-- Invalid key file rejection
-- Key file format verification
-
-**Service Account Impersonation**
-- Valid impersonation configuration
-- Invalid configuration rejection
-- Target service account validation
-
-**Application Default Credentials (ADC)**
-- ADC availability detection
-- Source identification
-- Fallback behavior
-
-**Credential Expiration**
-- Expired credential detection
-- Fresh credential validation
-- Expiration timeline calculation
-
-**Cross-Environment Authentication**
-- Development environment validation
-- Staging environment validation
-- Production environment validation
-
-**Security Compliance**
-- Compliant credential validation
-- Security violation detection
-- Policy enforcement testing
+For detailed information on authentication methods and testing, refer to the [Authentication Implementation Guide](AUTHENTICATION_IMPLEMENTATION_GUIDE.md).
 
 ### 2. End-to-End Workflow Tests (`test:e2e`)
 

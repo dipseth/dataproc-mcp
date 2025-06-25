@@ -121,10 +121,10 @@ export const clusterTools = [
     },
   },
 
-  // New tool: get Zeppelin notebook URL for a cluster
+  // New tool: get all HTTP endpoints for a cluster
   {
-    name: 'get_zeppelin_url',
-    description: 'Get the Zeppelin notebook URL for a Dataproc cluster (if enabled).',
+    name: 'get_cluster_endpoints',
+    description: 'Get all available HTTP endpoints for a Dataproc cluster.',
     inputSchema: {
       type: 'object',
       properties: {
