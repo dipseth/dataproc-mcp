@@ -542,6 +542,7 @@ export class DataprocHttpServer {
         logger.info('GitHub OAuth setup completed successfully');
       } else {
         // Setup Google OAuth (existing logic)
+<<<<<<< fix/ci-gcp-tests
         if (!authConfig.oauthProxyEndpoints) {
           logger.warn(
             'Google OAuth enabled but missing required oauthProxyEndpoints configuration'
@@ -575,6 +576,10 @@ export class DataprocHttpServer {
           logger.warn(
             'Google OAuth enabled but client ID or secret could not be loaded. OAuth functionality may be limited.'
           );
+=======
+        if (!authConfig.oauthProxyEndpoints || !authConfig.oauthProxyClientId) {
+          logger.warn('Google OAuth enabled but missing required configuration');
+>>>>>>> main
           return;
         }
 
@@ -592,8 +597,13 @@ export class DataprocHttpServer {
             revocationUrl: authConfig.oauthProxyEndpoints.revocationUrl,
           },
           clientStore: clientStore,
+<<<<<<< fix/ci-gcp-tests
           fallbackClientId: googleClientId,
           fallbackClientSecret: googleClientSecret,
+=======
+          fallbackClientId: authConfig.oauthProxyClientId,
+          fallbackClientSecret: authConfig.oauthProxyClientSecret,
+>>>>>>> main
           fallbackRedirectUris: authConfig.oauthProxyRedirectUris,
         });
 
