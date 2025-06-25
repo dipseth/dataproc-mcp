@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- semantic-release-changelog -->
 
+## [4.6.0](https://github.com/dipseth/dataproc-mcp/compare/v4.5.0...v4.6.0) (2025-06-25)
+
+
+### 🚀 Features
+
+* Claude.ai Web App Integration (v4.6.0 Release) ([#35](https://github.com/dipseth/dataproc-mcp/issues/35)) ([8bd23e4](https://github.com/dipseth/dataproc-mcp/commit/8bd23e491a1eb627b85d88ab02a4fd0e7762bd54))
+
+
+### 📚 Documentation
+
+* update documentation for v4.5.0 ([eee6c8a](https://github.com/dipseth/dataproc-mcp/commit/eee6c8ae8489a5a9936d6cd13ab103e6e15ec972))
+
 ## [4.5.0](https://github.com/dipseth/dataproc-mcp/compare/v4.4.0...v4.5.0) (2025-06-17)
 
 
