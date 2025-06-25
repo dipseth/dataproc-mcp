@@ -272,10 +272,18 @@ async function testTemplateFunctionIntegration(context) {
   // Setup realistic test data
   await setupTestData(context);
   
+  // Check if we're in CI environment
+  const isCI = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
+  
   const tests = [
     {
       name: 'jobOutput() - Basic Field Extraction',
       test: async () => {
+        if (isCI) {
+          console.log('⏭️  Skipping GCP-dependent test in CI environment');
+          testResults.skippedTests++;
+          return;
+        }
         const result = await context.templateFunctions.jobOutput(TEST_CONFIG.REAL_JOB_ID, 'status');
         if (!result) throw new Error('jobOutput returned null/undefined');
       }
@@ -283,6 +291,11 @@ async function testTemplateFunctionIntegration(context) {
     {
       name: 'jobOutput() - Nested Field Extraction',
       test: async () => {
+        if (isCI) {
+          console.log('⏭️  Skipping GCP-dependent test in CI environment');
+          testResults.skippedTests++;
+          return;
+        }
         const result = await context.templateFunctions.jobOutput(TEST_CONFIG.REAL_JOB_ID, 'tables[0].rows[0][0]');
         // Should not throw error even if path doesn't exist
       }
@@ -290,6 +303,11 @@ async function testTemplateFunctionIntegration(context) {
     {
       name: 'jobOutput() - Metadata Extraction',
       test: async () => {
+        if (isCI) {
+          console.log('⏭️  Skipping GCP-dependent test in CI environment');
+          testResults.skippedTests++;
+          return;
+        }
         const result = await context.templateFunctions.jobOutput(TEST_CONFIG.REAL_JOB_ID, 'metadata.duration');
         // Should handle gracefully even if metadata doesn't exist
       }
@@ -324,6 +342,8 @@ async function testTemplateFunctionIntegration(context) {
 async function testEndToEndWorkflows(context) {
   console.log('📋 Test Suite 4: End-to-End Workflow Testing');
   console.log('==============================================');
+  
+  const isCI = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
   
   const tests = [
     {
@@ -377,6 +397,11 @@ async function testEndToEndWorkflows(context) {
     {
       name: 'Dynamic Parameter Resolution Pipeline',
       test: async () => {
+        if (isCI) {
+          console.log('⏭️  Skipping GCP-dependent test in CI environment');
+          testResults.skippedTests++;
+          return;
+        }
         const templateParameters = {
           jobStatus: `{{job_output('${TEST_CONFIG.REAL_JOB_ID}', 'status')}}`,
           clusterInfo: `{{qdrant_query('ml cluster', 'clusterName')}}`,
@@ -400,10 +425,17 @@ async function testPerformanceAndReliability(context) {
   console.log('📋 Test Suite 5: Performance and Reliability');
   console.log('=============================================');
   
+  const isCI = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
+  
   const tests = [
     {
       name: 'Concurrent Template Function Calls',
       test: async () => {
+        if (isCI) {
+          console.log('⏭️  Skipping GCP-dependent test in CI environment');
+          testResults.skippedTests++;
+          return;
+        }
         const startTime = Date.now();
         const promises = [];
         
@@ -431,6 +463,11 @@ async function testPerformanceAndReliability(context) {
     {
       name: 'Caching Performance',
       test: async () => {
+        if (isCI) {
+          console.log('⏭️  Skipping GCP-dependent test in CI environment');
+          testResults.skippedTests++;
+          return;
+        }
         const startTime = Date.now();
         
         // First call (cache miss)
@@ -459,6 +496,11 @@ async function testPerformanceAndReliability(context) {
     {
       name: 'Error Handling and Recovery',
       test: async () => {
+        if (isCI) {
+          console.log('⏭️  Skipping GCP-dependent test in CI environment');
+          testResults.skippedTests++;
+          return;
+        }
         // Test with invalid job ID
         try {
           await context.templateFunctions.jobOutput('invalid-job-id', 'status');

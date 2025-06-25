@@ -52,6 +52,13 @@ export class EnhancedOAuthProvider extends ProxyOAuthServerProvider {
   }
 
   /**
+   * Get the fallback client ID (Google OAuth client ID)
+   */
+  public getFallbackClientId(): string | undefined {
+    return this.fallbackClientId;
+  }
+
+  /**
    * Internal method to get client information
    */
   private async getClientInternal(clientId: string) {
