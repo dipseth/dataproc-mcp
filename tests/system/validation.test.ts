@@ -10,7 +10,7 @@ import {
   ListClustersSchema,
   SubmitHiveQuerySchema,
   CreateClusterFromProfileSchema,
-} from '../../src/validation/schemas.js';
+} from '../../src/validation/schemas';
 
 describe('Validation Schemas', () => {
   describe('StartDataprocClusterSchema', () => {
