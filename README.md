@@ -3,11 +3,13 @@
 [![npm version](https://img.shields.io/npm/v/@dipseth/dataproc-mcp-server.svg)](https://www.npmjs.com/package/@dipseth/dataproc-mcp-server)
 [![npm downloads](https://img.shields.io/npm/dm/@dipseth/dataproc-mcp-server.svg)](https://npmjs.org/package/@dipseth/dataproc-mcp-server)
 [![Build Status](https://github.com/dipseth/dataproc-mcp/workflows/%F0%9F%94%84%20Continuous%20Integration/badge.svg)](https://github.com/dipseth/dataproc-mcp/actions)
+[![Release Status](https://github.com/dipseth/dataproc-mcp/workflows/%F0%9F%9A%80%20Release%20%26%20Publish/badge.svg)](https://github.com/dipseth/dataproc-mcp/actions/workflows/release.yml)
 [![Coverage Status](https://coveralls.io/repos/github/dipseth/dataproc-mcp/badge.svg?branch=main)](https://coveralls.io/github/dipseth/dataproc-mcp?branch=main)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/node/v/@dipseth/dataproc-mcp-server.svg)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue.svg)](https://www.typescriptlang.org/)
 [![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-green.svg)](https://modelcontextprotocol.io/)
+[![semantic-release](https://img.shields.io/badge/%20%20%F0%9F%93%A6%F0%9F%9A%80-semantic--release-e10079.svg)](https://github.com/semantic-release/semantic-release)
 
 A production-ready Model Context Protocol (MCP) server for Google Cloud Dataproc operations with intelligent parameter injection, enterprise-grade security, and comprehensive tooling. Designed for seamless integration with **Roo (VS Code)**.
 
