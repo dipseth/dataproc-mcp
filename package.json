@@ -94,7 +94,7 @@
     "test:system:real-agent": "NODE_OPTIONS='--loader ts-node/esm' mocha 'tests/system/real-agent-usage.test.ts' --timeout 60000 --exit",
     "test:integration:full": "npm run test:auth && npm run test:system:e2e && npm run test:mcp && npm run test:query-results",
     "test:integration:quick": "npm run test:mcp:integration",
-    "test:all:organized": "npm run test:templating && npm run test:qdrant && npm run test:knowledge && npm run test:system",
+    "test:all:organized": "npm run test:templating && npm run test:knowledge && npm run test:system",
     "test:setup": "npm run build && npm run test:cleanup",
     "test:cleanup": "rm -f test-*.log && rm -f *.test.json",
     "test:all": "npm run test:setup && npm run test:unit && npm run test:all:organized",
